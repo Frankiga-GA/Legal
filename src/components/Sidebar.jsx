@@ -5,7 +5,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'library', label: 'Biblioteca de Casos', icon: FileText },
-    { id: 'ai-chat', label: 'Asistente IA', icon: MessageSquare },
+    { id: 'ai-chat', label: 'ManagerIA', icon: MessageSquare },
     { id: 'settings', label: 'Configuración', icon: Settings },
   ];
 
