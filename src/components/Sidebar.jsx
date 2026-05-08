@@ -1,11 +1,13 @@
+// src/components/Sidebar.jsx
 import React from 'react';
-import { Scale, LayoutDashboard, MessageSquare, FileText, Settings } from 'lucide-react';
+import { Scale, LayoutDashboard, FileText, MessageSquare, Settings, Newspaper } from 'lucide-react'; // <-- Añadimos Newspaper
 
 const Sidebar = ({ activeTab, setActiveTab }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'library', label: 'Biblioteca de Casos', icon: FileText },
-    { id: 'ai-chat', label: 'ManagerIA', icon: MessageSquare },
+    { id: 'ai-chat', label: 'ManagerBot', icon: MessageSquare },
+    { id: 'elperuano', label: 'El Peruano', icon: Newspaper }, // <-- NUEVA OPCIÓN
     { id: 'settings', label: 'Configuración', icon: Settings },
   ];
 
@@ -13,7 +15,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     <div className="w-64 bg-slate-900 text-white h-screen flex flex-col p-4 shadow-xl">
       <div className="flex items-center gap-2 mb-8 px-2">
         <Scale className="w-8 h-8 text-blue-400" />
-        <h1 className="text-xl font-bold tracking-tight">LegalKMS AI</h1>
+        <h1 className="text-xl font-bold tracking-tight">J&N LegalTech AI</h1>
       </div>
       
       <nav className="flex-1 space-y-2">
@@ -34,7 +36,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
       </nav>
 
       <div className="pt-4 border-t border-slate-800 text-xs text-slate-500 text-center">
-        v1.0.0 - ProInnovate
+        v1.0.0 - ProInnovate MiPyme Digital
       </div>
     </div>
   );
