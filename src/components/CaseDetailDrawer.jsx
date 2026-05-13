@@ -1,23 +1,20 @@
 // src/components/CaseDetailDrawer.jsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X, FileText, Calendar, User, Upload } from 'lucide-react';
 
 const CaseDetailDrawer = ({ caseData, onClose }) => {
-  if (!caseData) return null;
-
-  // Estado local para simular subida de documentos durante la sesión
   const [uploadedDocs, setUploadedDocs] = useState([]);
 
-  // Combinar documentos originales + los que subimos ahora
+  if (!caseData) return null;
+
   const allDocuments = [...caseData.documents, ...uploadedDocs];
 
-  // Función para simular la subida de un archivo
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
       const newDoc = {
         name: file.name,
-        date: new Date().toISOString().split('T')[0], // Fecha de hoy
+        date: new Date().toISOString().split('T')[0],
         type: file.type,
       };
       setUploadedDocs(prev => [...prev, newDoc]);
@@ -25,58 +22,57 @@ const CaseDetailDrawer = ({ caseData, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full sm:w-[500px] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 flex flex-col border-l border-slate-200">
+    <div className="fixed inset-y-0 right-0 w-full sm:w-[500px] bg-brand-dark shadow-2xl transform transition-transform duration-500 ease-out z-50 flex flex-col border-l border-white/[0.05] animate-in slide-in-from-right">
       
-      {/* Header del Drawer */}
-      <div className="p-6 border-b border-slate-200 flex justify-between items-start bg-slate-50">
+      {/* Header */}
+      <div className="p-10 border-b border-white/[0.05] flex justify-between items-start bg-white/[0.01]">
         <div>
-          <h3 className="text-xl font-bold text-slate-800">{caseData.id}</h3>
-          <p className="text-sm text-slate-500 mt-1">{caseData.clientName} • DNI: {caseData.dni}</p>
+          <h3 className="text-3xl font-serif font-medium text-brand-ivory tracking-tight">{caseData.id}</h3>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-brand-accent/40 font-bold mt-2">Expediente Operativo</p>
         </div>
-        <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500">
-          <X className="w-5 h-5" />
+        <button onClick={onClose} className="p-2 hover:bg-white/[0.05] rounded-full transition-colors text-brand-accent/40">
+          <X className="w-6 h-6" />
         </button>
       </div>
 
-      {/* Contenido Scrollable - SIN CHAT */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar">
         
         {/* Info Básica */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-            <div className="flex items-center gap-2 text-slate-500 text-xs uppercase mb-1 font-semibold">
-              <User className="w-4 h-4" /> Cliente
+        <div className="grid grid-cols-2 gap-6">
+          <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05]">
+            <div className="flex items-center gap-2 text-brand-accent/20 text-[9px] uppercase tracking-widest mb-2 font-bold">
+              <User className="w-3 h-3" /> Titular
             </div>
-            <p className="font-medium text-slate-800">{caseData.clientName}</p>
+            <p className="text-sm font-medium text-brand-ivory/80">{caseData.clientName}</p>
           </div>
-          <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-            <div className="flex items-center gap-2 text-slate-500 text-xs uppercase mb-1 font-semibold">
-              <Calendar className="w-4 h-4" /> Actualización
+          <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05]">
+            <div className="flex items-center gap-2 text-brand-accent/20 text-[9px] uppercase tracking-widest mb-2 font-bold">
+              <Calendar className="w-3 h-3" /> Actualización
             </div>
-            <p className="font-medium text-slate-800">{caseData.lastUpdate}</p>
+            <p className="text-sm font-medium text-brand-ivory/80">{caseData.lastUpdate}</p>
           </div>
         </div>
 
         {/* Resumen */}
-        <div>
-          <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-blue-600" /> Resumen del Caso
+        <div className="space-y-4">
+          <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-accent/40 flex items-center gap-2">
+            <FileText className="w-3.5 h-3.5 text-brand-gold" /> Análisis de Materia
           </h4>
-          <p className="text-slate-600 text-sm leading-relaxed bg-blue-50 p-3 rounded-lg border border-blue-100">
+          <div className="text-brand-ivory/70 text-sm leading-relaxed font-light bg-white/[0.01] p-6 rounded-2xl border border-white/[0.05]">
             {caseData.summary}
-          </p>
+          </div>
         </div>
 
         {/* Documentos */}
-        <div>
-          <div className="flex justify-between items-center mb-3">
-            <h4 className="font-semibold text-slate-700 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-600" /> Documentos ({allDocuments.length})
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-accent/40 flex items-center gap-2">
+              <FileText className="w-3.5 h-3.5 text-brand-gold" /> Acervo Probatorio ({allDocuments.length})
             </h4>
-            {/* Input oculto para subir archivos */}
-            <label className="cursor-pointer inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+            <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-brand-ivory text-brand-black text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-white transition-all shadow-lg">
               <Upload className="w-3 h-3" />
-              Subir Doc
+              Vincular
               <input 
                 type="file" 
                 accept=".pdf,.doc,.docx,.jpg,.png" 
@@ -86,27 +82,31 @@ const CaseDetailDrawer = ({ caseData, onClose }) => {
             </label>
           </div>
           
-          <ul className="space-y-2">
+          <div className="space-y-2">
             {allDocuments.length > 0 ? (
               allDocuments.map((doc, idx) => (
-                <li key={idx} className="group flex justify-between items-center p-2 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-200 transition-all">
-                  <div className="flex items-center gap-2">
-                    <span className="text-blue-600">📄</span>
-                    <span className="text-sm text-slate-700 font-medium truncate max-w-[200px]">{doc.name}</span>
+                <div key={idx} className="group flex justify-between items-center p-4 hover:bg-white/[0.03] rounded-xl border border-white/[0.05] transition-all cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-white/[0.03] flex items-center justify-center text-brand-accent/20 group-hover:text-brand-gold transition-colors">
+                       <FileText className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs text-brand-ivory/60 font-light truncate max-w-[200px]">{doc.name}</span>
                   </div>
-                  <span className="text-slate-400 text-xs">{doc.date}</span>
-                </li>
+                  <span className="text-[9px] uppercase tracking-widest text-brand-accent/20 font-bold">{doc.date}</span>
+                </div>
               ))
             ) : (
-              <li className="text-slate-400 text-sm italic text-center py-4">No hay documentos adjuntos.</li>
+              <p className="text-brand-accent/20 text-xs italic text-center py-8">No se han vinculado archivos al expediente.</p>
             )}
-          </ul>
+          </div>
         </div>
       </div>
 
-      {/* Footer opcional o espacio vacío */}
-      <div className="p-4 bg-slate-50 border-t border-slate-200 text-center text-xs text-slate-500">
-        Usa el asistente IA flotante (esquina inferior derecha) para preguntar sobre este caso.
+      {/* Footer */}
+      <div className="p-8 bg-white/[0.01] border-t border-white/[0.05] text-center">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-brand-accent/20 font-bold">
+          Conexión Segura de Datos &bull; Legal KMS
+        </p>
       </div>
     </div>
   );

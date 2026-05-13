@@ -1,125 +1,112 @@
-// src/components/Dashboard.jsx
-import React from 'react';
-import { FileText, Clock, BrainCircuit, TrendingUp, AlertCircle, CheckCircle, ArrowRight } from 'lucide-react';
+import { FileText, Database, Zap, BrainCircuit, ArrowRight, MessageSquare } from 'lucide-react';
 
 const Dashboard = ({ setActiveTab }) => {
-  // Definimos los datos de las tarjetas según la imagen
   const stats = [
-    { 
-      title: "Casos Activos", 
-      value: "12", 
-      icon: FileText, 
-      color: "blue", 
-      trend: "Gestión centralizada",
-      bgGradient: "from-blue-50/80 to-white",
-      border: "border-blue-200",
-      text: "text-blue-600",
-      iconBg: "bg-blue-100",
-      glowColor: "bg-blue-400"
-    },
-    { 
-      title: "Docs Indexados", 
-      value: "145", 
-      icon: FileText, 
-      color: "indigo", 
-      trend: "Meta: 100+ (Cumplido)",
-      bgGradient: "from-indigo-50/80 to-white",
-      border: "border-indigo-200",
-      text: "text-indigo-600",
-      iconBg: "bg-indigo-100",
-      glowColor: "bg-indigo-400"
-    },
-    { 
-      title: "Ahorro de Tiempo", 
-      value: "32h", 
-      icon: Clock, 
-      color: "emerald", 
-      trend: "Este mes",
-      bgGradient: "from-emerald-50/80 to-white",
-      border: "border-emerald-200",
-      text: "text-emerald-600",
-      iconBg: "bg-emerald-100",
-      glowColor: "bg-emerald-400"
-    },
-    { 
-      title: "Bots IA Activos", 
-      value: "3", 
-      icon: BrainCircuit, 
-      color: "purple", 
-      trend: "Asistencia automatizada",
-      bgGradient: "from-purple-50/80 to-white",
-      border: "border-purple-200",
-      text: "text-purple-600",
-      iconBg: "bg-purple-100",
-      glowColor: "bg-purple-400"
-    }
+    { title: "Casos Activos", value: "12", icon: FileText },
+    { title: "Docs Indexados", value: "145", icon: Database },
+    { title: "Eficiencia", value: "32%", icon: Zap },
+    { title: "Instancias IA", value: "03", icon: BrainCircuit }
   ];
 
   const recentActivity = [
-    { id: 1, type: 'case', title: 'Nuevo caso creado: EXP-2026-004', user: 'Juan Pérez', time: 'Hace 2 horas' },
-    { id: 2, type: 'bot', title: 'Bot "Experto Laboral" entrenado con 5 nuevos docs', user: 'Admin', time: 'Hace 4 horas' },
-    { id: 3, type: 'doc', title: 'Documento subido: Contrato_Alquiler_MariaGomez.pdf', user: 'María Gómez', time: 'Hace 6 horas' },
+    { id: 1, title: 'Análisis completo: Caso #2026-04', time: 'hace 2h' },
+    { id: 2, title: 'Nueva fuente añadida a la Bóveda', time: 'hace 4h' },
+    { id: 3, title: 'Borrador de contrato generado', time: 'hace 6h' },
   ];
 
   return (
-    <div className="p-8 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="p-8 md:p-12 min-h-screen relative">
+      {/* Background Glow */}
+      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-brand-gold/5 rounded-full blur-[150px] pointer-events-none"></div>
+
+      <div className="max-w-6xl mx-auto space-y-16 relative z-10">
         
         {/* Header */}
-        <header>
-          <h1 className="text-3xl font-bold text-slate-800">Panel General</h1>
-          <p className="text-slate-500 mt-1">Resumen de productividad legal y estado del sistema J&N.</p>
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/[0.05] pb-10">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-gold/10 rounded-full border border-brand-gold/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-gold animate-pulse"></span>
+              <span className="text-[9px] uppercase tracking-widest text-brand-gold font-bold">Workspace Sincronizado</span>
+            </div>
+            <h1 className="text-5xl font-serif font-medium tracking-tight text-brand-ivory">Centro de Mando</h1>
+            <p className="text-brand-accent/40 font-light text-sm tracking-wide">Monitoreo heurístico y gestión operativa de alta precisión.</p>
+          </div>
+          <div className="text-[10px] uppercase tracking-[0.3em] font-bold text-brand-gold bg-brand-gold/5 px-6 py-3 rounded-xl border border-brand-gold/10">
+            Mayo 2026
+          </div>
         </header>
 
-        {/* TARJETAS ESTILO IMAGEN REFERENCIA */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {stats.map((stat, index) => (
-            <FuturisticCard key={index} stat={stat} />
+            <div key={index} className="glass-card p-10 rounded-3xl group cursor-pointer border border-white/[0.05] hover:border-brand-gold/30 transition-all bg-white/[0.01]">
+              <div className="flex justify-between items-start mb-8">
+                <div className="p-3 bg-brand-gold/10 rounded-xl group-hover:bg-brand-gold transition-all">
+                  <stat.icon className="w-6 h-6 text-brand-gold group-hover:text-brand-black transition-colors" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-5xl font-serif font-medium text-brand-ivory tracking-tighter">{stat.value}</h2>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-brand-accent/40 font-bold">{stat.title}</p>
+              </div>
+            </div>
           ))}
         </div>
 
-        {/* Sección Inferior: Actividades + Acciones */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Content Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 pt-8">
           
-          {/* Actividades Recientes */}
-          <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-blue-600" /> Actividad Reciente
-            </h3>
-            <div className="space-y-4">
+          {/* Recent Activity */}
+          <div className="lg:col-span-2 space-y-10">
+            <div className="flex items-center justify-between">
+              <h3 className="text-2xl font-serif font-medium text-brand-ivory">Log de Operaciones</h3>
+              <button className="text-[10px] uppercase tracking-widest text-brand-gold font-bold hover:text-brand-ivory transition-colors">Ver Historial Completo</button>
+            </div>
+            
+            <div className="space-y-px rounded-3xl overflow-hidden border border-white/[0.05] bg-white/[0.01]">
               {recentActivity.map(activity => (
-                <div key={activity.id} className="flex items-start gap-3 p-3 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-50 last:border-0">
-                  <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${
-                    activity.type === 'case' ? 'bg-blue-500' :
-                    activity.type === 'bot' ? 'bg-purple-500' :
-                    activity.type === 'doc' ? 'bg-green-500' : 'bg-yellow-500'
-                  }`}></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-800">{activity.title}</p>
-                    <p className="text-xs text-slate-500">{activity.user} • {activity.time}</p>
+                <div key={activity.id} className="flex items-center justify-between p-6 bg-white/[0.01] hover:bg-white/[0.03] transition-all group cursor-pointer border-b border-white/[0.03] last:border-0">
+                  <div className="flex items-center gap-5">
+                    <div className="w-2 h-2 rounded-full bg-brand-gold opacity-20 group-hover:opacity-100 group-hover:shadow-[0_0_8px_rgba(197,160,89,0.8)] transition-all"></div>
+                    <span className="text-sm font-light text-brand-ivory/70 group-hover:text-brand-ivory transition-colors">{activity.title}</span>
                   </div>
+                  <span className="text-[10px] uppercase tracking-widest text-brand-accent/20 font-bold">{activity.time}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Acciones Rápidas */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-600" /> Acciones Rápidas
-            </h3>
-            <div className="space-y-3">
-              <QuickActionBtn label="Crear Nuevo Caso" icon={FileText} color="blue" onClick={() => setActiveTab('library')} />
-              <QuickActionBtn label="Entrenar Nuevo Bot" icon={BrainCircuit} color="purple" onClick={() => setActiveTab('ai-chat')} />
-              <QuickActionBtn label="Ver Casos Pendientes" icon={AlertCircle} color="yellow" onClick={() => setActiveTab('library')} />
+          {/* Quick Actions */}
+          <div className="space-y-10">
+            <h3 className="text-2xl font-serif font-medium text-brand-ivory">Ejecución</h3>
+            <div className="space-y-4">
+              <button 
+                onClick={() => setActiveTab('library')}
+                className="w-full flex items-center justify-between p-6 bg-brand-ivory text-brand-black rounded-2xl hover:bg-white transition-all group shadow-xl"
+              >
+                <span className="text-xs uppercase tracking-widest font-bold">Desplegar Bóveda</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </button>
+              <button 
+                onClick={() => setActiveTab('ai-chat')}
+                className="w-full flex items-center justify-between p-6 bg-brand-gold/10 border border-brand-gold/20 text-brand-gold rounded-2xl hover:bg-brand-gold hover:text-brand-black transition-all group"
+              >
+                <span className="text-xs uppercase tracking-widest font-bold">Sincronizar IA</span>
+                <MessageSquare className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              </button>
             </div>
-            <div className="mt-6 pt-6 border-t border-slate-100">
-              <h4 className="text-sm font-semibold text-slate-700 mb-2">Estado del Sistema</h4>
-              <div className="flex items-center gap-2 text-xs text-green-600">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                Todos los servicios operativos
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1">J&N Asesoría Legal - v1.0.0</p>
+            
+            <div className="p-8 rounded-3xl border border-white/[0.05] bg-white/[0.01] space-y-4 overflow-hidden relative">
+               <div className="absolute inset-0 bg-brand-gold/5"></div>
+               <div className="relative z-10 space-y-4">
+                 <div className="flex items-center gap-3">
+                   <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.6)]"></div>
+                   <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-accent/40">Soberanía de Datos</span>
+                 </div>
+                 <p className="text-[12px] text-brand-accent/60 leading-relaxed font-light italic">
+                   "La integridad de los datos legales está garantizada bajo el protocolo de encriptación J&N-V4."
+                 </p>
+               </div>
             </div>
           </div>
 
@@ -128,51 +115,5 @@ const Dashboard = ({ setActiveTab }) => {
     </div>
   );
 };
-
-// Componente de Tarjeta Estilo "Futurista/Glassmorphism" (Réplica de la imagen)
-const FuturisticCard = ({ stat }) => {
-  const Icon = stat.icon;
-  
-  return (
-    <div className={`relative overflow-hidden rounded-2xl border ${stat.border} bg-gradient-to-br ${stat.bgGradient} p-6 shadow-lg hover:shadow-xl transition-all duration-300 group`}>
-      
-      {/* Línea de brillo superior (efecto glass) */}
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/70 to-transparent opacity-60"></div>
-      
-      {/* Contenido Principal */}
-      <div className="flex justify-between items-start mb-4 relative z-10">
-        <div>
-          <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">{stat.title}</p>
-          <h2 className={`text-4xl font-extrabold mt-2 ${stat.text}`}>{stat.value}</h2>
-        </div>
-        <div className={`p-3 rounded-xl ${stat.iconBg} ${stat.text} shadow-sm group-hover:scale-110 transition-transform duration-300`}>
-          <Icon className="w-6 h-6" />
-        </div>
-      </div>
-
-      {/* Indicador de tendencia */}
-      <div className="flex items-center gap-2 mt-4 relative z-10">
-        <div className={`h-1.5 w-1.5 rounded-full ${stat.text.replace('text-', 'bg-')}`}></div>
-        <p className="text-xs font-medium text-slate-600">{stat.trend}</p>
-      </div>
-
-      {/* Decoración de fondo: Círculo difuminado (Glow Effect) */}
-      <div className={`absolute -bottom-6 -right-6 w-32 h-32 rounded-full ${stat.glowColor} opacity-10 blur-3xl group-hover:opacity-20 transition-opacity duration-300`}></div>
-      
-      {/* Decoración adicional: Pequeño círculo secundario */}
-      <div className={`absolute top-1/2 -left-4 w-16 h-16 rounded-full ${stat.glowColor} opacity-5 blur-2xl`}></div>
-    </div>
-  );
-};
-
-const QuickActionBtn = ({ label, icon: Icon, color, onClick }) => (
-  <button onClick={onClick} className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border border-slate-200 hover:border-${color}-500 hover:bg-${color}-50 transition-all group`}>
-    <div className="flex items-center gap-3">
-      <Icon className={`w-5 h-5 text-${color}-600 group-hover:scale-110 transition-transform`} />
-      <span className="text-sm font-medium text-slate-700">{label}</span>
-    </div>
-    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-${color}-600" />
-  </button>
-);
 
 export default Dashboard;

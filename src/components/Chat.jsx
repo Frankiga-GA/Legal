@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles } from 'lucide-react';
 import { mockCases, mockAIResponses } from '../data/mockData'; // <-- CORREGIDO: solo "../" no "../../../"
 

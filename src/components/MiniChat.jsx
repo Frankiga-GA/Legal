@@ -1,5 +1,5 @@
 // src/components/MiniChat.jsx
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User } from 'lucide-react';
 
 const MiniChat = ({ caseData }) => {
