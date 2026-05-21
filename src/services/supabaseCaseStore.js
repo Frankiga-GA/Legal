@@ -2,6 +2,14 @@ import { isSupabaseConfigured, supabase } from '../utils/supabase';
 
 const TABLE_NAME = 'cases';
 
+const getCurrentUserId = async () => {
+  if (!supabase) return null;
+
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  return data.user?.id || null;
+};
+
 const toAppCase = (row) => ({
   id: row.id,
   clientName: row.client_name,
@@ -34,9 +42,13 @@ export const canUseSupabaseCases = () => isSupabaseConfigured && Boolean(supabas
 export const fetchSupabaseCases = async () => {
   if (!canUseSupabaseCases()) return { cases: [], error: null, skipped: true };
 
+  const userId = await getCurrentUserId();
+  if (!userId) return { cases: [], error: null, skipped: true };
+
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .select('*')
+    .eq('user_id', userId)
     .order('last_update', { ascending: false });
 
   if (error) return { cases: [], error, skipped: false };
@@ -46,9 +58,12 @@ export const fetchSupabaseCases = async () => {
 export const upsertSupabaseCase = async (caseData) => {
   if (!canUseSupabaseCases()) return { error: null, skipped: true };
 
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: null, skipped: true };
+
   const { error } = await supabase
     .from(TABLE_NAME)
-    .upsert(toDbCase(caseData), { onConflict: 'id' });
+    .upsert({ ...toDbCase(caseData), user_id: userId }, { onConflict: 'id' });
 
   return { error, skipped: false };
 };
@@ -56,16 +71,19 @@ export const upsertSupabaseCase = async (caseData) => {
 export const replaceSupabaseCases = async (cases) => {
   if (!canUseSupabaseCases()) return { error: null, skipped: true };
 
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: null, skipped: true };
+
   const { error: deleteError } = await supabase
     .from(TABLE_NAME)
     .delete()
-    .neq('id', '');
+    .eq('user_id', userId);
 
   if (deleteError) return { error: deleteError, skipped: false };
 
   const { error } = await supabase
     .from(TABLE_NAME)
-    .insert(cases.map(toDbCase));
+    .insert(cases.map((caseData) => ({ ...toDbCase(caseData), user_id: userId })));
 
   return { error, skipped: false };
 };
