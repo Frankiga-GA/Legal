@@ -111,3 +111,86 @@ export const askGeminiAboutCase = async ({
   if (!text) throw new Error('Gemini devolvio una respuesta vacia.');
   return text;
 };
+
+const buildRegistryContext = ({ item, cases }) => ({
+  registroOficial: {
+    titulo: item.title,
+    fecha: item.date,
+    tipo: item.type,
+    fuente: item.source,
+    entidad: item.entity,
+    resumen: item.summary,
+    impactoBase: item.impact,
+    url: item.url,
+    materia: item.category,
+    urgencia: item.urgency,
+  },
+  expedientesDisponibles: cases.map((caseItem) => ({
+    id: caseItem.id,
+    cliente: caseItem.clientName,
+    materia: caseItem.type,
+    estado: caseItem.status,
+    resumen: caseItem.summary,
+    ultimaActualizacion: caseItem.lastUpdate,
+  })),
+});
+
+const buildRegistryPrompt = (context) => `
+Eres LUSTI, un analista legal peruano para estudios juridicos.
+Analiza el registro oficial con prudencia: si no tienes texto completo, dilo claramente y trabaja solo con el titulo, resumen y metadatos entregados.
+No inventes articulos, plazos ni contenido no disponible.
+
+Entrega la respuesta en este formato:
+Resumen legal:
+Impacto probable:
+Materias afectadas:
+Expedientes sugeridos:
+Acciones recomendadas:
+Datos faltantes:
+
+Contexto:
+${JSON.stringify(context, null, 2)}
+`;
+
+export const analyzeOfficialRegistryItem = async ({ item, cases }) => {
+  if (!isGeminiConfigured) {
+    throw new Error('Gemini no esta configurado.');
+  }
+
+  const context = buildRegistryContext({ item, cases });
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: buildRegistryPrompt(context) }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          topP: 0.9,
+          maxOutputTokens: 1000,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Gemini no pudo analizar el registro.');
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text)
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+
+  if (!text) throw new Error('Gemini devolvio un analisis vacio.');
+  return text;
+};

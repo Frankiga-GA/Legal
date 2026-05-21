@@ -21,6 +21,7 @@ import {
   loadSavedRegistryItems,
   saveRegistryItem,
 } from '../services/savedRegistryStore';
+import { analyzeOfficialRegistryItem, isGeminiConfigured } from '../services/geminiService';
 
 const ElPeruano = () => {
   const [items, setItems] = useState(() => getOfficialRegistryFallbackItems());
@@ -309,9 +310,27 @@ const ElPeruano = () => {
 
 const RegistryCard = ({ item, cases, onSave, onLink, isSaved }) => {
   const [selectedCaseId, setSelectedCaseId] = useState('');
+  const [aiAnalysis, setAiAnalysis] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const relatedCases = getRelatedCases(item, cases);
   const Icon = item.type === 'Jurisprudencia' ? Gavel : FileText;
   const linkOptions = relatedCases.length > 0 ? relatedCases : cases;
+
+  const handleAnalyze = async () => {
+    if (isAnalyzing) return;
+
+    setIsAnalyzing(true);
+
+    try {
+      const analysis = await analyzeOfficialRegistryItem({ item, cases });
+      setAiAnalysis(analysis);
+    } catch (error) {
+      console.warn('Gemini no pudo analizar el registro. Usando analisis local.', error);
+      setAiAnalysis(buildLocalRegistryAnalysis(item, relatedCases));
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   return (
     <article className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-6 transition-colors hover:border-brand-gold/20 hover:bg-white/[0.025]">
@@ -357,6 +376,20 @@ const RegistryCard = ({ item, cases, onSave, onLink, isSaved }) => {
         )}
       </div>
 
+      {aiAnalysis && (
+        <div className="mt-5 rounded-lg border border-brand-gold/15 bg-brand-gold/[0.04] p-4">
+          <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-gold">
+            <Bot className="h-4 w-4" />
+            Analisis IA
+          </div>
+          <div className="space-y-2 text-sm font-light leading-6 text-brand-ivory/75">
+            {aiAnalysis.split('\n').filter(Boolean).map((line, index) => (
+              <p key={index}>{line}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-6 flex flex-col gap-3 border-t border-white/[0.05] pt-5 sm:flex-row sm:items-center sm:justify-between">
         <a
           href={item.url}
@@ -368,6 +401,15 @@ const RegistryCard = ({ item, cases, onSave, onLink, isSaved }) => {
           <ExternalLink className="h-4 w-4" />
         </a>
         <div className="flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            disabled={isAnalyzing}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-gold/20 bg-brand-gold/10 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-brand-gold transition-colors hover:bg-brand-gold/15 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Bot className="h-4 w-4" />
+            {isAnalyzing ? 'Analizando' : isGeminiConfigured ? 'Analizar IA' : 'Analisis local'}
+          </button>
           <label className="relative min-w-[220px] rounded-lg border border-white/[0.08] bg-white/[0.02] px-3">
             <select
               value={selectedCaseId}
@@ -470,6 +512,23 @@ const getRelatedCases = (item, cases) => {
     })
     .slice(0, 4);
 };
+
+const buildLocalRegistryAnalysis = (item, relatedCases) => [
+  'Resumen legal:',
+  item.summary || 'No hay resumen disponible; revisar la fuente oficial para validar el contenido completo.',
+  'Impacto probable:',
+  item.impact || `Puede tener impacto en materia ${item.category}.`,
+  'Materias afectadas:',
+  item.category || 'General',
+  'Expedientes sugeridos:',
+  relatedCases.length
+    ? relatedCases.map((caseItem) => `${caseItem.id} - ${caseItem.type}`).join(', ')
+    : 'No hay expedientes sugeridos por materia en este momento.',
+  'Acciones recomendadas:',
+  'Guardar el registro, revisar la fuente oficial y vincularlo al expediente si afecta estrategia, plazos o documentos.',
+  'Datos faltantes:',
+  'Texto completo de la norma y validacion juridica final del abogado responsable.',
+].join('\n');
 
 const formatCheckedAt = (value) => {
   if (!value) return '';
