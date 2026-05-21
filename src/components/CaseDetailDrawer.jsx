@@ -13,6 +13,7 @@ import {
   User,
   X,
 } from 'lucide-react';
+import { askGeminiAboutCase, isGeminiConfigured } from '../services/geminiService';
 
 const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
   const [activeTab, setActiveTab] = useState('summary');
@@ -23,6 +24,7 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
     priority: 'Media',
   });
   const [aiInput, setAiInput] = useState('');
+  const [isAiThinking, setIsAiThinking] = useState(false);
   const [aiMessages, setAiMessages] = useState([
     {
       role: 'ai',
@@ -91,19 +93,51 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
     setDeadlineForm({ title: '', date: '', priority: 'Media' });
   };
 
-  const handleAskAi = (e) => {
-    e.preventDefault();
-    if (!aiInput.trim()) return;
+  const getAiResponse = async (question) => {
+    const fallback = () => buildCaseResponse(question, caseData, documents, notes, importantDates, officialReferences);
 
-    const question = aiInput.trim();
-    const response = buildCaseResponse(question, caseData, documents, notes, importantDates, officialReferences);
+    if (!isGeminiConfigured) return fallback();
+
+    try {
+      return await askGeminiAboutCase({
+        question,
+        caseData,
+        documents,
+        notes,
+        importantDates,
+        officialReferences,
+      });
+    } catch (error) {
+      console.warn('Gemini no pudo responder. Usando IA local.', error);
+      return `${fallback()}\n\nNota: Gemini no respondio en este intento, asi que use el analisis local de LUSTI.`;
+    }
+  };
+
+  const submitAiQuestion = async (question) => {
+    if (!question.trim() || isAiThinking) return;
 
     setAiMessages(prev => [
       ...prev,
       { role: 'user', content: question },
+    ]);
+    setIsAiThinking(true);
+
+    const response = await getAiResponse(question);
+
+    setAiMessages(prev => [
+      ...prev,
       { role: 'ai', content: response },
     ]);
+    setIsAiThinking(false);
+  };
+
+  const handleAskAi = async (e) => {
+    e.preventDefault();
+    if (!aiInput.trim()) return;
+
+    const question = aiInput.trim();
     setAiInput('');
+    await submitAiQuestion(question);
   };
 
   const tabs = [
@@ -331,7 +365,9 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
                 <div>
                   <h4 className="text-lg font-serif text-brand-ivory">IA del expediente</h4>
                   <p className="mt-1 text-xs text-brand-accent/45">
-                    Responde usando los datos visibles del caso. La conexion a IA real vendra en la siguiente fase.
+                    {isGeminiConfigured
+                      ? 'Conectada a Gemini y preparada para usar resumen, documentos, fechas, notas y normas vinculadas.'
+                      : 'Responde con IA local. Agrega VITE_GEMINI_API_KEY para activar Gemini.'}
                   </p>
                 </div>
                 <div className="rounded-lg bg-brand-gold/10 p-3 text-brand-gold">
@@ -354,6 +390,13 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
                   </div>
                 </div>
               ))}
+              {isAiThinking && (
+                <div className="flex justify-start">
+                  <div className="rounded-lg border border-white/[0.06] bg-brand-black/30 px-4 py-3 text-sm leading-6 text-brand-accent/60">
+                    Analizando expediente con IA...
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-white/[0.06] p-4">
@@ -369,14 +412,8 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
                   <button
                     key={prompt}
                     type="button"
-                    onClick={() => {
-                      const response = buildCaseResponse(prompt, caseData, documents, notes, importantDates, officialReferences);
-                      setAiMessages(prev => [
-                        ...prev,
-                        { role: 'user', content: prompt },
-                        { role: 'ai', content: response },
-                      ]);
-                    }}
+                    disabled={isAiThinking}
+                    onClick={() => submitAiQuestion(prompt)}
                     className="rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-brand-accent/60 transition-colors hover:border-brand-gold/25 hover:text-brand-ivory"
                   >
                     {prompt}
@@ -393,9 +430,10 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
                 />
                 <button
                   type="submit"
+                  disabled={isAiThinking}
                   className="rounded-lg bg-brand-ivory px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-brand-black transition-colors hover:bg-white"
                 >
-                  Enviar
+                  {isAiThinking ? '...' : 'Enviar'}
                 </button>
               </form>
             </div>
