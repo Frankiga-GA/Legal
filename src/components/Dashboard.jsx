@@ -83,7 +83,7 @@ const Dashboard = ({ setActiveTab }) => {
     { label: 'Nuevo expediente', icon: Plus, tab: 'library', primary: true },
     { label: 'Subir documento', icon: UploadCloud, tab: 'library' },
     { label: 'Consultar IA', icon: MessageSquare, tab: 'ai-chat' },
-    { label: 'Ver alertas legales', icon: Newspaper, tab: 'elperuano' },
+    { label: 'Monitor judicial', icon: Newspaper, tab: 'monitor' },
   ];
 
   return (
@@ -245,7 +245,7 @@ const Dashboard = ({ setActiveTab }) => {
               <p className="mt-1 text-xs text-brand-accent/45">Normas, jurisprudencia y movimientos internos relevantes.</p>
             </div>
             <button
-              onClick={() => setActiveTab('elperuano')}
+              onClick={() => setActiveTab('monitor')}
               className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-brand-gold transition-colors hover:text-brand-ivory"
             >
               Ver monitor legal <ArrowRight className="h-4 w-4" />

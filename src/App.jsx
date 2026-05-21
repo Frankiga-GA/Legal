@@ -10,6 +10,7 @@ import Settings from './components/Settings';
 import LoginPage from './components/LoginPage';
 import LandingPage from './components/LandingPage';
 import ElPeruano from './components/ElPeruano';
+import LegalMonitor from './components/LegalMonitor';
 import { getCurrentSession, onAuthStateChange, signOut } from './services/authService';
 
 function App() {
@@ -62,6 +63,7 @@ function App() {
     switch (activeTab) {
       case 'dashboard': return <Dashboard setActiveTab={setActiveTab} />;
       case 'library': return <CaseLibrary />;
+      case 'monitor': return <LegalMonitor setActiveTab={setActiveTab} />;
       case 'ai-chat': return <ManagerBot />;
       case 'elperuano': return <ElPeruano />;
       case 'settings': return <Settings />;

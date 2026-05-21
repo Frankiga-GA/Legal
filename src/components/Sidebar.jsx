@@ -1,6 +1,7 @@
 // src/components/Sidebar.jsx
 import {
   FileText,
+  FileSearch,
   LayoutDashboard,
   LogOut,
   MessageSquare,
@@ -13,6 +14,7 @@ const Sidebar = ({ activeTab, setActiveTab, onHome, onLogout, userEmail }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Panel Control', icon: LayoutDashboard },
     { id: 'library', label: 'Boveda', icon: FileText },
+    { id: 'monitor', label: 'Monitor Judicial', icon: FileSearch },
     { id: 'ai-chat', label: 'Asistente', icon: MessageSquare },
     { id: 'elperuano', label: 'Registros Oficiales', icon: Newspaper },
     { id: 'settings', label: 'Preferencias', icon: Settings },
