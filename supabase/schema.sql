@@ -10,6 +10,7 @@ create table if not exists public.cases (
   documents jsonb not null default '[]'::jsonb,
   notes jsonb not null default '[]'::jsonb,
   important_dates jsonb not null default '[]'::jsonb,
+  official_references jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

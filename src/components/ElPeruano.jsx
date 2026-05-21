@@ -14,13 +14,14 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { getCases } from '../services/caseStore';
+import { loadCases, updateCaseAsync } from '../services/caseStore';
 import { fetchOfficialRegistryItems, getOfficialRegistryFallbackItems } from '../services/officialRegistryService';
 
 const SAVED_REGISTRY_KEY = 'lusti-saved-official-registry';
 
 const ElPeruano = () => {
   const [items, setItems] = useState(() => getOfficialRegistryFallbackItems());
-  const [cases] = useState(() => getCases());
+  const [cases, setCases] = useState(() => getCases());
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Todas');
@@ -49,6 +50,10 @@ const ElPeruano = () => {
 
   useEffect(() => {
     let isMounted = true;
+
+    loadCases().then((result) => {
+      if (isMounted) setCases(result.cases);
+    });
 
     fetchOfficialRegistryItems().then((result) => {
       if (isMounted) applyRegistryResult(result);
@@ -110,6 +115,42 @@ const ElPeruano = () => {
     setSavedItems(nextItems);
     window.localStorage.setItem(SAVED_REGISTRY_KEY, JSON.stringify(nextItems));
     setStatusMessage(exists ? 'Ese registro ya estaba guardado.' : 'Registro oficial guardado en la biblioteca normativa local.');
+  };
+
+  const linkRegistryToCase = async (item, caseId) => {
+    const targetCase = cases.find((caseItem) => caseItem.id === caseId);
+    if (!targetCase) return;
+
+    const references = Array.isArray(targetCase.officialReferences) ? targetCase.officialReferences : [];
+    const exists = references.some((reference) => reference.id === item.id);
+
+    if (exists) {
+      setStatusMessage(`El registro ya estaba vinculado a ${caseId}.`);
+      return;
+    }
+
+    const reference = {
+      id: item.id,
+      title: item.title,
+      source: item.source,
+      entity: item.entity,
+      type: item.type,
+      category: item.category,
+      date: item.date,
+      url: item.url,
+      impact: item.impact,
+      linkedAt: new Date().toISOString(),
+    };
+
+    const result = await updateCaseAsync(cases, caseId, {
+      officialReferences: [reference, ...references],
+    });
+
+    setCases(result.cases);
+    setStatusMessage(result.error
+      ? `Registro vinculado localmente a ${caseId}. Supabase no respondio.`
+      : `Registro oficial vinculado a ${caseId}.`
+    );
   };
 
   return (
@@ -188,6 +229,7 @@ const ElPeruano = () => {
                   item={item}
                   cases={cases}
                   onSave={() => saveRegistryItem(item)}
+                  onLink={linkRegistryToCase}
                   isSaved={savedItems.some((saved) => saved.id === item.id)}
                 />
               ))
@@ -215,9 +257,9 @@ const ElPeruano = () => {
                   Cada registro se clasifica por materia y se cruza con tus expedientes para sugerir donde puede haber impacto.
                 </p>
                 <div className="rounded-lg border border-white/[0.06] bg-brand-black/30 p-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-gold">Siguiente fase</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-gold">Proxima mejora</p>
                   <p className="mt-2 text-sm text-brand-ivory/80">
-                    Conectar un backend propio para extraer texto completo, resumirlo con IA y guardar alertas por usuario en Supabase.
+                    LUSTI analizara automaticamente cada norma, generara un resumen legal y avisara que expedientes podrian verse afectados.
                   </p>
                 </div>
               </div>
@@ -253,9 +295,11 @@ const ElPeruano = () => {
   );
 };
 
-const RegistryCard = ({ item, cases, onSave, isSaved }) => {
+const RegistryCard = ({ item, cases, onSave, onLink, isSaved }) => {
+  const [selectedCaseId, setSelectedCaseId] = useState('');
   const relatedCases = getRelatedCases(item, cases);
   const Icon = item.type === 'Jurisprudencia' ? Gavel : FileText;
+  const linkOptions = relatedCases.length > 0 ? relatedCases : cases;
 
   return (
     <article className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-6 transition-colors hover:border-brand-gold/20 hover:bg-white/[0.025]">
@@ -311,18 +355,46 @@ const RegistryCard = ({ item, cases, onSave, isSaved }) => {
           Ver fuente oficial
           <ExternalLink className="h-4 w-4" />
         </a>
-        <button
-          type="button"
-          onClick={onSave}
-          className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] transition-colors ${
-            isSaved
-              ? 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-300'
-              : 'bg-brand-ivory text-brand-black hover:bg-white'
-          }`}
-        >
-          <Archive className="h-4 w-4" />
-          {isSaved ? 'Guardado' : 'Guardar registro'}
-        </button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <label className="relative min-w-[220px] rounded-lg border border-white/[0.08] bg-white/[0.02] px-3">
+            <select
+              value={selectedCaseId}
+              onChange={(event) => setSelectedCaseId(event.target.value)}
+              className="h-full w-full bg-transparent py-3 text-xs font-bold uppercase tracking-[0.12em] text-brand-accent/70 outline-none"
+            >
+              <option value="" className="bg-brand-dark">Elegir expediente</option>
+              {linkOptions.map((caseItem) => (
+                <option key={caseItem.id} value={caseItem.id} className="bg-brand-dark">
+                  {caseItem.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={!selectedCaseId}
+            onClick={() => {
+              onLink(item, selectedCaseId);
+              setSelectedCaseId('');
+            }}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-gold/20 bg-brand-gold/10 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-brand-gold transition-colors hover:bg-brand-gold/15 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Link2 className="h-4 w-4" />
+            Vincular
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-[11px] font-bold uppercase tracking-[0.14em] transition-colors ${
+              isSaved
+                ? 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-300'
+                : 'bg-brand-ivory text-brand-black hover:bg-white'
+            }`}
+          >
+            <Archive className="h-4 w-4" />
+            {isSaved ? 'Guardado' : 'Guardar'}
+          </button>
+        </div>
       </div>
     </article>
   );

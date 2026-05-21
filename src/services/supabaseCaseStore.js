@@ -21,6 +21,7 @@ const toAppCase = (row) => ({
   documents: Array.isArray(row.documents) ? row.documents : [],
   notes: Array.isArray(row.notes) ? row.notes : [],
   importantDates: Array.isArray(row.important_dates) ? row.important_dates : [],
+  officialReferences: Array.isArray(row.official_references) ? row.official_references : [],
 });
 
 const toDbCase = (caseData) => ({
@@ -34,6 +35,7 @@ const toDbCase = (caseData) => ({
   documents: caseData.documents || [],
   notes: caseData.notes || [],
   important_dates: caseData.importantDates || [],
+  official_references: caseData.officialReferences || [],
   updated_at: new Date().toISOString(),
 });
 

@@ -5,6 +5,8 @@ import {
   Calendar,
   CheckCircle2,
   FileText,
+  Gavel,
+  ExternalLink,
   MessageSquare,
   Plus,
   Upload,
@@ -33,6 +35,7 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
   const documents = Array.isArray(caseData.documents) ? caseData.documents : [];
   const notes = Array.isArray(caseData.notes) ? caseData.notes : [];
   const importantDates = Array.isArray(caseData.importantDates) ? caseData.importantDates : [];
+  const officialReferences = Array.isArray(caseData.officialReferences) ? caseData.officialReferences : [];
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -107,6 +110,7 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
     { id: 'summary', label: 'Resumen', icon: FileText },
     { id: 'documents', label: 'Documentos', icon: Upload },
     { id: 'dates', label: 'Fechas', icon: Calendar },
+    { id: 'official', label: 'Normas', icon: Gavel },
     { id: 'notes', label: 'Notas', icon: MessageSquare },
     { id: 'ai', label: 'IA', icon: Bot },
   ];
@@ -132,15 +136,16 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <SummaryMetric label="Documentos" value={documents.length} />
           <SummaryMetric label="Fechas" value={importantDates.length} />
           <SummaryMetric label="Notas" value={notes.length} />
+          <SummaryMetric label="Normas" value={officialReferences.length} />
         </div>
       </div>
 
       <div className="border-b border-white/[0.06] bg-brand-black/20 px-6 py-3">
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-6 gap-2">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -267,6 +272,25 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
                 ))
               ) : (
                 <EmptyState icon={Calendar} text="No hay vencimientos registrados." />
+              )}
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'official' && (
+          <section className="space-y-5">
+            <div>
+              <h4 className="text-lg font-serif text-brand-ivory">Registros oficiales vinculados</h4>
+              <p className="mt-1 text-xs text-brand-accent/45">Normas y fuentes oficiales relacionadas con este expediente desde el Radar Normativo.</p>
+            </div>
+
+            <div className="space-y-3">
+              {officialReferences.length > 0 ? (
+                officialReferences.map((reference, idx) => (
+                  <OfficialReferenceRow key={reference.id || `${reference.title}-${idx}`} reference={reference} />
+                ))
+              ) : (
+                <EmptyState icon={Gavel} text="No hay normas vinculadas a este expediente." />
               )}
             </div>
           </section>
@@ -451,6 +475,40 @@ const NoteRow = ({ note }) => (
       <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-accent/35">{note.date}</span>
     </div>
     <p className="text-sm font-light leading-6 text-brand-ivory/72">{note.text}</p>
+  </div>
+);
+
+const OfficialReferenceRow = ({ reference }) => (
+  <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-4">
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <span className="rounded-full border border-brand-gold/20 bg-brand-gold/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-gold">
+        {reference.source}
+      </span>
+      <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-accent/60">
+        {reference.category}
+      </span>
+    </div>
+    <h5 className="text-base font-serif leading-snug text-brand-ivory">{reference.title}</h5>
+    <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-accent/35">
+      {reference.entity} - {reference.date} - {reference.type}
+    </p>
+    {reference.impact && (
+      <div className="mt-4 rounded-lg border border-brand-gold/15 bg-brand-gold/[0.04] p-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-gold">Impacto sugerido</p>
+        <p className="mt-2 text-sm font-light leading-6 text-brand-ivory/72">{reference.impact}</p>
+      </div>
+    )}
+    {reference.url && (
+      <a
+        href={reference.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-4 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-gold transition-colors hover:text-brand-ivory"
+      >
+        Ver fuente oficial
+        <ExternalLink className="h-3.5 w-3.5" />
+      </a>
+    )}
   </div>
 );
 

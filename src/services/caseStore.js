@@ -10,6 +10,7 @@ const normalizeCase = (caseData) => ({
   documents: Array.isArray(caseData.documents) ? caseData.documents : [],
   notes: Array.isArray(caseData.notes) ? caseData.notes : [],
   importantDates: Array.isArray(caseData.importantDates) ? caseData.importantDates : [],
+  officialReferences: Array.isArray(caseData.officialReferences) ? caseData.officialReferences : [],
 });
 
 export const getCases = () => {
