@@ -16,8 +16,11 @@ import {
 import { getCases } from '../services/caseStore';
 import { loadCases, updateCaseAsync } from '../services/caseStore';
 import { fetchOfficialRegistryItems, getOfficialRegistryFallbackItems } from '../services/officialRegistryService';
-
-const SAVED_REGISTRY_KEY = 'lusti-saved-official-registry';
+import {
+  getLocalSavedRegistryItems,
+  loadSavedRegistryItems,
+  saveRegistryItem,
+} from '../services/savedRegistryStore';
 
 const ElPeruano = () => {
   const [items, setItems] = useState(() => getOfficialRegistryFallbackItems());
@@ -29,7 +32,8 @@ const ElPeruano = () => {
   const [statusMessage, setStatusMessage] = useState('');
   const [feedSource, setFeedSource] = useState('curated-official-links');
   const [lastChecked, setLastChecked] = useState('');
-  const [savedItems, setSavedItems] = useState(() => getSavedRegistryItems());
+  const [savedItems, setSavedItems] = useState(() => getLocalSavedRegistryItems());
+  const [savedItemsSource, setSavedItemsSource] = useState('local');
 
   const applyRegistryResult = (result) => {
     setItems(result.items);
@@ -53,6 +57,13 @@ const ElPeruano = () => {
 
     loadCases().then((result) => {
       if (isMounted) setCases(result.cases);
+    });
+
+    loadSavedRegistryItems().then((result) => {
+      if (!isMounted) return;
+      setSavedItems(result.items);
+      setSavedItemsSource(result.source);
+      if (result.error) setStatusMessage('Biblioteca normativa cargada localmente. Supabase no respondio.');
     });
 
     fetchOfficialRegistryItems().then((result) => {
@@ -106,15 +117,16 @@ const ElPeruano = () => {
     ];
   }, [items, savedItems.length]);
 
-  const saveRegistryItem = (item) => {
-    const exists = savedItems.some((saved) => saved.id === item.id);
-    const nextItems = exists
-      ? savedItems
-      : [{ ...item, savedAt: new Date().toISOString() }, ...savedItems];
-
-    setSavedItems(nextItems);
-    window.localStorage.setItem(SAVED_REGISTRY_KEY, JSON.stringify(nextItems));
-    setStatusMessage(exists ? 'Ese registro ya estaba guardado.' : 'Registro oficial guardado en la biblioteca normativa local.');
+  const handleSaveRegistryItem = async (item) => {
+    const result = await saveRegistryItem(savedItems, item);
+    setSavedItems(result.items);
+    setSavedItemsSource(result.source);
+    setStatusMessage(result.saved
+      ? result.error
+        ? 'Registro guardado localmente. Supabase no respondio.'
+        : 'Registro oficial guardado en la biblioteca normativa.'
+      : 'Ese registro ya estaba guardado.'
+    );
   };
 
   const linkRegistryToCase = async (item, caseId) => {
@@ -228,7 +240,7 @@ const ElPeruano = () => {
                   key={item.id}
                   item={item}
                   cases={cases}
-                  onSave={() => saveRegistryItem(item)}
+                  onSave={() => handleSaveRegistryItem(item)}
                   onLink={linkRegistryToCase}
                   isSaved={savedItems.some((saved) => saved.id === item.id)}
                 />
@@ -267,7 +279,7 @@ const ElPeruano = () => {
 
             <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-6">
               <h2 className="text-lg font-serif text-brand-ivory">Biblioteca normativa</h2>
-              <p className="mt-1 text-xs text-brand-accent/45">Registros guardados para seguimiento.</p>
+              <p className="mt-1 text-xs text-brand-accent/45">Registros guardados para seguimiento. Fuente: {formatSavedSource(savedItemsSource)}.</p>
               <div className="mt-5 space-y-3">
                 {savedItems.length > 0 ? savedItems.slice(0, 5).map((item) => (
                   <a
@@ -448,16 +460,6 @@ const InfoBlock = ({ label, text, highlight = false }) => (
   </div>
 );
 
-const getSavedRegistryItems = () => {
-  try {
-    const stored = window.localStorage.getItem(SAVED_REGISTRY_KEY);
-    const parsed = stored ? JSON.parse(stored) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
 const getRelatedCases = (item, cases) => {
   const category = item.category.toLowerCase();
 
@@ -477,6 +479,12 @@ const formatCheckedAt = (value) => {
 const formatFeedSource = (source) => {
   if (source === 'live') return 'consulta publica en vivo';
   return 'fuentes oficiales curadas';
+};
+
+const formatSavedSource = (source) => {
+  if (source === 'supabase') return 'Supabase';
+  if (source === 'supabase-seeded') return 'Supabase inicializado';
+  return 'Local';
 };
 
 export default ElPeruano;
