@@ -194,3 +194,60 @@ export const analyzeOfficialRegistryItem = async ({ item, cases }) => {
   if (!text) throw new Error('Gemini devolvio un analisis vacio.');
   return text;
 };
+
+const buildSpecializedAssistantPrompt = ({ bot, question }) => `
+Eres ${bot.name}, un asistente legal especializado para un estudio juridico peruano.
+Especialidad declarada: ${bot.description || 'Asistencia legal general'}.
+Documentos de referencia disponibles segun el sistema: ${bot.docs || 0}.
+
+Responde en espanol claro, profesional y util.
+Si el usuario saluda, saluda brevemente y ofrece formas concretas de ayuda segun tu especialidad.
+Si falta informacion para analizar un caso, pide los datos necesarios.
+No inventes documentos, normas, plazos ni hechos no entregados.
+No presentes la respuesta como asesoria legal definitiva; indica que es analisis preliminar para revision de un abogado.
+
+Pregunta del usuario:
+${question}
+`;
+
+export const askGeminiSpecializedAssistant = async ({ bot, question }) => {
+  if (!isGeminiConfigured) {
+    throw new Error('Gemini no esta configurado.');
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: buildSpecializedAssistantPrompt({ bot, question }) }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.25,
+          topP: 0.9,
+          maxOutputTokens: 1000,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Gemini no pudo responder.');
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text)
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+
+  if (!text) throw new Error('Gemini devolvio una respuesta vacia.');
+  return text;
+};

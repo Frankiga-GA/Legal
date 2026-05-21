@@ -1,102 +1,127 @@
-// src/components/BotChat.jsx
-import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, ArrowLeft, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Bot, Send, Sparkles, User } from 'lucide-react';
+import { askGeminiSpecializedAssistant, isGeminiConfigured } from '../services/geminiService';
 
 const BotChat = ({ bot, onBack }) => {
   const [messages, setMessages] = useState([
-    { 
-      role: 'ai', 
-      content: `Soy ${bot.name}. ${bot.description ? bot.description : 'Listo para apoyar el analisis legal.'} \n\nTengo ${bot.docs} documentos de referencia disponibles. ¿Que necesitas revisar hoy?` 
-    }
+    {
+      role: 'ai',
+      content: `Soy ${bot.name}. ${bot.description || 'Listo para apoyar el analisis legal.'}\n\nTengo ${bot.docs} documentos de referencia disponibles. Que necesitas revisar hoy?`,
+    },
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const buildLocalAssistantResponse = (userMessage) => {
+    const lowerInput = userMessage.toLowerCase();
 
-    const userMessage = input;
+    if (bot.name.toLowerCase().includes('laboral')) {
+      if (lowerInput.includes('liquidacion') || lowerInput.includes('liquidación') || lowerInput.includes('despido')) {
+        return [
+          'Revision laboral preliminar:',
+          '',
+          '1. El despido arbitrario puede activar indemnizacion segun tiempo de servicio.',
+          '2. Los beneficios sociales deben verificarse contra fecha de cese y pagos pendientes.',
+          '3. Conviene revisar comunicaciones previas y medios probatorios antes de definir estrategia.',
+        ].join('\n');
+      }
+
+      return 'Como asistente laboral, puedo ayudarte con cartas, calculos de beneficios, revision de contratos o analisis de contingencias. Indica el caso, hechos principales o documento a revisar.';
+    }
+
+    if (bot.name.toLowerCase().includes('civil') || bot.name.toLowerCase().includes('contrato')) {
+      if (lowerInput.includes('alquiler') || lowerInput.includes('arrendamiento')) {
+        return [
+          'Para revisar un arrendamiento, empezaria por:',
+          '',
+          '1. Penalidades por retraso.',
+          '2. Obligaciones de mantenimiento.',
+          '3. Causales de resolucion.',
+          '4. Garantias, entrega y devolucion del inmueble.',
+        ].join('\n');
+      }
+
+      return 'Puedo analizar contratos de compraventa, fianzas o arrendamientos comerciales. Indica si quieres detectar riesgos, preparar un borrador o mejorar clausulas.';
+    }
+
+    return 'Recibido. Para darte una respuesta util, comparte la materia, el objetivo de la revision o el documento que quieres analizar.';
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() || isTyping) return;
+
+    const userMessage = input.trim();
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setInput('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      let responseContent = "";
-      const lowerInput = userMessage.toLowerCase();
-
-      if (bot.name.toLowerCase().includes('laboral')) {
-        if (lowerInput.includes('liquidación') || lowerInput.includes('despido')) {
-          responseContent = "Revision laboral preliminar:\n\n1. El despido arbitrario puede activar indemnizacion segun tiempo de servicio.\n2. Los beneficios sociales deben verificarse contra fecha de cese y pagos pendientes.\n3. Conviene revisar comunicaciones previas y medios probatorios antes de definir estrategia.";
-        } else {
-          responseContent = "Como asistente laboral, puedo ayudarte con cartas, calculos de beneficios, revision de contratos o analisis de contingencias. Indica el caso o documento a revisar.";
-        }
-      } else if (bot.name.toLowerCase().includes('civil') || bot.name.toLowerCase().includes('contrato')) {
-        if (lowerInput.includes('alquiler') || lowerInput.includes('arrendamiento')) {
-          responseContent = "Respecto a los contratos de arrendamiento, los estatutos actuales requieren:\n- Cláusulas de penalidad específicas por pagos atrasados.\n- Definiciones claras de las responsabilidades de mantenimiento.\n- Firmas legalizadas para cláusulas de allanamiento futuro.";
-        } else {
-          responseContent = "Puedo analizar contratos de compraventa, fianzas o arrendamientos comerciales. Tengo los modelos actualizados del Código Civil en mi memoria. ¿Te gustaría generar un borrador?";
-        }
-      } else {
-        responseContent = "Recibido. Para darte una respuesta util, comparte la materia, el objetivo de la revision o el documento que quieres analizar.";
-      }
+    try {
+      const responseContent = isGeminiConfigured
+        ? await askGeminiSpecializedAssistant({ bot, question: userMessage })
+        : buildLocalAssistantResponse(userMessage);
 
       setMessages(prev => [...prev, { role: 'ai', content: responseContent }]);
+    } catch (error) {
+      console.warn('Gemini no pudo responder en asistente especializado. Usando fallback local.', error);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'ai',
+          content: `${buildLocalAssistantResponse(userMessage)}\n\nNota: Gemini no respondio en este intento, asi que use el analisis local de LUSTI.`,
+        },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyDown = (e) => {
     if (e.key === 'Enter') handleSend();
   };
 
   return (
-    <div className="flex flex-col h-full bg-brand-black relative">
-      {/* Background Glow */}
-      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-brand-gold/5 rounded-full blur-[150px] pointer-events-none"></div>
+    <div className="relative flex h-full flex-col bg-brand-black">
+      <div className="pointer-events-none absolute right-0 top-0 h-[600px] w-[600px] rounded-full bg-brand-gold/5 blur-[150px]"></div>
 
-      {/* Header */}
-      <div className="glass-panel p-8 flex items-center justify-between border-b border-white/[0.05] relative z-10">
+      <div className="glass-panel relative z-10 flex items-center justify-between border-b border-white/[0.05] p-8">
         <div className="flex items-center gap-6">
-          <button onClick={onBack} className="p-3 hover:bg-white/[0.05] rounded-xl transition-colors text-brand-accent/40 hover:text-brand-ivory">
-            <ArrowLeft className="w-5 h-5" />
+          <button onClick={onBack} className="rounded-xl p-3 text-brand-accent/40 transition-colors hover:bg-white/[0.05] hover:text-brand-ivory">
+            <ArrowLeft className="h-5 w-5" />
           </button>
-          <div className="p-3 bg-brand-gold rounded-xl shadow-[0_0_20px_rgba(197,160,89,0.2)]">
-            <Sparkles className="w-5 h-5 text-brand-black" />
+          <div className="rounded-xl bg-brand-gold p-3 shadow-[0_0_20px_rgba(197,160,89,0.2)]">
+            <Sparkles className="h-5 w-5 text-brand-black" />
           </div>
           <div>
-            <h3 className="text-xl font-serif font-medium text-brand-ivory tracking-tight">{bot.name}</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <p className="text-[10px] uppercase tracking-widest text-brand-gold font-bold">Asistente activo • Contexto privado</p>
+            <h3 className="text-xl font-serif font-medium tracking-tight text-brand-ivory">{bot.name}</h3>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-brand-gold">
+                {isGeminiConfigured ? 'Gemini activo' : 'IA local'} &bull; Contexto privado
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar relative z-10">
+      <div className="custom-scrollbar relative z-10 flex-1 space-y-12 overflow-y-auto p-10">
         {messages.map((msg, idx) => (
-          <div key={idx} className={`flex gap-8 max-w-4xl mx-auto ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-1 shadow-2xl ${
-              msg.role === 'ai' ? 'bg-brand-ivory text-brand-black' : 'bg-white/[0.03] text-brand-accent/40 border border-white/[0.05]'
+          <div key={idx} className={`mx-auto flex max-w-4xl gap-8 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+            <div className={`mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl shadow-2xl ${
+              msg.role === 'ai' ? 'bg-brand-ivory text-brand-black' : 'border border-white/[0.05] bg-white/[0.03] text-brand-accent/40'
             }`}>
-              {msg.role === 'ai' ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
+              {msg.role === 'ai' ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
             </div>
             <div className={`flex-1 space-y-4 ${msg.role === 'user' ? 'text-right' : ''}`}>
-               <div className={`inline-block text-[15px] leading-relaxed font-light ${
-                 msg.role === 'ai' ? 'text-brand-ivory/80' : 'text-brand-accent/80'
-               }`}>
+              <div className={`inline-block text-[15px] font-light leading-relaxed ${
+                msg.role === 'ai' ? 'text-brand-ivory/80' : 'text-brand-accent/80'
+              }`}>
                 {msg.content.split('\n').map((line, i) => (
-                  <p key={i} className="mb-5 last:mb-0 whitespace-pre-wrap">
+                  <p key={i} className="mb-5 whitespace-pre-wrap last:mb-0">
                     {line}
                   </p>
                 ))}
@@ -104,42 +129,41 @@ const BotChat = ({ bot, onBack }) => {
             </div>
           </div>
         ))}
-        
+
         {isTyping && (
-          <div className="flex gap-8 max-w-4xl mx-auto">
-            <div className="w-10 h-10 rounded-xl bg-brand-ivory text-brand-black flex items-center justify-center shadow-xl">
-              <Bot className="w-5 h-5" />
+          <div className="mx-auto flex max-w-4xl gap-8">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-ivory text-brand-black shadow-xl">
+              <Bot className="h-5 w-5" />
             </div>
             <div className="flex items-center gap-2 opacity-20">
-              <span className="w-1 h-1 bg-brand-ivory rounded-full animate-bounce"></span>
-              <span className="w-1 h-1 bg-brand-ivory rounded-full animate-bounce delay-75"></span>
-              <span className="w-1 h-1 bg-brand-ivory rounded-full animate-bounce delay-150"></span>
+              <span className="h-1 w-1 rounded-full bg-brand-ivory animate-bounce"></span>
+              <span className="h-1 w-1 rounded-full bg-brand-ivory animate-bounce delay-75"></span>
+              <span className="h-1 w-1 rounded-full bg-brand-ivory animate-bounce delay-150"></span>
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-10 border-t border-white/[0.05] relative z-10 bg-white/[0.01]">
-        <div className="max-w-3xl mx-auto relative group">
+      <div className="relative z-10 border-t border-white/[0.05] bg-white/[0.01] p-10">
+        <div className="group relative mx-auto max-w-3xl">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown}
             placeholder={`Escribe una consulta para ${bot.name}...`}
-            className="w-full pl-8 pr-20 py-6 bg-white/[0.02] border border-white/[0.05] rounded-3xl focus:outline-none focus:border-brand-gold/40 focus:bg-white/[0.04] transition-all text-brand-ivory placeholder:text-brand-accent/10 font-light shadow-2xl"
+            className="w-full rounded-3xl border border-white/[0.05] bg-white/[0.02] py-6 pl-8 pr-20 font-light text-brand-ivory shadow-2xl transition-all placeholder:text-brand-accent/10 focus:border-brand-gold/40 focus:bg-white/[0.04] focus:outline-none"
           />
-          <button 
+          <button
             onClick={handleSend}
-            className="absolute right-5 top-1/2 -translate-y-1/2 p-3 text-brand-accent hover:text-brand-gold transition-colors disabled:opacity-10"
+            className="absolute right-5 top-1/2 -translate-y-1/2 p-3 text-brand-accent transition-colors hover:text-brand-gold disabled:opacity-10"
             disabled={!input.trim() || isTyping}
           >
-            <Send className="w-6 h-6" />
+            <Send className="h-6 w-6" />
           </button>
         </div>
-        <p className="text-center text-[10px] uppercase tracking-[0.4em] text-brand-accent/20 mt-8 font-bold">
+        <p className="mt-8 text-center text-[10px] font-bold uppercase tracking-[0.4em] text-brand-accent/20">
           Asistencia legal generativa &bull; Verifica la informacion antes de presentarla
         </p>
       </div>
