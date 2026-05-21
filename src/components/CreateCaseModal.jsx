@@ -48,7 +48,9 @@ const CreateCaseModal = ({ onClose, onSave }) => {
     const newCase = {
       ...formData,
       id: finalId,
-      documents: selectedFiles
+      documents: selectedFiles,
+      notes: [],
+      importantDates: []
     };
 
     onSave(newCase);

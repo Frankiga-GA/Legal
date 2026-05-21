@@ -94,6 +94,18 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes scan-line {
+  0% { transform: translateY(0); opacity: 0; }
+  12% { opacity: 0.85; }
+  50% { opacity: 0.65; }
+  100% { transform: translateY(360px); opacity: 0; }
+}
+
+@keyframes live-feed {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 .animate-float {
   animation: float 6s ease-in-out infinite;
 }
@@ -104,6 +116,14 @@
 
 .animate-rotate-slow {
   animation: rotate-slow 20s linear infinite;
+}
+
+.animate-scan-line {
+  animation: scan-line 5s ease-in-out infinite;
+}
+
+.animate-live-feed {
+  animation: live-feed 18s linear infinite;
 }
 
 .blur-3xl {

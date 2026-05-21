@@ -6,7 +6,7 @@ const BotChat = ({ bot, onBack }) => {
   const [messages, setMessages] = useState([
     { 
       role: 'ai', 
-      content: `Soy ${bot.name}. ${bot.description ? bot.description : 'Operativo y listo para el análisis.'} \n\nHe sido indexado con ${bot.docs} documentos legales especializados. ¿En qué puedo asistir tu investigación hoy?` 
+      content: `Soy ${bot.name}. ${bot.description ? bot.description : 'Listo para apoyar el analisis legal.'} \n\nTengo ${bot.docs} documentos de referencia disponibles. ¿Que necesitas revisar hoy?` 
     }
   ]);
   const [input, setInput] = useState('');
@@ -35,9 +35,9 @@ const BotChat = ({ bot, onBack }) => {
 
       if (bot.name.toLowerCase().includes('laboral')) {
         if (lowerInput.includes('liquidación') || lowerInput.includes('despido')) {
-          responseContent = "Basado en mi entrenamiento indexado en derecho laboral:\n\n1. El despido arbitrario típicamente activa un multiplicador de indemnización basado en los años de servicio.\n2. Los beneficios sociales devengados deben liquidarse dentro del plazo legal de 48 horas.\n3. La jurisprudencia sugiere priorizar la conciliación en casos colectivos.";
+          responseContent = "Revision laboral preliminar:\n\n1. El despido arbitrario puede activar indemnizacion segun tiempo de servicio.\n2. Los beneficios sociales deben verificarse contra fecha de cese y pagos pendientes.\n3. Conviene revisar comunicaciones previas y medios probatorios antes de definir estrategia.";
         } else {
-          responseContent = "Como nodo laboral, puedo asistirte en la redacción de cartas de despido, cálculos de beneficios o análisis de contratos de servicios. Por favor, especifica tus requerimientos.";
+          responseContent = "Como asistente laboral, puedo ayudarte con cartas, calculos de beneficios, revision de contratos o analisis de contingencias. Indica el caso o documento a revisar.";
         }
       } else if (bot.name.toLowerCase().includes('civil') || bot.name.toLowerCase().includes('contrato')) {
         if (lowerInput.includes('alquiler') || lowerInput.includes('arrendamiento')) {
@@ -46,7 +46,7 @@ const BotChat = ({ bot, onBack }) => {
           responseContent = "Puedo analizar contratos de compraventa, fianzas o arrendamientos comerciales. Tengo los modelos actualizados del Código Civil en mi memoria. ¿Te gustaría generar un borrador?";
         }
       } else {
-        responseContent = "Recibido. Procesando tu consulta a través de mis nodos legales especializados. ¿Podrías proporcionar más parámetros del caso?";
+        responseContent = "Recibido. Para darte una respuesta util, comparte la materia, el objetivo de la revision o el documento que quieres analizar.";
       }
 
       setMessages(prev => [...prev, { role: 'ai', content: responseContent }]);
@@ -76,7 +76,7 @@ const BotChat = ({ bot, onBack }) => {
             <h3 className="text-xl font-serif font-medium text-brand-ivory tracking-tight">{bot.name}</h3>
             <div className="flex items-center gap-2 mt-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <p className="text-[10px] uppercase tracking-widest text-brand-gold font-bold">Nodo Activo • Encriptado</p>
+              <p className="text-[10px] uppercase tracking-widest text-brand-gold font-bold">Asistente activo • Contexto privado</p>
             </div>
           </div>
         </div>
@@ -128,7 +128,7 @@ const BotChat = ({ bot, onBack }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={`Sincronizar consulta con ${bot.name}...`}
+            placeholder={`Escribe una consulta para ${bot.name}...`}
             className="w-full pl-8 pr-20 py-6 bg-white/[0.02] border border-white/[0.05] rounded-3xl focus:outline-none focus:border-brand-gold/40 focus:bg-white/[0.04] transition-all text-brand-ivory placeholder:text-brand-accent/10 font-light shadow-2xl"
           />
           <button 
@@ -140,7 +140,7 @@ const BotChat = ({ bot, onBack }) => {
           </button>
         </div>
         <p className="text-center text-[10px] uppercase tracking-[0.4em] text-brand-accent/20 mt-8 font-bold">
-          Protocolo de Respuesta Generativa v4.2 &bull; Harvey System
+          Asistencia legal generativa &bull; Verifica la informacion antes de presentarla
         </p>
       </div>
     </div>

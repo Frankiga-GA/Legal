@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, User, Sparkles } from 'lucide-react';
-import { mockCases } from '../data/mockData';
+import { getCases } from '../services/caseStore';
 
 const FloatingChat = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -31,7 +31,7 @@ const FloatingChat = () => {
       let responseContent = "";
       const lowerInput = userMessage.toLowerCase();
 
-      const foundCase = mockCases.find(c => 
+      const foundCase = getCases().find(c => 
         lowerInput.includes(c.clientName.toLowerCase()) || 
         lowerInput.includes(c.dni) || 
         lowerInput.includes(c.id.toLowerCase())

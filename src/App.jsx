@@ -1,5 +1,5 @@
 // src/App.jsx
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import CaseLibrary from './components/CaseLibrary';
@@ -10,15 +10,52 @@ import Settings from './components/Settings';
 import LoginPage from './components/LoginPage';
 import LandingPage from './components/LandingPage';
 import ElPeruano from './components/ElPeruano';
+import { getCurrentSession, onAuthStateChange, signOut } from './services/authService';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLanding, setIsLanding] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [session, setSession] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  const handleLogin = () => {
-    setIsAuthenticated(true);
+  useEffect(() => {
+    let isMounted = true;
+
+    getCurrentSession()
+      .then((currentSession) => {
+        if (!isMounted) return;
+        setSession(currentSession);
+        if (currentSession) setIsLanding(false);
+      })
+      .catch(() => {
+        if (isMounted) setSession(null);
+      })
+      .finally(() => {
+        if (isMounted) setIsAuthLoading(false);
+      });
+
+    const subscription = onAuthStateChange((nextSession) => {
+      setSession(nextSession);
+      if (nextSession) setIsLanding(false);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleLogin = (nextSession) => {
+    setSession(nextSession);
+    setIsLanding(false);
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    setSession(null);
+    setActiveTab('dashboard');
+    setIsLanding(false);
   };
 
   const renderContent = () => {
@@ -37,11 +74,22 @@ function App() {
     setIsMobileMenuOpen(false);
   };
 
-  if (isLanding) {
+  if (isAuthLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-brand-black text-brand-ivory">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-8 w-8 rounded-full border border-brand-gold/30 border-t-brand-gold animate-spin"></div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-accent/50">Cargando LUSTI</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLanding && !session) {
     return <LandingPage onGetStarted={() => setIsLanding(false)} />;
   }
 
-  if (!isAuthenticated) {
+  if (!session) {
     return <LoginPage onLogin={handleLogin} onBack={() => setIsLanding(true)} />;
   }
 
@@ -70,7 +118,7 @@ function App() {
           ></div>
         )}
         <div className="h-full bg-brand-black border-r border-white/[0.05]">
-          <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} onHome={() => setIsLanding(true)} />
+          <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} onHome={() => setIsLanding(true)} onLogout={handleLogout} userEmail={session.user?.email} />
         </div>
       </div>
 
