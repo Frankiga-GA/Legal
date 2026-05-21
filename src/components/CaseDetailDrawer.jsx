@@ -96,7 +96,7 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
     if (!aiInput.trim()) return;
 
     const question = aiInput.trim();
-    const response = buildCaseResponse(question, caseData, documents, notes, importantDates);
+    const response = buildCaseResponse(question, caseData, documents, notes, importantDates, officialReferences);
 
     setAiMessages(prev => [
       ...prev,
@@ -362,13 +362,15 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
                   'Resumen ejecutivo',
                   'Documentos faltantes',
                   'Proximos pasos',
-                  'Riesgos del caso',
-                ].map((prompt) => (
+                    'Normas vinculadas',
+                    'Riesgos del caso',
+                    'Impacto normativo',
+                  ].map((prompt) => (
                   <button
                     key={prompt}
                     type="button"
                     onClick={() => {
-                      const response = buildCaseResponse(prompt, caseData, documents, notes, importantDates);
+                      const response = buildCaseResponse(prompt, caseData, documents, notes, importantDates, officialReferences);
                       setAiMessages(prev => [
                         ...prev,
                         { role: 'user', content: prompt },
@@ -519,7 +521,7 @@ const EmptyState = ({ icon: Icon, text }) => (
   </div>
 );
 
-const buildCaseResponse = (question, caseData, documents, notes, importantDates) => {
+const buildCaseResponse = (question, caseData, documents, notes, importantDates, officialReferences = []) => {
   const normalizedQuestion = question.toLowerCase();
   const documentList = documents.length
     ? documents.map((doc, index) => `${index + 1}. ${doc.name}${doc.date ? ` (${doc.date})` : ''}`).join('\n')
@@ -527,6 +529,12 @@ const buildCaseResponse = (question, caseData, documents, notes, importantDates)
   const dateList = importantDates.length
     ? importantDates.map((item, index) => `${index + 1}. ${item.title} - ${item.date} [${item.priority}]`).join('\n')
     : 'No hay vencimientos registrados.';
+  const referenceList = officialReferences.length
+    ? officialReferences.map((item, index) => `${index + 1}. ${item.title} - ${item.source}/${item.entity} [${item.category}]`).join('\n')
+    : 'No hay normas o registros oficiales vinculados.';
+  const impactList = officialReferences.length
+    ? officialReferences.map((item, index) => `${index + 1}. ${item.impact || 'Revisar impacto especifico.'}`).join('\n')
+    : 'No hay impactos normativos vinculados todavia.';
   const latestNote = notes[0]?.text || 'No hay notas internas registradas.';
 
   if (normalizedQuestion.includes('resumen') || normalizedQuestion.includes('ejecutivo')) {
@@ -538,7 +546,39 @@ const buildCaseResponse = (question, caseData, documents, notes, importantDates)
       `Resumen registrado: ${caseData.summary || 'Sin resumen registrado.'}`,
       `Documentos vinculados: ${documents.length}`,
       `Fechas importantes: ${importantDates.length}`,
+      `Normas vinculadas: ${officialReferences.length}`,
       `Nota interna mas reciente: ${latestNote}`,
+      officialReferences.length ? `Principal alerta normativa: ${officialReferences[0].impact || officialReferences[0].title}` : 'No hay alertas normativas vinculadas al expediente.',
+    ].join('\n');
+  }
+
+  if (normalizedQuestion.includes('norma') || normalizedQuestion.includes('registro') || normalizedQuestion.includes('oficial')) {
+    return [
+      `Normas vinculadas a ${caseData.id}`,
+      referenceList,
+      '',
+      'Lectura operativa',
+      impactList,
+      '',
+      officialReferences.length
+        ? 'Recomendacion: validar vigencia, revisar texto oficial completo y decidir si cambia la teoria del caso, documentos requeridos o proximo escrito.'
+        : 'Recomendacion: desde Registros Oficiales vincula normas relevantes para que el expediente tenga contexto normativo propio.',
+    ].join('\n');
+  }
+
+  if (normalizedQuestion.includes('impacto') || normalizedQuestion.includes('afecta') || normalizedQuestion.includes('afectar')) {
+    return [
+      'Impacto normativo preliminar',
+      officialReferences.length
+        ? impactList
+        : 'No hay normas vinculadas, asi que no puedo cruzar impacto normativo especifico con este expediente.',
+      '',
+      `Materia del expediente: ${caseData.type}`,
+      `Estado actual: ${caseData.status}`,
+      '',
+      officialReferences.length
+        ? 'Accion sugerida: convertir cada impacto en una tarea concreta: revisar plazo, ajustar argumento, pedir documento, preparar informe o advertir al cliente.'
+        : 'Accion sugerida: vincular una norma desde Registros Oficiales y volver a consultar este analisis.',
     ].join('\n');
   }
 
@@ -569,7 +609,8 @@ const buildCaseResponse = (question, caseData, documents, notes, importantDates)
       'Riesgos preliminares detectables con la informacion actual',
       `1. Riesgo documental: ${documents.length ? 'hay documentos vinculados, pero falta clasificarlos por valor probatorio.' : 'no hay documentos vinculados al expediente.'}`,
       `2. Riesgo de plazo: ${importantDates.length ? 'existen fechas registradas que deben monitorearse.' : 'no hay vencimientos registrados.'}`,
-      `3. Riesgo de estrategia: ${caseData.summary ? 'el resumen existe, pero conviene convertirlo en teoria del caso.' : 'falta un resumen operativo del caso.'}`,
+      `3. Riesgo normativo: ${officialReferences.length ? 'hay normas vinculadas; revisar si modifican argumentos, plazos o documentacion.' : 'no hay normas vinculadas para evaluar cambios regulatorios o jurisprudenciales.'}`,
+      `4. Riesgo de estrategia: ${caseData.summary ? 'el resumen existe, pero conviene convertirlo en teoria del caso.' : 'falta un resumen operativo del caso.'}`,
       '',
       'Esto es una revision preliminar; debe validarse con el expediente completo.',
     ].join('\n');
@@ -581,8 +622,9 @@ const buildCaseResponse = (question, caseData, documents, notes, importantDates)
       '1. Revisar y completar el resumen operativo del expediente.',
       documents.length ? '2. Clasificar documentos por demanda, prueba, comunicacion y actuacion.' : '2. Subir los documentos principales del caso.',
       importantDates.length ? '3. Confirmar responsables para los vencimientos registrados.' : '3. Registrar vencimientos, audiencias o fechas de seguimiento.',
-      notes.length ? '4. Convertir notas internas en tareas accionables.' : '4. Agregar una primera nota interna con estado y estrategia.',
-      '5. Preparar una consulta juridica especifica para el asistente.',
+      officialReferences.length ? '4. Revisar normas vinculadas y decidir si afectan estrategia, escrito o comunicacion al cliente.' : '4. Vincular normas relevantes desde Registros Oficiales.',
+      notes.length ? '5. Convertir notas internas en tareas accionables.' : '5. Agregar una primera nota interna con estado y estrategia.',
+      '6. Preparar una consulta juridica especifica para el asistente.',
     ].join('\n');
   }
 
@@ -592,6 +634,7 @@ const buildCaseResponse = (question, caseData, documents, notes, importantDates)
       `En el expediente ${caseData.id}, seguido por ${caseData.clientName}, correspondiente a materia ${caseData.type}, se deja constancia de que el caso se encuentra en estado ${caseData.status}.`,
       '',
       `Resumen base: ${caseData.summary || 'Pendiente de completar.'}`,
+      officialReferences.length ? `Base normativa vinculada: ${officialReferences.map((item) => item.title).join('; ')}` : 'Base normativa vinculada: pendiente de asociar desde Registros Oficiales.',
       '',
       'Se recomienda complementar este borrador con pretension, fundamentos de hecho, fundamentos de derecho y anexos disponibles.',
     ].join('\n');
@@ -603,6 +646,7 @@ const buildCaseResponse = (question, caseData, documents, notes, importantDates)
     '- Revision de documentos vinculados.',
     '- Fechas y vencimientos.',
     '- Riesgos preliminares.',
+    '- Normas vinculadas e impacto normativo.',
     '- Proximos pasos.',
     '- Borrador breve.',
     '',
