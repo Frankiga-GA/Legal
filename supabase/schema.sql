@@ -100,3 +100,86 @@ create policy "Users can delete their own saved registry items"
 on public.saved_registry_items for delete
 to authenticated
 using (auth.uid() = user_id);
+
+create table if not exists public.assistants (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  description text not null default '',
+  templates jsonb not null default '[]'::jsonb,
+  documents jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.assistants enable row level security;
+
+create index if not exists assistants_user_id_idx on public.assistants(user_id);
+
+drop policy if exists "Users can read their own assistants" on public.assistants;
+drop policy if exists "Users can insert their own assistants" on public.assistants;
+drop policy if exists "Users can update their own assistants" on public.assistants;
+drop policy if exists "Users can delete their own assistants" on public.assistants;
+
+create policy "Users can read their own assistants"
+on public.assistants for select
+to authenticated
+using (auth.uid() = user_id);
+
+create policy "Users can insert their own assistants"
+on public.assistants for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+create policy "Users can update their own assistants"
+on public.assistants for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "Users can delete their own assistants"
+on public.assistants for delete
+to authenticated
+using (auth.uid() = user_id);
+
+create table if not exists public.assistant_templates (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  category text,
+  description text,
+  prompt text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(user_id, name)
+);
+
+alter table public.assistant_templates enable row level security;
+
+create index if not exists assistant_templates_user_id_idx on public.assistant_templates(user_id);
+
+drop policy if exists "Users can read their own assistant templates" on public.assistant_templates;
+drop policy if exists "Users can insert their own assistant templates" on public.assistant_templates;
+drop policy if exists "Users can update their own assistant templates" on public.assistant_templates;
+drop policy if exists "Users can delete their own assistant templates" on public.assistant_templates;
+
+create policy "Users can read their own assistant templates"
+on public.assistant_templates for select
+to authenticated
+using (auth.uid() = user_id);
+
+create policy "Users can insert their own assistant templates"
+on public.assistant_templates for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+create policy "Users can update their own assistant templates"
+on public.assistant_templates for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "Users can delete their own assistant templates"
+on public.assistant_templates for delete
+to authenticated
+using (auth.uid() = user_id);
