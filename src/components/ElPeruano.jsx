@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Archive,
@@ -35,15 +35,37 @@ const ElPeruano = () => {
   const [lastChecked, setLastChecked] = useState('');
   const [savedItems, setSavedItems] = useState(() => getLocalSavedRegistryItems());
   const [savedItemsSource, setSavedItemsSource] = useState('local');
+  const [notificationState] = useState(() => (typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'));
+  const [newPublicationCount, setNewPublicationCount] = useState(0);
+  const [publicationAlert, setPublicationAlert] = useState('');
+  const lastPublicationIdsRef = useRef(new Set());
+  const hasLoadedPublicationsRef = useRef(false);
 
   const applyRegistryResult = (result) => {
     setItems(result.items);
     setFeedSource(result.source);
     setLastChecked(formatCheckedAt(result.checkedAt));
-    setStatusMessage(result.error
-      ? 'El navegador bloqueo la consulta en vivo. Mostrando fuentes oficiales curadas.'
-      : 'Registros oficiales actualizados desde fuente publica.'
-    );
+    const nextIds = new Set((result.items || []).map((item) => item.id));
+    const previousIds = lastPublicationIdsRef.current;
+    const newItems = hasLoadedPublicationsRef.current
+      ? (result.items || []).filter((item) => !previousIds.has(item.id))
+      : [];
+
+    if (newItems.length > 0) {
+      setNewPublicationCount(newItems.length);
+      const alertMessage = `${newItems.length} nueva${newItems.length > 1 ? 's' : ''} publicación${newItems.length > 1 ? 'es' : ''} detectada${newItems.length > 1 ? 's' : ''}.`;
+      setPublicationAlert(alertMessage);
+      setStatusMessage(alertMessage);
+      notifyPublicationUpdate(newItems);
+    } else if (!hasLoadedPublicationsRef.current) {
+      setStatusMessage(result.error
+        ? 'El navegador bloqueo la consulta en vivo. Mostrando fuentes oficiales curadas.'
+        : 'Registros oficiales actualizados desde fuente publica.'
+      );
+    }
+
+    lastPublicationIdsRef.current = nextIds;
+    hasLoadedPublicationsRef.current = true;
     setLoading(false);
   };
 
@@ -71,8 +93,15 @@ const ElPeruano = () => {
       if (isMounted) applyRegistryResult(result);
     });
 
+    const intervalId = window.setInterval(() => {
+      fetchOfficialRegistryItems().then((result) => {
+        if (isMounted) applyRegistryResult(result);
+      });
+    }, 10 * 60 * 1000);
+
     return () => {
       isMounted = false;
+      window.clearInterval(intervalId);
     };
   }, []);
 
@@ -199,6 +228,22 @@ const ElPeruano = () => {
           </div>
         )}
 
+        {(publicationAlert || newPublicationCount > 0) && (
+          <div className="flex flex-col gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-5 py-4 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-emerald-200">
+              <span className="font-bold uppercase tracking-[0.16em] text-emerald-300">Novedades detectadas</span>
+              <p className="mt-1 text-emerald-100/80">{publicationAlert || `${newPublicationCount} nuevas publicaciones detectadas.`}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPublicationAlert('')}
+              className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-200 transition-colors hover:text-white"
+            >
+              Marcar como visto
+            </button>
+          </div>
+        )}
+
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {stats.map((stat) => (
             <Metric key={stat.label} {...stat} />
@@ -278,8 +323,17 @@ const ElPeruano = () => {
               </div>
             </div>
 
-            <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-6">
-              <h2 className="text-lg font-serif text-brand-ivory">Biblioteca normativa</h2>
+          <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-6">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-lg font-serif text-brand-ivory">Biblioteca normativa</h2>
+                <button
+                  type="button"
+                  onClick={requestBrowserNotifications}
+                  className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-gold transition-colors hover:text-brand-ivory"
+                >
+                  {notificationState === 'granted' ? 'Notificaciones activas' : 'Activar avisos'}
+                </button>
+              </div>
               <p className="mt-1 text-xs text-brand-accent/45">Registros guardados para seguimiento. Fuente: {formatSavedSource(savedItemsSource)}.</p>
               <div className="mt-5 space-y-3">
                 {savedItems.length > 0 ? savedItems.slice(0, 5).map((item) => (
@@ -529,6 +583,21 @@ const buildLocalRegistryAnalysis = (item, relatedCases) => [
   'Datos faltantes:',
   'Texto completo de la norma y validacion juridica final del abogado responsable.',
 ].join('\n');
+
+const notifyPublicationUpdate = (newItems) => {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  newItems.slice(0, 3).forEach((item) => {
+    new Notification('LUSTI: nueva publicacion detectada', {
+      body: item.title,
+    });
+  });
+};
+
+const requestBrowserNotifications = async () => {
+  if (!('Notification' in window)) return 'unsupported';
+  return Notification.requestPermission();
+};
 
 const formatCheckedAt = (value) => {
   if (!value) return '';
