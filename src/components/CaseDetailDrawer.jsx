@@ -49,6 +49,8 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
       size: (file.size / 1024).toFixed(2) + ' KB',
       date: new Date().toISOString().split('T')[0],
       type: file.type,
+      excerpt: 'Archivo subido por el usuario. Para que la IA lea contenido completo, registra el texto del documento en la carga documental avanzada.',
+      content: '',
     };
 
     onUpdate(caseData.id, {
@@ -471,17 +473,24 @@ const InfoCard = ({ icon: Icon, label, value }) => (
 );
 
 const DocumentRow = ({ doc }) => (
-  <div className="group flex items-center justify-between gap-4 rounded-lg border border-white/[0.06] bg-white/[0.015] p-4 transition-colors hover:bg-white/[0.03]">
-    <div className="flex min-w-0 items-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-gold/10 text-brand-gold">
-        <FileText className="h-5 w-5" />
+  <div className="group rounded-lg border border-white/[0.06] bg-white/[0.015] p-4 transition-colors hover:bg-white/[0.03]">
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-gold/10 text-brand-gold">
+          <FileText className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm text-brand-ivory/80">{doc.name}</p>
+          <p className="mt-1 text-xs text-brand-accent/35">{doc.size || 'Archivo vinculado'}</p>
+        </div>
       </div>
-      <div className="min-w-0">
-        <p className="truncate text-sm text-brand-ivory/80">{doc.name}</p>
-        <p className="mt-1 text-xs text-brand-accent/35">{doc.size || 'Archivo vinculado'}</p>
-      </div>
+      <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-accent/35">{doc.date}</span>
     </div>
-    <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-accent/35">{doc.date}</span>
+    {doc.excerpt && (
+      <p className="mt-3 border-t border-white/[0.04] pt-3 text-xs font-light leading-5 text-brand-accent/55">
+        {doc.excerpt}
+      </p>
+    )}
   </div>
 );
 
@@ -562,7 +571,7 @@ const EmptyState = ({ icon: Icon, text }) => (
 const buildCaseResponse = (question, caseData, documents, notes, importantDates, officialReferences = []) => {
   const normalizedQuestion = question.toLowerCase();
   const documentList = documents.length
-    ? documents.map((doc, index) => `${index + 1}. ${doc.name}${doc.date ? ` (${doc.date})` : ''}`).join('\n')
+    ? documents.map((doc, index) => `${index + 1}. ${doc.name}${doc.date ? ` (${doc.date})` : ''}${doc.excerpt ? ` - ${doc.excerpt}` : ''}`).join('\n')
     : 'No hay documentos vinculados todavia.';
   const dateList = importantDates.length
     ? importantDates.map((item, index) => `${index + 1}. ${item.title} - ${item.date} [${item.priority}]`).join('\n')

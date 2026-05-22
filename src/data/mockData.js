@@ -1,30 +1,26 @@
 // src/data/mockData.js
+import { demoDocumentsByCaseId } from './demoDocuments';
 
 export const mockCases = [
   {
     id: 'EXP-2026-001',
-    clientName: 'Juan Pérez',
+    clientName: 'Juan Perez',
     dni: '12345678',
     type: 'Laboral',
     status: 'Activo',
     lastUpdate: '2026-05-01',
     summary: 'Demanda por despido arbitrario. Etapa de pruebas.',
-    documents: [
-      { name: 'Demanda Inicial.pdf', date: '2026-04-10' },
-      { name: 'Pruebas Testimoniales.pdf', date: '2026-04-25' }
-    ]
+    documents: demoDocumentsByCaseId['EXP-2026-001'],
   },
   {
     id: 'EXP-2026-002',
-    clientName: 'María Gómez',
+    clientName: 'Maria Gomez',
     dni: '87654321',
     type: 'Civil',
     status: 'Pendiente',
     lastUpdate: '2026-05-05',
-    summary: 'Contrato de alquiler residencial. Revisión de cláusulas.',
-    documents: [
-      { name: 'Borrador Contrato.docx', date: '2026-05-05' }
-    ]
+    summary: 'Contrato de alquiler residencial. Revision de clausulas.',
+    documents: demoDocumentsByCaseId['EXP-2026-002'],
   },
   {
     id: 'EXP-2026-003',
@@ -33,15 +29,13 @@ export const mockCases = [
     type: 'Corporativo',
     status: 'Cerrado',
     lastUpdate: '2026-03-15',
-    summary: 'Asesoría en fusión empresarial. Caso cerrado exitosamente.',
-    documents: [
-      { name: 'Acta de Fusión.pdf', date: '2026-03-15' }
-    ]
-  }
+    summary: 'Asesoria en fusion empresarial. Caso cerrado exitosamente.',
+    documents: demoDocumentsByCaseId['EXP-2026-003'],
+  },
 ];
 
 export const mockAIResponses = {
-  default: "Hola, soy tu Asistente Legal IA. Puedo ayudarte a buscar expedientes, resumir casos o redactar borradores. ¿En qué te ayudo hoy?",
-  search: (caseInfo) => `He encontrado el caso **${caseInfo.id}** de **${caseInfo.clientName}**. \n\n📄 **Resumen Rápido:** ${caseInfo.summary}\n\n📅 **Última actualización:** ${caseInfo.lastUpdate}`,
-  notFound: "No encontré ningún expediente con esos datos. Verifica el DNI, Nombre o Código."
+  default: 'Hola, soy tu Asistente Legal IA. Puedo ayudarte a buscar expedientes, resumir casos o redactar borradores. En que te ayudo hoy?',
+  search: (caseInfo) => `He encontrado el caso ${caseInfo.id} de ${caseInfo.clientName}.\n\nResumen rapido: ${caseInfo.summary}\n\nUltima actualizacion: ${caseInfo.lastUpdate}`,
+  notFound: 'No encontre ningun expediente con esos datos. Verifica el DNI, nombre o codigo.',
 };

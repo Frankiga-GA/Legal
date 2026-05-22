@@ -1,13 +1,23 @@
 import { mockCases } from '../data/mockData';
+import { demoDocumentsByCaseId } from '../data/demoDocuments';
 import { fetchSupabaseCases, replaceSupabaseCases, upsertSupabaseCase } from './supabaseCaseStore';
 
 const STORAGE_KEY = 'lusti-cases';
 
 const cloneCases = (cases) => JSON.parse(JSON.stringify(cases));
 
+const mergeDemoDocuments = (caseData) => {
+  const documents = Array.isArray(caseData.documents) ? caseData.documents : [];
+  const demoDocuments = demoDocumentsByCaseId[caseData.id] || [];
+  const existingKeys = new Set(documents.map((doc) => doc.id || doc.name));
+  const missingDemoDocuments = demoDocuments.filter((doc) => !existingKeys.has(doc.id) && !existingKeys.has(doc.name));
+
+  return [...documents, ...missingDemoDocuments];
+};
+
 const normalizeCase = (caseData) => ({
   ...caseData,
-  documents: Array.isArray(caseData.documents) ? caseData.documents : [],
+  documents: mergeDemoDocuments(caseData),
   notes: Array.isArray(caseData.notes) ? caseData.notes : [],
   importantDates: Array.isArray(caseData.importantDates) ? caseData.importantDates : [],
   officialReferences: Array.isArray(caseData.officialReferences) ? caseData.officialReferences : [],

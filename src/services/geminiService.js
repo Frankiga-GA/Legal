@@ -24,6 +24,8 @@ const buildCaseContext = ({ caseData, documents, notes, importantDates, official
     fecha: doc.date,
     tipo: doc.type,
     tamano: doc.size,
+    extracto: doc.excerpt,
+    contenido: doc.content,
   })),
   notas: notes.map((note) => ({
     texto: note.text,
