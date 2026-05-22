@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import CaseLibrary from './components/CaseLibrary';
-import FloatingChat from './components/FloatingChat';
 import ManagerBot from './components/ManagerBot';
 import Dashboard from './components/Dashboard';
 import Settings from './components/Settings';
@@ -62,7 +61,7 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard setActiveTab={setActiveTab} />;
-      case 'library': return <CaseLibrary />;
+      case 'library': return <CaseLibrary setActiveTab={setActiveTab} />;
       case 'monitor': return <LegalMonitor setActiveTab={setActiveTab} />;
       case 'ai-chat': return <ManagerBot />;
       case 'elperuano': return <ElPeruano />;
@@ -130,7 +129,6 @@ function App() {
             {renderContent()}
           </div>
         </div>
-        {activeTab === 'library' && <FloatingChat />}
       </main>
     </div>
   );

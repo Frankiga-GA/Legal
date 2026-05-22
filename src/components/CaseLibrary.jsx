@@ -1,6 +1,7 @@
 // src/components/CaseLibrary.jsx
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowRight,
   CalendarClock,
   ChevronDown,
   ChevronRight,
@@ -16,7 +17,7 @@ import CaseDetailDrawer from './CaseDetailDrawer';
 import CreateCaseModal from './CreateCaseModal';
 import { addCaseAsync, getCases, loadCases, resetCasesAsync, updateCaseAsync } from '../services/caseStore';
 
-const CaseLibrary = () => {
+const CaseLibrary = ({ setActiveTab }) => {
   const [cases, setCases] = useState(() => getCases());
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
@@ -122,13 +123,23 @@ const CaseLibrary = () => {
               Gestiona casos, documentos, vencimientos y actividad del estudio desde una sola vista.
             </p>
           </div>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2 rounded-lg bg-brand-ivory px-6 py-3 font-semibold tracking-tight text-brand-black shadow-lg transition-all hover:bg-white"
-          >
-            <Plus className="h-5 w-5" />
-            Nuevo Registro
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={() => setActiveTab?.('ai-chat')}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-brand-accent/65 transition-all hover:border-brand-gold/25 hover:text-brand-ivory"
+            >
+              <MessageSquare className="h-4 w-4" />
+              Abrir asistente
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-2 rounded-lg bg-brand-ivory px-6 py-3 font-semibold tracking-tight text-brand-black shadow-lg transition-all hover:bg-white"
+            >
+              <Plus className="h-5 w-5" />
+              Nuevo Registro
+            </button>
+          </div>
         </header>
 
         {statusMessage && (
