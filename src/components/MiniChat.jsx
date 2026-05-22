@@ -4,7 +4,7 @@ import { Send, Bot, User } from 'lucide-react';
 
 const MiniChat = ({ caseData }) => {
   const [messages, setMessages] = useState([
-    { role: 'ai', content: `Hola, soy tu asistente para el caso **${caseData.id}**. ¿Necesitas un resumen, ver documentos o analizar riesgos?` }
+    { role: 'ai', content: `Hola, soy tu asistente para el caso ${caseData.id}. ¿Necesitas un resumen, ver documentos o analizar riesgos?` }
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -33,7 +33,7 @@ const MiniChat = ({ caseData }) => {
 
       // Lógica simple de detección de intención
       if (lowerInput.includes('resumen') || lowerInput.includes('estado')) {
-        responseContent = `📌 **Estado:** ${caseData.status}\n\n📝 **Resumen:** ${caseData.summary}\n\n📅 **Última act.:** ${caseData.lastUpdate}`;
+        responseContent = `Estado: ${caseData.status}\n\nResumen: ${caseData.summary}\n\nUltima act.: ${caseData.lastUpdate}`;
       } else if (lowerInput.includes('documento') || lowerInput.includes('prueba') || lowerInput.includes('archivo')) {
         if (caseData.documents.length === 0) {
           responseContent = "Aún no hay documentos adjuntos a este caso.";
@@ -42,7 +42,7 @@ const MiniChat = ({ caseData }) => {
           responseContent = `He encontrado ${caseData.documents.length} documento(s):\n\n${docList}`;
         }
       } else if (lowerInput.includes('riesgo') || lowerInput.includes('peligro')) {
-        responseContent = "⚠️ **Análisis de Riesgo (Simulado):** Basado en el tipo de caso '${caseData.type}', se recomienda revisar las cláusulas de indemnización y plazos procesales.";
+        responseContent = `Analisis de riesgo simulado: Basado en el tipo de caso ${caseData.type}, se recomienda revisar las clausulas de indemnizacion y plazos procesales.`;
       } else {
         responseContent = "Entendido. Puedo ayudarte con resúmenes, listas de documentos o análisis básicos. ¿Qué más necesitas saber de este expediente?";
       }

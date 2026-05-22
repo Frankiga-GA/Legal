@@ -3,6 +3,12 @@ const geminiModel = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash';
 
 export const isGeminiConfigured = Boolean(geminiApiKey);
 
+const cleanAssistantText = (text = '') => text
+  .replace(/\*\*/g, '')
+  .replace(/^\s*\*\s+/gm, '- ')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
 const buildCaseContext = ({ caseData, documents, notes, importantDates, officialReferences }) => ({
   expediente: {
     id: caseData.id,
@@ -45,6 +51,7 @@ const buildCaseContext = ({ caseData, documents, notes, importantDates, official
 const buildPrompt = (question, context) => `
 Eres LUSTI, un asistente legal para estudios juridicos peruanos.
 Responde en espanol claro, profesional y accionable.
+No uses Markdown. No uses asteriscos para negritas. Usa texto limpio, guiones simples y secciones cortas.
 No inventes informacion. Si falta contexto, dilo y pide el dato faltante.
 No presentes tu respuesta como asesoria legal definitiva; tratala como analisis preliminar para revision de un abogado.
 
@@ -109,7 +116,7 @@ export const askGeminiAboutCase = async ({
     .trim();
 
   if (!text) throw new Error('Gemini devolvio una respuesta vacia.');
-  return text;
+  return cleanAssistantText(text);
 };
 
 const buildRegistryContext = ({ item, cases }) => ({
@@ -141,6 +148,7 @@ Analiza el registro oficial con prudencia: si no tienes texto completo, dilo cla
 No inventes articulos, plazos ni contenido no disponible.
 
 Entrega la respuesta en este formato:
+No uses Markdown ni asteriscos.
 Resumen legal:
 Impacto probable:
 Materias afectadas:
@@ -192,7 +200,7 @@ export const analyzeOfficialRegistryItem = async ({ item, cases }) => {
     .trim();
 
   if (!text) throw new Error('Gemini devolvio un analisis vacio.');
-  return text;
+  return cleanAssistantText(text);
 };
 
 const buildSpecializedAssistantPrompt = ({ bot, question }) => `
@@ -201,6 +209,7 @@ Especialidad declarada: ${bot.description || 'Asistencia legal general'}.
 Documentos de referencia disponibles segun el sistema: ${bot.docs || 0}.
 
 Responde en espanol claro, profesional y util.
+No uses Markdown. No uses asteriscos para negritas. Usa texto limpio.
 Si el usuario saluda, saluda brevemente y ofrece formas concretas de ayuda segun tu especialidad.
 Si falta informacion para analizar un caso, pide los datos necesarios.
 No inventes documentos, normas, plazos ni hechos no entregados.
@@ -249,5 +258,73 @@ export const askGeminiSpecializedAssistant = async ({ bot, question }) => {
     .trim();
 
   if (!text) throw new Error('Gemini devolvio una respuesta vacia.');
-  return text;
+  return cleanAssistantText(text);
+};
+
+const buildVaultAssistantPrompt = ({ question, cases }) => `
+Eres LUSTI, asistente operativo de la boveda de expedientes de un estudio juridico peruano.
+Responde en espanol claro y breve.
+No uses Markdown. No uses asteriscos para negritas. Usa texto limpio.
+Usa solo los expedientes entregados como contexto. Si preguntan por conteos, calcula con estos datos.
+Si no encuentras un expediente, dilo sin tratarlo como error tecnico.
+
+Expedientes:
+${JSON.stringify(cases.map((caseItem) => ({
+  id: caseItem.id,
+  cliente: caseItem.clientName,
+  identificacion: caseItem.dni,
+  materia: caseItem.type,
+  estado: caseItem.status,
+  resumen: caseItem.summary,
+  ultimaActualizacion: caseItem.lastUpdate,
+  documentos: Array.isArray(caseItem.documents) ? caseItem.documents.length : 0,
+  notas: Array.isArray(caseItem.notes) ? caseItem.notes.length : 0,
+  fechas: Array.isArray(caseItem.importantDates) ? caseItem.importantDates.length : 0,
+  normas: Array.isArray(caseItem.officialReferences) ? caseItem.officialReferences.length : 0,
+})), null, 2)}
+
+Pregunta:
+${question}
+`;
+
+export const askGeminiVaultAssistant = async ({ question, cases }) => {
+  if (!isGeminiConfigured) {
+    throw new Error('Gemini no esta configurado.');
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: buildVaultAssistantPrompt({ question, cases }) }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          topP: 0.9,
+          maxOutputTokens: 900,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Gemini no pudo responder.');
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text)
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+
+  if (!text) throw new Error('Gemini devolvio una respuesta vacia.');
+  return cleanAssistantText(text);
 };
