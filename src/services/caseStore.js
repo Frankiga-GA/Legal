@@ -57,8 +57,9 @@ export const loadCases = async () => {
       return { cases: localCases, source: 'supabase-seeded', error: null };
     }
 
-    saveCases(cases);
-    return { cases, source: 'supabase', error: null };
+    const normalizedCases = cases.map(normalizeCase);
+    saveCases(normalizedCases);
+    return { cases: normalizedCases, source: 'supabase', error: null };
   } catch (error) {
     console.warn('Supabase no esta disponible. Usando almacenamiento local.', error);
     return { cases: localCases, source: 'local', error };

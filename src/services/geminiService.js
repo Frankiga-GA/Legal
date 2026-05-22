@@ -64,6 +64,9 @@ Formato preferido:
 - Acciones recomendadas.
 - Datos faltantes, si aplica.
 
+Si la pregunta pide leer documentos, usa el campo "contenido" y cita los nombres de documentos disponibles.
+No digas que no puedes identificar el contenido si el contexto incluye extracto o contenido documental.
+
 Contexto del expediente:
 ${JSON.stringify(context, null, 2)}
 
