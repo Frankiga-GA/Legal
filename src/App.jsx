@@ -10,14 +10,18 @@ import LoginPage from './components/LoginPage';
 import LandingPage from './components/LandingPage';
 import ElPeruano from './components/ElPeruano';
 import LegalMonitor from './components/LegalMonitor';
+import DriveVault from './components/DriveVault';
 import { getCurrentSession, onAuthStateChange, signOut } from './services/authService';
+import { getStoredDriveToken, onDriveTokenChange, onDriveTokenMessage } from './services/googleDriveService';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLanding, setIsLanding] = useState(true);
   const [session, setSession] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isDriveConnected, setIsDriveConnected] = useState(() => Boolean(getStoredDriveToken()?.access_token));
 
   useEffect(() => {
     let isMounted = true;
@@ -46,6 +50,37 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const syncDriveState = () => {
+      setIsDriveConnected(Boolean(getStoredDriveToken()?.access_token));
+    };
+
+    syncDriveState();
+
+    const onStorage = (event) => {
+      if (!event.key || event.key === 'lusti-google-drive-token') {
+        syncDriveState();
+      }
+    };
+
+    const unsubscribeDriveToken = onDriveTokenMessage(() => {
+      syncDriveState();
+    });
+    const unsubscribeDriveChange = onDriveTokenChange(() => {
+      syncDriveState();
+    });
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', syncDriveState);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', syncDriveState);
+      unsubscribeDriveToken();
+      unsubscribeDriveChange();
+    };
+  }, []);
+
   const handleLogin = (nextSession) => {
     setSession(nextSession);
     setIsLanding(false);
@@ -60,9 +95,10 @@ function App() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard': return <Dashboard setActiveTab={setActiveTab} />;
+      case 'dashboard': return <Dashboard setActiveTab={setActiveTab} isDriveConnected={isDriveConnected} />;
       case 'library': return <CaseLibrary setActiveTab={setActiveTab} />;
       case 'monitor': return <LegalMonitor setActiveTab={setActiveTab} />;
+      case 'drive': return <DriveVault />;
       case 'ai-chat': return <ManagerBot />;
       case 'elperuano': return <ElPeruano />;
       case 'settings': return <Settings />;
@@ -72,8 +108,15 @@ function App() {
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
+    setIsSidebarCollapsed(tab === 'ai-chat');
     setIsMobileMenuOpen(false);
   };
+
+  useEffect(() => {
+    if (!isDriveConnected && activeTab === 'drive') {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, isDriveConnected]);
 
   if (isAuthLoading) {
     return (
@@ -103,7 +146,7 @@ function App() {
       <div className="md:hidden absolute top-6 left-6 z-50">
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-white"
+          className="rounded-lg border border-white/[0.08] bg-white/[0.04] p-3 text-white"
         >
           {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
@@ -114,12 +157,21 @@ function App() {
         {/* Mobile Background Overlay */}
         {isMobileMenuOpen && (
           <div 
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[-1] md:hidden w-screen h-screen" 
+            className="fixed inset-0 z-[-1] h-screen w-screen bg-black/80" 
             onClick={() => setIsMobileMenuOpen(false)}
           ></div>
         )}
         <div className="h-full bg-brand-black border-r border-white/[0.05]">
-          <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} onHome={() => setIsLanding(true)} onLogout={handleLogout} userEmail={session.user?.email} />
+          <Sidebar
+            activeTab={activeTab}
+            setActiveTab={handleTabChange}
+            onHome={() => setIsLanding(true)}
+            onLogout={handleLogout}
+            userEmail={session.user?.email}
+            collapsed={isSidebarCollapsed}
+            onToggleCollapse={() => setIsSidebarCollapsed((value) => !value)}
+            showDrive={isDriveConnected}
+          />
         </div>
       </div>
 

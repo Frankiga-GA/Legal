@@ -22,6 +22,24 @@ export const signInWithEmail = async ({ email, password }) => {
   return data.session;
 };
 
+export const signInWithGoogle = async () => {
+  if (!supabase) {
+    throw new Error('Supabase no esta configurado.');
+  }
+
+  const redirectTo = `${window.location.origin}${window.location.pathname}`;
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo,
+    },
+  });
+
+  if (error) throw error;
+  return data;
+};
+
 export const signUpWithEmail = async ({ email, password }) => {
   if (!supabase) {
     throw new Error('Supabase no esta configurado.');

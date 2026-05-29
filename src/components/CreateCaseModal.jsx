@@ -1,6 +1,7 @@
 // src/components/CreateCaseModal.jsx
-import { useState } from 'react';
-import { X, FileText, User, Upload, Paperclip } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { X, FileText, User, Upload, Paperclip, HardDrive, RefreshCw, ExternalLink } from 'lucide-react';
+import { getStoredDriveToken, listDriveFiles, listDriveFolders } from '../services/googleDriveService';
 
 const CreateCaseModal = ({ onClose, onSave }) => {
   const [formData, setFormData] = useState({
@@ -10,36 +11,115 @@ const CreateCaseModal = ({ onClose, onSave }) => {
     type: 'Laboral',
     status: 'Activo',
     summary: '',
-    lastUpdate: new Date().toISOString().split('T')[0]
+    lastUpdate: new Date().toISOString().split('T')[0],
   });
 
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [selectedDriveFolderId, setSelectedDriveFolderId] = useState('');
+  const [driveFolders, setDriveFolders] = useState([]);
+  const [driveFiles, setDriveFiles] = useState([]);
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [driveError, setDriveError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleFileSelect = (e) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files).map(file => ({
-        name: file.name,
-        size: (file.size / 1024).toFixed(2) + ' KB',
-        type: file.type,
-        date: new Date().toISOString().split('T')[0]
-      }));
-      setSelectedFiles(prev => [...prev, ...newFiles]);
+    if (!e.target.files) return;
+
+    const newFiles = Array.from(e.target.files).map((file) => ({
+      name: file.name,
+      size: `${(file.size / 1024).toFixed(2)} KB`,
+      type: file.type,
+      date: new Date().toISOString().split('T')[0],
+      source: 'Local',
+    }));
+
+    setSelectedFiles((prev) => [...prev, ...newFiles]);
+  };
+
+  const loadDriveFiles = async () => {
+    const token = getStoredDriveToken();
+    if (!token?.access_token) {
+      setDriveFolders([]);
+      setDriveFiles([]);
+      setDriveError('');
+      return;
+    }
+
+    setDriveLoading(true);
+    setDriveError('');
+
+    try {
+      const [folders, files] = await Promise.all([listDriveFolders(token), listDriveFiles(token)]);
+      setDriveFolders(
+        folders
+          .filter((folder) => folder.mimeType === 'application/vnd.google-apps.folder')
+          .sort((a, b) => {
+            const aTime = a?.modifiedTime ? new Date(a.modifiedTime).getTime() : 0;
+            const bTime = b?.modifiedTime ? new Date(b.modifiedTime).getTime() : 0;
+            return bTime - aTime;
+          })
+      );
+      setDriveFiles(
+        files
+          .filter((file) => file.mimeType !== 'application/vnd.google-apps.folder')
+          .sort((a, b) => {
+            const aTime = a?.modifiedTime ? new Date(a.modifiedTime).getTime() : 0;
+            const bTime = b?.modifiedTime ? new Date(b.modifiedTime).getTime() : 0;
+            return bTime - aTime;
+          })
+      );
+    } catch (error) {
+      setDriveError(error?.message || 'No se pudieron cargar los archivos de Drive.');
+      setDriveFolders([]);
+      setDriveFiles([]);
+    } finally {
+      setDriveLoading(false);
     }
   };
 
+  useEffect(() => {
+    loadDriveFiles();
+  }, []);
+
+  const driveTokenAvailable = useMemo(() => Boolean(getStoredDriveToken()?.access_token), []);
+  const selectedDriveFolder = useMemo(
+    () => driveFolders.find((folder) => folder.id === selectedDriveFolderId) || null,
+    [driveFolders, selectedDriveFolderId]
+  );
+  const filteredDriveFiles = useMemo(
+    () =>
+      selectedDriveFolderId
+        ? driveFiles.filter((file) => Array.isArray(file.parents) && file.parents.includes(selectedDriveFolderId))
+        : [],
+    [driveFiles, selectedDriveFolderId]
+  );
+
+  const addDriveFile = (file) => {
+    setSelectedFiles((current) => [
+      ...current,
+      {
+        name: file.name,
+        size: file.size ? `${Math.round(Number(file.size) / 1024)} KB` : 'Archivo de Drive',
+        type: file.mimeType || 'application/octet-stream',
+        date: file.modifiedTime ? file.modifiedTime.split('T')[0] : new Date().toISOString().split('T')[0],
+        source: 'Drive',
+        webViewLink: file.webViewLink || '',
+      },
+    ]);
+  };
+
   const removeFile = (index) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.clientName || !formData.dni) return;
-    
+
     let finalId = formData.id;
     if (!finalId) {
       finalId = `EXP-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 100).padStart(3, '0')}`;
@@ -50,7 +130,7 @@ const CreateCaseModal = ({ onClose, onSave }) => {
       id: finalId,
       documents: selectedFiles,
       notes: [],
-      importantDates: []
+      importantDates: [],
     };
 
     onSave(newCase);
@@ -58,122 +138,123 @@ const CreateCaseModal = ({ onClose, onSave }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-brand-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-6">
-      <div className="bg-brand-dark border border-white/[0.05] rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in duration-500 flex flex-col max-h-[90vh]">
-        
-        {/* Header */}
-        <div className="p-10 border-b border-white/[0.05] flex justify-between items-center">
-          <h3 className="text-3xl font-serif font-medium text-brand-ivory flex items-center gap-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-black/90 p-6">
+      <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-white/[0.05] bg-brand-dark">
+        <div className="flex items-center justify-between border-b border-white/[0.05] p-10">
+          <h3 className="flex items-center gap-4 font-serif text-3xl font-medium text-brand-ivory">
             Apertura de Expediente
           </h3>
-          <button onClick={onClose} className="p-2 hover:bg-white/[0.05] rounded-full transition-colors text-brand-accent/40">
-            <X className="w-6 h-6" />
+          <button onClick={onClose} className="rounded-full p-2 text-brand-accent/40 transition-colors hover:bg-white/[0.05]">
+            <X className="h-6 w-6" />
           </button>
         </div>
 
-        {/* Formulario */}
-        <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto flex-1 custom-scrollbar">
-          
+        <form onSubmit={handleSubmit} className="flex-1 space-y-8 overflow-y-auto p-10 custom-scrollbar">
           <div className="grid grid-cols-2 gap-8">
-             <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest text-brand-accent/40 font-semibold">Identificador</label>
-                <input
-                  type="text"
-                  name="id"
-                  value={formData.id}
-                  onChange={handleChange}
-                  placeholder="ID Automático"
-                  className="w-full px-5 py-4 bg-white/[0.02] border border-white/[0.05] rounded-xl text-brand-ivory outline-none focus:border-brand-gold/40 transition-all placeholder:text-brand-accent/10"
-                />
-             </div>
-             <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest text-brand-accent/40 font-semibold">Materia Legal</label>
-                <select
-                  name="type"
-                  value={formData.type}
-                  onChange={handleChange}
-                  className="w-full px-5 py-4 bg-white/[0.02] border border-white/[0.05] rounded-xl text-brand-ivory outline-none focus:border-brand-gold/40 appearance-none"
-                >
-                  <option className="bg-brand-dark">Laboral</option>
-                  <option className="bg-brand-dark">Civil</option>
-                  <option className="bg-brand-dark">Penal</option>
-                  <option className="bg-brand-dark">Corporativo</option>
-                </select>
-             </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/40">Identificador</label>
+              <input
+                type="text"
+                name="id"
+                value={formData.id}
+                onChange={handleChange}
+                placeholder="ID Automático"
+                className="w-full rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-4 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/10 focus:border-brand-gold/40"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/40">Materia Legal</label>
+              <select
+                name="type"
+                value={formData.type}
+                onChange={handleChange}
+                className="w-full appearance-none rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-4 text-brand-ivory outline-none transition-all focus:border-brand-gold/40"
+              >
+                <option className="bg-brand-dark">Laboral</option>
+                <option className="bg-brand-dark">Civil</option>
+                <option className="bg-brand-dark">Penal</option>
+                <option className="bg-brand-dark">Corporativo</option>
+              </select>
+            </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest text-brand-accent/40 font-semibold">Titular / Cliente</label>
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/40">Titular / Cliente</label>
             <div className="relative">
-              <User className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-accent/20" />
+              <User className="absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-accent/20" />
               <input
                 type="text"
                 name="clientName"
                 value={formData.clientName}
                 onChange={handleChange}
                 placeholder="Nombre completo o Razón Social"
-                className="w-full pl-14 pr-6 py-4 bg-white/[0.02] border border-white/[0.05] rounded-xl text-brand-ivory outline-none focus:border-brand-gold/40 transition-all placeholder:text-brand-accent/10"
+                className="w-full rounded-xl border border-white/[0.05] bg-white/[0.02] py-4 pl-14 pr-6 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/10 focus:border-brand-gold/40"
                 required
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest text-brand-accent/40 font-semibold">Identificación (DNI / RUC)</label>
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/40">Identificación (DNI / RUC)</label>
             <input
               type="text"
               name="dni"
               value={formData.dni}
               onChange={handleChange}
               placeholder="Ingrese el número de identificación"
-              className="w-full px-5 py-4 bg-white/[0.02] border border-white/[0.05] rounded-xl text-brand-ivory outline-none focus:border-brand-gold/40 transition-all placeholder:text-brand-accent/10"
+              className="w-full rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-4 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/10 focus:border-brand-gold/40"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest text-brand-accent/40 font-semibold">Resumen Operativo</label>
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/40">Resumen Operativo</label>
             <textarea
               name="summary"
               value={formData.summary}
               onChange={handleChange}
               rows="3"
               placeholder="Descripción detallada de la materia..."
-              className="w-full px-5 py-4 bg-white/[0.02] border border-white/[0.05] rounded-xl text-brand-ivory outline-none focus:border-brand-gold/40 resize-none transition-all placeholder:text-brand-accent/10"
-            ></textarea>
+              className="w-full resize-none rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-4 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/10 focus:border-brand-gold/40"
+            />
           </div>
 
           <div className="space-y-4">
-            <label className="text-[10px] uppercase tracking-widest text-brand-accent/40 font-semibold flex items-center gap-2">
-              <Paperclip className="w-3.5 h-3.5 text-brand-gold" />
+            <label className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-brand-accent/40">
+              <Paperclip className="h-3.5 w-3.5 text-brand-gold" />
               Activos Documentales
             </label>
-            
-            <div className="border border-dashed border-white/[0.1] rounded-2xl p-8 text-center hover:bg-white/[0.02] transition-all cursor-pointer relative group">
-              <input 
-                type="file" 
-                multiple 
-                onChange={handleFileSelect} 
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+
+            <div className="relative cursor-pointer rounded-lg border border-dashed border-white/[0.1] p-8 text-center transition-colors hover:bg-white/[0.02] group">
+              <input
+                type="file"
+                multiple
+                onChange={handleFileSelect}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
               />
-              <Upload className="w-8 h-8 text-brand-accent/10 mx-auto mb-4 group-hover:text-brand-gold transition-colors" />
-              <p className="text-[10px] uppercase tracking-widest text-brand-accent/40 font-bold">Vincular Archivos</p>
+              <Upload className="mx-auto mb-4 h-8 w-8 text-brand-accent/10 transition-colors group-hover:text-brand-gold" />
+              <p className="text-[10px] font-bold uppercase tracking-widest text-brand-accent/40">Vincular Archivos</p>
             </div>
 
             {selectedFiles.length > 0 && (
               <div className="grid grid-cols-1 gap-2">
                 {selectedFiles.map((file, idx) => (
-                  <div key={idx} className="flex justify-between items-center bg-white/[0.02] p-4 rounded-xl border border-white/[0.05]">
+                  <div key={idx} className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.02] p-4">
                     <div className="flex items-center gap-3">
-                      <FileText className="w-4 h-4 text-brand-accent/40" />
-                      <span className="text-xs text-brand-ivory/60 truncate max-w-[240px] font-light">{file.name}</span>
+                      <FileText className="h-4 w-4 text-brand-accent/40" />
+                      <div className="min-w-0">
+                        <span className="block max-w-[240px] truncate text-xs font-light text-brand-ivory/60">{file.name}</span>
+                        <span className="mt-1 block text-[10px] uppercase tracking-widest text-brand-gold/60">
+                          {file.source || 'Local'}
+                        </span>
+                      </div>
                     </div>
-                    <button 
+                    <button
                       type="button"
                       onClick={() => removeFile(idx)}
-                      className="text-brand-accent/20 hover:text-red-500 transition-colors"
+                      className="text-brand-accent/20 transition-colors hover:text-red-500"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="h-4 w-4" />
                     </button>
                   </div>
                 ))}
@@ -181,20 +262,110 @@ const CreateCaseModal = ({ onClose, onSave }) => {
             )}
           </div>
 
+          <div className="space-y-4">
+            <label className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-brand-accent/40">
+              <HardDrive className="h-3.5 w-3.5 text-brand-gold" />
+              Carpeta de Drive
+            </label>
+
+            {!driveTokenAvailable ? (
+              <div className="rounded-lg border border-dashed border-white/[0.08] bg-white/[0.02] p-6 text-sm text-brand-accent/45">
+                Conecta Drive en Preferencias para ver carpetas y documentos disponibles.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <label className="block text-[10px] uppercase tracking-widest text-brand-accent/35">
+                    Selecciona la carpeta del expediente
+                  </label>
+                  <select
+                    value={selectedDriveFolderId}
+                    onChange={(e) => setSelectedDriveFolderId(e.target.value)}
+                    className="w-full rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-sm text-brand-ivory outline-none transition-colors focus:border-brand-gold/40"
+                  >
+                    <option value="" className="bg-brand-dark">
+                      Elegir carpeta
+                    </option>
+                    {driveFolders.map((folder) => (
+                      <option key={folder.id} value={folder.id} className="bg-brand-dark">
+                        {folder.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-brand-accent/35">
+                  <span>{selectedDriveFolder ? `Carpeta: ${selectedDriveFolder.name}` : 'Sin carpeta seleccionada'}</span>
+                  <button
+                    type="button"
+                    onClick={loadDriveFiles}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 hover:text-brand-ivory"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Refrescar
+                  </button>
+                </div>
+
+                {driveError ? (
+                  <div className="rounded-xl border border-red-500/15 bg-red-500/10 px-4 py-3 text-xs text-red-200">
+                    {driveError}
+                  </div>
+                ) : null}
+
+                <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                  {driveLoading ? (
+                    <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-4 text-sm text-brand-accent/45">
+                      Cargando archivos de Drive...
+                    </div>
+                  ) : selectedDriveFolderId ? (
+                    filteredDriveFiles.length ? (
+                      filteredDriveFiles.map((file) => (
+                        <button
+                          key={file.id}
+                          type="button"
+                          onClick={() => addDriveFile(file)}
+                          className="flex w-full items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.02] p-4 text-left transition-all hover:border-brand-gold/25 hover:bg-white/[0.04]"
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium text-brand-ivory">{file.name}</div>
+                            <div className="mt-1 text-[10px] uppercase tracking-widest text-brand-accent/35">
+                              {file.mimeType || 'Archivo'}
+                              {file.size ? ` • ${Math.round(Number(file.size) / 1024)} KB` : ''}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-brand-gold/60">
+                            <span>Importar</span>
+                            <ExternalLink className="h-4 w-4" />
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-4 text-sm text-brand-accent/45">
+                        No hay archivos dentro de esta carpeta.
+                      </div>
+                    )
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-white/[0.08] bg-white/[0.02] p-4 text-sm text-brand-accent/45">
+                      Elige una carpeta para ver sus documentos y agregarlos al expediente.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </form>
 
-        {/* Footer */}
-        <div className="p-10 border-t border-white/[0.05] flex gap-4 bg-white/[0.01]">
+        <div className="flex gap-4 border-t border-white/[0.05] bg-white/[0.01] p-10">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-8 py-4 border border-white/[0.1] text-brand-accent/60 rounded-xl hover:bg-white/[0.05] transition-all font-semibold tracking-tight"
+            className="flex-1 rounded-xl border border-white/[0.1] px-8 py-4 font-semibold tracking-tight text-brand-accent/60 transition-all hover:bg-white/[0.05]"
           >
             Anular
           </button>
           <button
             onClick={handleSubmit}
-            className="flex-1 px-8 py-4 bg-brand-ivory text-brand-black rounded-xl hover:bg-white transition-all font-bold tracking-tight shadow-lg"
+            className="flex-1 rounded-lg bg-brand-ivory px-8 py-4 font-bold tracking-tight text-brand-black transition-colors hover:bg-white"
           >
             Registrar Expediente
           </button>

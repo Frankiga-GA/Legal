@@ -1,20 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
   Bell,
+  Bot,
   CalendarClock,
   CheckCircle2,
+  Clock3,
+  FileCheck2,
   FileText,
   FolderOpen,
+  Gauge,
   MessageSquare,
   Newspaper,
   Plus,
+  Scale,
+  SearchCheck,
   UploadCloud,
 } from 'lucide-react';
 import { getCases, loadCases } from '../services/caseStore';
 
-const Dashboard = ({ setActiveTab }) => {
+const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
   const [cases, setCases] = useState(() => getCases());
 
   useEffect(() => {
@@ -29,12 +35,26 @@ const Dashboard = ({ setActiveTab }) => {
     };
   }, []);
 
-  const activeCases = cases.filter(caso => caso.status === 'Activo');
-  const pendingCases = cases.filter(caso => caso.status === 'Pendiente');
-  const indexedDocs = cases.reduce((total, caso) => total + (caso.documents?.length || 0), 0);
+  const activeCases = cases.filter((caseItem) => caseItem.status === 'Activo');
+  const pendingCases = cases.filter((caseItem) => caseItem.status === 'Pendiente');
+  const indexedDocs = cases.reduce((total, caseItem) => total + (caseItem.documents?.length || 0), 0);
+  const aiReadyDocs = cases.reduce(
+    (total, caseItem) => total + (caseItem.documents || []).filter((doc) => doc.content || doc.excerpt).length,
+    0
+  );
   const upcomingDeadlines = getUpcomingDeadlines(cases);
-  const weekDeadlines = upcomingDeadlines.filter(item => item.daysUntil <= 7);
-  const urgentDeadlines = upcomingDeadlines.filter(item => item.daysUntil <= 1 || item.priority === 'Alta');
+  const weekDeadlines = upcomingDeadlines.filter((item) => item.daysUntil <= 7);
+  const urgentDeadlines = upcomingDeadlines.filter((item) => item.daysUntil <= 1 || item.priority === 'Alta');
+  const legalAlerts = buildLegalAlerts({ upcomingDeadlines, urgentDeadlines, cases });
+  const activityItems = buildActivityItems(cases);
+  const priorityCases = buildPriorityCases(cases, upcomingDeadlines);
+
+  const readinessScore = useMemo(() => {
+    const caseSignal = Math.min(activeCases.length * 18, 36);
+    const docSignal = indexedDocs ? Math.min(aiReadyDocs / indexedDocs, 1) * 34 : 0;
+    const deadlineSignal = urgentDeadlines.length ? 14 : 30;
+    return Math.max(42, Math.round(caseSignal + docSignal + deadlineSignal));
+  }, [activeCases.length, aiReadyDocs, indexedDocs, urgentDeadlines.length]);
 
   const stats = [
     {
@@ -42,232 +62,292 @@ const Dashboard = ({ setActiveTab }) => {
       value: activeCases.length.toString().padStart(2, '0'),
       detail: `${pendingCases.length} pendientes por revisar`,
       icon: FolderOpen,
+      tone: 'gold',
     },
     {
-      title: 'Documentos vinculados',
-      value: indexedDocs.toString().padStart(2, '0'),
-      detail: 'Listos para analisis por caso',
-      icon: FileText,
+      title: 'Docs analizados por IA',
+      value: aiReadyDocs.toString().padStart(2, '0'),
+      detail: `${indexedDocs} documentos vinculados`,
+      icon: FileCheck2,
+      tone: 'emerald',
     },
     {
-      title: 'Alertas de la semana',
+      title: 'Vencimientos proximos',
       value: weekDeadlines.length.toString().padStart(2, '0'),
       detail: `${urgentDeadlines.length} requieren atencion`,
-      icon: Bell,
+      icon: CalendarClock,
+      tone: urgentDeadlines.length ? 'red' : 'gold',
     },
     {
-      title: 'Consultas IA',
-      value: '18',
-      detail: 'Borradores y resumenes asistidos',
-      icon: MessageSquare,
+      title: 'Alertas legales',
+      value: legalAlerts.length.toString().padStart(2, '0'),
+      detail: 'Normas y actividad relevante',
+      icon: Bell,
+      tone: 'blue',
     },
-  ];
-
-  const priorityCases = cases.slice(0, 4).map((caso, index) => ({
-    ...caso,
-    nextStep: [
-      'Validar documentos pendientes',
-      'Preparar borrador de respuesta',
-      'Revisar ultima actuacion',
-      'Actualizar resumen ejecutivo',
-    ][index] || 'Revisar seguimiento',
-  }));
-
-  const legalAlerts = [
-    { id: 1, source: 'El Peruano', title: 'Nueva norma laboral detectada', time: 'Hace 20 min', type: 'Norma legal' },
-    { id: 2, source: 'Jurisprudencia', title: 'Criterio reciente sobre despido motivado', time: 'Hace 2 h', type: 'TC' },
-    { id: 3, source: 'Agenda interna', title: `${upcomingDeadlines.length} vencimientos registrados`, time: 'Hoy', type: 'Gestion' },
   ];
 
   const quickActions = [
-    { label: 'Nuevo expediente', icon: Plus, tab: 'library', primary: true },
-    { label: 'Subir documento', icon: UploadCloud, tab: 'library' },
-    { label: 'Consultar IA', icon: MessageSquare, tab: 'ai-chat' },
-    { label: 'Monitor judicial', icon: Newspaper, tab: 'monitor' },
+    {
+      label: 'Crear expediente',
+      description: 'Registra cliente, materia y seguimiento inicial.',
+      icon: Plus,
+      tab: 'library',
+      primary: true,
+    },
+    {
+      label: 'Conectar documentos',
+      description: isDriveConnected ? 'Usa Drive como fuente documental.' : 'Adjunta archivos desde la boveda del caso.',
+      icon: UploadCloud,
+      tab: isDriveConnected ? 'drive' : 'library',
+    },
+    {
+      label: 'Preguntar o generar con IA',
+      description: 'Consulta asistentes y trabaja con plantillas legales.',
+      icon: MessageSquare,
+      tab: 'ai-chat',
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-brand-black p-6 md:p-10">
-      <div className="mx-auto flex max-w-7xl flex-col gap-8">
-        <header className="flex flex-col gap-5 border-b border-white/[0.06] pb-8 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-300">Operacion al dia</span>
-            </div>
-            <div>
-              <h1 className="text-4xl font-serif font-medium tracking-tight text-brand-ivory md:text-5xl">Resumen del estudio</h1>
-              <p className="mt-3 max-w-2xl text-sm font-light leading-6 text-brand-accent/60">
-                Expedientes, vencimientos, documentos y alertas legales concentrados en una sola vista de trabajo.
-              </p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-brand-black p-5 md:p-8 xl:p-10">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <header className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+          <section className="relative overflow-hidden rounded-lg border border-white/[0.06] bg-white/[0.018] p-6 md:p-8">
+            <div className="absolute inset-x-0 top-0 h-px bg-white/[0.08]"></div>
+            <div className="relative z-10 flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
+              <div className="max-w-3xl">
+                <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                  <span className="text-[11px] font-semibold text-emerald-300">Central de operaciones legal</span>
+                </div>
+                <h1 className="text-4xl font-serif font-medium leading-tight tracking-tight text-brand-ivory md:text-5xl">
+                  Tres caminos claros para operar mejor: expediente, documentos e IA.
+                </h1>
+                <p className="mt-4 max-w-2xl text-sm font-light leading-6 text-brand-accent/65">
+                  LUSTI concentra la venta del producto en crear casos, conectar archivos y convertir ese contexto en respuestas o documentos asistidos por IA.
+                </p>
+              </div>
 
-          <div className="flex flex-col gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-5 py-4 text-sm text-brand-accent/70">
-            <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-brand-gold">Jornada</span>
-            <span className="font-medium text-brand-ivory">Jueves, 21 mayo 2026</span>
-          </div>
+              <div className="grid min-w-[260px] gap-3 rounded-lg border border-white/[0.06] bg-brand-black/45 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-brand-gold">Pulso operativo</p>
+                    <p className="mt-2 text-4xl font-serif text-brand-ivory">{readinessScore}%</p>
+                  </div>
+                  <Gauge className="h-8 w-8 text-brand-gold" />
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div className="h-full rounded-full bg-brand-gold" style={{ width: `${readinessScore}%` }}></div>
+                </div>
+                <p className="text-xs leading-5 text-brand-accent/50">
+                  Basado en expedientes activos, documentos con contenido y vencimientos urgentes.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-white/[0.06] bg-white/[0.018] p-5">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-brand-gold">Hoy</p>
+                <p className="mt-2 font-serif text-2xl text-brand-ivory">{formatToday()}</p>
+              </div>
+              <Scale className="h-6 w-6 text-brand-gold" />
+            </div>
+            <div className="grid gap-3">
+              {quickActions.map((action) => (
+                <button
+                  key={action.label}
+                  onClick={() => setActiveTab(action.tab)}
+                  className={`group flex items-center justify-between rounded-lg p-4 text-left transition-all ${
+                    action.primary
+                      ? 'bg-brand-ivory text-brand-black hover:bg-white'
+                      : 'border border-white/[0.06] bg-white/[0.02] text-brand-ivory hover:border-brand-gold/30 hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <action.icon className="h-5 w-5 shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold">{action.label}</span>
+                      <span className={`block truncate text-xs ${action.primary ? 'text-brand-black/60' : 'text-brand-accent/45'}`}>
+                        {action.description}
+                      </span>
+                    </span>
+                  </span>
+                  <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-1" />
+                </button>
+              ))}
+            </div>
+          </section>
         </header>
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {stats.map((stat) => (
-            <div key={stat.title} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-5 transition-colors hover:border-brand-gold/30">
-              <div className="mb-6 flex items-start justify-between">
-                <div className="rounded-lg bg-brand-gold/10 p-2.5">
-                  <stat.icon className="h-5 w-5 text-brand-gold" />
-                </div>
-                <CheckCircle2 className="h-4 w-4 text-emerald-400/70" />
-              </div>
-              <div className="space-y-1">
-                <p className="text-3xl font-serif text-brand-ivory">{stat.value}</p>
-                <h2 className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-accent/70">{stat.title}</h2>
-                <p className="text-xs font-light text-brand-accent/40">{stat.detail}</p>
-              </div>
-            </div>
+            <MetricCard key={stat.title} {...stat} />
           ))}
         </section>
 
-        <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.6fr_1fr]">
+        <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.35fr_0.65fr]">
           <div className="rounded-lg border border-white/[0.06] bg-white/[0.015]">
             <div className="flex flex-col gap-3 border-b border-white/[0.05] p-5 md:flex-row md:items-center md:justify-between">
               <div>
-                <h3 className="text-xl font-serif text-brand-ivory">Expedientes prioritarios</h3>
-                <p className="mt-1 text-xs text-brand-accent/45">Casos que requieren seguimiento operativo.</p>
+                <h2 className="text-xl font-serif text-brand-ivory">Expedientes listos para trabajar</h2>
+                <p className="mt-1 text-xs text-brand-accent/45">El primer flujo empieza aqui: crear caso y dejarlo listo para documentos e IA.</p>
               </div>
               <button
                 onClick={() => setActiveTab('library')}
-                className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-brand-gold transition-colors hover:text-brand-ivory"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-brand-gold transition-colors hover:text-brand-ivory"
               >
                 Abrir boveda <ArrowRight className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="border-b border-white/[0.05] bg-white/[0.015]">
-                  <tr>
-                    <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-brand-accent/45">Expediente</th>
-                    <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-brand-accent/45">Cliente</th>
-                    <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-brand-accent/45">Materia</th>
-                    <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-brand-accent/45">Siguiente paso</th>
-                    <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-brand-accent/45">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.04]">
-                  {priorityCases.map(caso => (
-                    <tr key={caso.id} className="transition-colors hover:bg-white/[0.025]">
-                      <td className="px-5 py-4 font-serif text-sm text-brand-ivory">{caso.id}</td>
-                      <td className="px-5 py-4 text-sm text-brand-ivory/75">{caso.clientName}</td>
-                      <td className="px-5 py-4 text-xs text-brand-accent/60">{caso.type}</td>
-                      <td className="px-5 py-4 text-xs text-brand-accent/70">{caso.nextStep}</td>
-                      <td className="px-5 py-4">
-                        <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-accent/70">
-                          {caso.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid gap-3 p-4">
+              {priorityCases.length ? priorityCases.map((caseItem) => (
+                <button
+                  key={caseItem.id}
+                  onClick={() => setActiveTab('library')}
+                  className="grid gap-4 rounded-lg border border-white/[0.05] bg-white/[0.018] p-4 text-left transition-all hover:border-brand-gold/30 hover:bg-white/[0.035] lg:grid-cols-[1fr_160px_150px]"
+                >
+                  <div className="min-w-0">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className="font-serif text-lg text-brand-ivory">{caseItem.id}</span>
+                      <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-xs font-medium text-brand-accent/65">
+                        {caseItem.status}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-brand-ivory/80">{caseItem.clientName}</p>
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-brand-accent/50">{caseItem.summary || 'Sin resumen registrado.'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-brand-gold">Materia</p>
+                    <p className="mt-2 text-sm text-brand-ivory/75">{caseItem.type}</p>
+                    <p className="mt-3 text-xs text-brand-accent/45">{caseItem.documentsCount} docs vinculados</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-brand-gold">Siguiente paso</p>
+                    <p className="mt-2 text-sm leading-5 text-brand-ivory/75">{caseItem.nextStep}</p>
+                  </div>
+                </button>
+              )) : (
+                <EmptyState
+                  icon={FolderOpen}
+                  title="Aun no hay expedientes"
+                  text="Crea el primer expediente demo para que el dashboard empiece a mostrar valor comercial."
+                  action="Crear expediente"
+                  onAction={() => setActiveTab('library')}
+                />
+              )}
             </div>
           </div>
 
           <div className="flex flex-col gap-6">
             <div className="rounded-lg border border-red-500/15 bg-red-500/[0.04] p-5">
-              <div className="mb-5 flex items-center gap-3">
-                <div className="rounded-lg bg-red-500/10 p-2">
-                  <AlertTriangle className="h-5 w-5 text-red-300" />
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-red-500/10 p-2">
+                    <AlertTriangle className="h-5 w-5 text-red-300" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-serif text-brand-ivory">Vencimientos proximos</h2>
+                    <p className="text-xs text-brand-accent/45">Lo que debe verse antes de que sea tarde.</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-serif text-brand-ivory">Vencimientos</h3>
-                  <p className="text-xs text-brand-accent/45">Prioridad procesal tomada de expedientes reales.</p>
-                </div>
+                <span className="text-2xl font-serif text-red-200">{upcomingDeadlines.length}</span>
               </div>
               <div className="space-y-3">
-                {upcomingDeadlines.length > 0 ? upcomingDeadlines.slice(0, 4).map(item => (
-                  <div key={item.id} className="rounded-lg border border-white/[0.05] bg-brand-black/30 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-brand-ivory/85">{item.title}</p>
-                        <p className="mt-1 text-xs text-brand-accent/45">{item.caseId} - {item.clientName}</p>
-                      </div>
-                      <span className={`text-[10px] font-bold uppercase tracking-[0.16em] ${getPriorityTextClass(item.priority)}`}>{item.priority}</span>
-                    </div>
-                    <div className="mt-3 flex items-center gap-2 text-xs text-brand-gold">
-                      <CalendarClock className="h-3.5 w-3.5" />
-                      {item.due}
-                    </div>
-                  </div>
+                {upcomingDeadlines.length > 0 ? upcomingDeadlines.slice(0, 4).map((item) => (
+                  <DeadlineItem key={item.id} item={item} />
                 )) : (
-                  <div className="rounded-lg border border-dashed border-white/[0.08] bg-brand-black/20 p-8 text-center">
-                    <CalendarClock className="mx-auto mb-3 h-8 w-8 text-brand-accent/15" />
-                    <p className="text-sm text-brand-accent/45">No hay vencimientos registrados todavia.</p>
-                    <button
-                      onClick={() => setActiveTab('library')}
-                      className="mt-4 text-[10px] font-bold uppercase tracking-[0.18em] text-brand-gold hover:text-brand-ivory"
-                    >
-                      Abrir boveda
-                    </button>
-                  </div>
+                  <EmptyState
+                    icon={CalendarClock}
+                    title="Sin vencimientos"
+                    text="Cuando registres fechas importantes, apareceran aqui por prioridad."
+                    compact
+                  />
                 )}
               </div>
             </div>
 
             <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-5">
-              <h3 className="mb-4 text-lg font-serif text-brand-ivory">Accesos rapidos</h3>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                {quickActions.map(action => (
-                  <button
-                    key={action.label}
-                    onClick={() => setActiveTab(action.tab)}
-                    className={`flex items-center justify-between rounded-lg px-4 py-3 text-left transition-all ${
-                      action.primary
-                        ? 'bg-brand-ivory text-brand-black hover:bg-white'
-                        : 'border border-white/[0.06] bg-white/[0.02] text-brand-ivory/75 hover:border-brand-gold/25 hover:text-brand-ivory'
-                    }`}
-                  >
-                    <span className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.14em]">
-                      <action.icon className="h-4 w-4" />
-                      {action.label}
-                    </span>
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                ))}
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-serif text-brand-ivory">IA lista para trabajar</h2>
+                  <p className="mt-1 text-xs text-brand-accent/45">Documentos con contenido usable por asistentes.</p>
+                </div>
+                <Bot className="h-5 w-5 text-brand-gold" />
               </div>
+              <div className="grid gap-3">
+                <AiSignal label="Documentos con texto" value={aiReadyDocs} total={indexedDocs || 1} />
+                <AiSignal label="Expedientes activos" value={activeCases.length} total={Math.max(cases.length, 1)} />
+              </div>
+              <button
+                onClick={() => setActiveTab('ai-chat')}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-gold px-4 py-3 text-sm font-bold text-brand-black transition-colors hover:bg-brand-ivory"
+              >
+                Consultar IA <ArrowRight className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </section>
 
-        <section className="rounded-lg border border-white/[0.06] bg-white/[0.015]">
-          <div className="flex flex-col gap-3 border-b border-white/[0.05] p-5 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h3 className="text-xl font-serif text-brand-ivory">Alertas legales y actividad reciente</h3>
-              <p className="mt-1 text-xs text-brand-accent/45">Normas, jurisprudencia y movimientos internos relevantes.</p>
-            </div>
-            <button
-              onClick={() => setActiveTab('monitor')}
-              className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-brand-gold transition-colors hover:text-brand-ivory"
-            >
-              Ver monitor legal <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="divide-y divide-white/[0.04]">
-            {legalAlerts.map(alert => (
-              <div key={alert.id} className="grid gap-3 p-5 transition-colors hover:bg-white/[0.02] md:grid-cols-[140px_1fr_120px] md:items-center">
-                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-gold">
-                  <Newspaper className="h-4 w-4" />
-                  {alert.source}
-                </div>
-                <div>
-                  <p className="text-sm text-brand-ivory/80">{alert.title}</p>
-                  <p className="mt-1 text-xs text-brand-accent/40">{alert.type}</p>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-brand-accent/45 md:justify-end">
-                  <CalendarClock className="h-3.5 w-3.5" />
-                  {alert.time}
-                </div>
+        <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-lg border border-white/[0.06] bg-white/[0.015]">
+            <div className="flex items-center justify-between border-b border-white/[0.05] p-5">
+              <div>
+                <h2 className="text-xl font-serif text-brand-ivory">Alertas legales</h2>
+                <p className="mt-1 text-xs text-brand-accent/45">Normas, agenda interna y senales para revisar.</p>
               </div>
-            ))}
+              <button
+                onClick={() => setActiveTab('monitor')}
+                className="text-brand-gold transition-colors hover:text-brand-ivory"
+                aria-label="Abrir monitor legal"
+              >
+                <ArrowRight className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="divide-y divide-white/[0.04]">
+              {legalAlerts.map((alert) => (
+                <div key={alert.id} className="grid gap-3 p-5 transition-colors hover:bg-white/[0.02]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-brand-gold">
+                      <Newspaper className="h-4 w-4" />
+                      {alert.source}
+                    </div>
+                    <span className="text-xs text-brand-accent/40">{alert.time}</span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-brand-ivory/80">{alert.title}</p>
+                    <p className="mt-1 text-xs text-brand-accent/40">{alert.type}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-white/[0.06] bg-white/[0.015]">
+            <div className="flex items-center justify-between border-b border-white/[0.05] p-5">
+              <div>
+                <h2 className="text-xl font-serif text-brand-ivory">Actividad reciente</h2>
+                <p className="mt-1 text-xs text-brand-accent/45">Movimiento visible para que el producto se sienta vivo.</p>
+              </div>
+              <Clock3 className="h-5 w-5 text-brand-gold" />
+            </div>
+            <div className="divide-y divide-white/[0.04]">
+              {activityItems.map((item) => (
+                <div key={item.id} className="grid gap-3 p-5 transition-colors hover:bg-white/[0.02] md:grid-cols-[34px_1fr_120px] md:items-center">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-gold/10 text-brand-gold">
+                    <item.icon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-brand-ivory/80">{item.title}</p>
+                    <p className="mt-1 text-xs text-brand-accent/40">{item.detail}</p>
+                  </div>
+                  <div className="text-xs text-brand-accent/45 md:text-right">{item.time}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       </div>
@@ -275,27 +355,182 @@ const Dashboard = ({ setActiveTab }) => {
   );
 };
 
+const MetricCard = ({ title, value, detail, icon: Icon, tone }) => {
+  const toneClass = {
+    gold: 'bg-brand-gold/10 text-brand-gold',
+    emerald: 'bg-emerald-500/10 text-emerald-300',
+    red: 'bg-red-500/10 text-red-300',
+    blue: 'bg-sky-500/10 text-sky-300',
+  }[tone] || 'bg-brand-gold/10 text-brand-gold';
+
+  return (
+    <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-5 transition-colors hover:border-brand-gold/30">
+      <div className="mb-6 flex items-start justify-between">
+        <div className={`rounded-lg p-2.5 ${toneClass}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <CheckCircle2 className="h-4 w-4 text-emerald-400/70" />
+      </div>
+      <p className="text-3xl font-serif text-brand-ivory">{value}</p>
+      <h2 className="mt-2 text-xs font-semibold text-brand-accent/70">{title}</h2>
+      <p className="mt-1 text-xs font-light text-brand-accent/40">{detail}</p>
+    </div>
+  );
+};
+
+const DeadlineItem = ({ item }) => (
+  <div className="rounded-lg border border-white/[0.05] bg-brand-black/30 p-4">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-sm font-medium text-brand-ivory/85">{item.title}</p>
+        <p className="mt-1 text-xs text-brand-accent/45">{item.caseId} - {item.clientName}</p>
+      </div>
+      <span className={`text-xs font-semibold ${getPriorityTextClass(item.priority)}`}>
+        {item.priority || 'Media'}
+      </span>
+    </div>
+    <div className="mt-3 flex items-center gap-2 text-xs text-brand-gold">
+      <CalendarClock className="h-3.5 w-3.5" />
+      {item.due}
+    </div>
+  </div>
+);
+
+const AiSignal = ({ label, value, total }) => {
+  const percent = Math.round(Math.min(value / total, 1) * 100);
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs text-brand-accent/55">{label}</span>
+        <span className="text-xs font-bold text-brand-ivory">{value}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+        <div className="h-full rounded-full bg-brand-gold" style={{ width: `${percent}%` }}></div>
+      </div>
+    </div>
+  );
+};
+
+const EmptyState = ({ icon: Icon, title, text, action, onAction, compact = false }) => (
+  <div className={`rounded-lg border border-dashed border-white/[0.08] bg-brand-black/20 text-center ${compact ? 'p-5' : 'p-8'}`}>
+    <Icon className="mx-auto mb-3 h-8 w-8 text-brand-accent/18" />
+    <p className="text-sm font-medium text-brand-ivory/75">{title}</p>
+    <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-brand-accent/45">{text}</p>
+    {action ? (
+      <button
+        onClick={onAction}
+        className="mt-4 text-xs font-semibold text-brand-gold hover:text-brand-ivory"
+      >
+        {action}
+      </button>
+    ) : null}
+  </div>
+);
+
 const getUpcomingDeadlines = (cases) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   return cases
-    .flatMap(caso => (Array.isArray(caso.importantDates) ? caso.importantDates : []).map(dateItem => {
+    .flatMap((caseItem) => (Array.isArray(caseItem.importantDates) ? caseItem.importantDates : []).map((dateItem) => {
       const parsedDate = new Date(`${dateItem.date}T00:00:00`);
       const daysUntil = Math.ceil((parsedDate - today) / 86400000);
 
       return {
         ...dateItem,
-        id: `${caso.id}-${dateItem.id || dateItem.title}`,
-        caseId: caso.id,
-        clientName: caso.clientName,
+        id: `${caseItem.id}-${dateItem.id || dateItem.title}`,
+        caseId: caseItem.id,
+        clientName: caseItem.clientName,
         parsedDate,
         daysUntil,
         due: formatDueDate(daysUntil, dateItem.date),
       };
     }))
-    .filter(item => item.date && !Number.isNaN(item.parsedDate.getTime()) && item.daysUntil >= 0)
+    .filter((item) => item.date && !Number.isNaN(item.parsedDate.getTime()) && item.daysUntil >= 0)
     .sort((a, b) => a.parsedDate - b.parsedDate);
+};
+
+const buildPriorityCases = (cases, deadlines) => {
+  const deadlineByCaseId = new Map(deadlines.map((item) => [item.caseId, item]));
+
+  return [...cases]
+    .sort((a, b) => {
+      const aDeadline = deadlineByCaseId.get(a.id)?.daysUntil ?? 999;
+      const bDeadline = deadlineByCaseId.get(b.id)?.daysUntil ?? 999;
+      return aDeadline - bDeadline;
+    })
+    .slice(0, 4)
+    .map((caseItem, index) => {
+      const deadline = deadlineByCaseId.get(caseItem.id);
+      return {
+        ...caseItem,
+        documentsCount: caseItem.documents?.length || 0,
+        nextStep: deadline
+          ? `Preparar ${deadline.title.toLowerCase()}`
+          : [
+              'Validar documentos pendientes',
+              'Preparar borrador de respuesta',
+              'Revisar ultima actuacion',
+              'Actualizar resumen ejecutivo',
+            ][index] || 'Revisar seguimiento',
+      };
+    });
+};
+
+const buildLegalAlerts = ({ upcomingDeadlines, urgentDeadlines, cases }) => [
+  {
+    id: 'legal-1',
+    source: 'El Peruano',
+    title: 'Nueva norma laboral detectada para revision del equipo',
+    time: 'Hoy',
+    type: 'Norma legal',
+  },
+  {
+    id: 'legal-2',
+    source: 'Jurisprudencia',
+    title: 'Criterio reciente podria impactar expedientes laborales activos',
+    time: 'Hace 2 h',
+    type: 'Analisis preliminar',
+  },
+  {
+    id: 'legal-3',
+    source: 'Agenda interna',
+    title: urgentDeadlines.length
+      ? `${urgentDeadlines.length} vencimientos requieren atencion inmediata`
+      : `${upcomingDeadlines.length} vencimientos registrados en el sistema`,
+    time: 'Ahora',
+    type: `${cases.length} expedientes monitoreados`,
+  },
+];
+
+const buildActivityItems = (cases) => {
+  const caseActivities = cases.slice(0, 4).map((caseItem, index) => ({
+    id: `case-${caseItem.id}`,
+    icon: index === 0 ? SearchCheck : FileText,
+    title: `${caseItem.clientName} actualizado`,
+    detail: `${caseItem.type} - ${caseItem.documents?.length || 0} documentos vinculados`,
+    time: formatRelativeFromDate(caseItem.lastUpdate),
+  }));
+
+  const baseActivities = [
+    {
+      id: 'ai-ready',
+      icon: Bot,
+      title: 'Asistentes legales listos para consulta',
+      detail: 'Puedes consultar IA especializada desde el menu lateral.',
+      time: 'Listo',
+    },
+    {
+      id: 'monitor-ready',
+      icon: Newspaper,
+      title: 'Monitor legal disponible',
+      detail: 'Alertas normativas y registros oficiales preparados para revision.',
+      time: 'Activo',
+    },
+  ];
+
+  return [...caseActivities, ...baseActivities].slice(0, 6);
 };
 
 const formatDueDate = (daysUntil, fallbackDate) => {
@@ -304,6 +539,29 @@ const formatDueDate = (daysUntil, fallbackDate) => {
   if (daysUntil <= 7) return `En ${daysUntil} dias`;
   return fallbackDate;
 };
+
+const formatRelativeFromDate = (dateValue) => {
+  if (!dateValue) return 'Sin fecha';
+
+  const parsed = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return dateValue;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysAgo = Math.round((today - parsed) / 86400000);
+
+  if (daysAgo <= 0) return 'Hoy';
+  if (daysAgo === 1) return 'Ayer';
+  if (daysAgo < 30) return `Hace ${daysAgo} dias`;
+  return parsed.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
+};
+
+const formatToday = () =>
+  new Date().toLocaleDateString('es-PE', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+  });
 
 const getPriorityTextClass = (priority) => {
   if (priority === 'Alta') return 'text-red-300';

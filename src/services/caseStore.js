@@ -3,6 +3,7 @@ import { demoDocumentsByCaseId } from '../data/demoDocuments';
 import { fetchSupabaseCases, replaceSupabaseCases, upsertSupabaseCase } from './supabaseCaseStore';
 
 const STORAGE_KEY = 'lusti-cases';
+const DEMO_CASE_IDS = new Set(mockCases.map((caseItem) => caseItem.id));
 
 const cloneCases = (cases) => JSON.parse(JSON.stringify(cases));
 
@@ -23,21 +24,47 @@ const normalizeCase = (caseData) => ({
   officialReferences: Array.isArray(caseData.officialReferences) ? caseData.officialReferences : [],
 });
 
+const getDemoCases = () => cloneCases(mockCases).map(normalizeCase);
+
+const isOldDemoState = (cases) => {
+  if (!Array.isArray(cases) || cases.length === 0) return true;
+  if (cases.length > 3) return false;
+  return cases.every((caseItem) => DEMO_CASE_IDS.has(caseItem.id));
+};
+
+const upgradeLocalDemo = (cases) => {
+  if (isOldDemoState(cases)) {
+    const demoCases = getDemoCases();
+    saveCases(demoCases);
+    return demoCases;
+  }
+
+  const normalizedCases = cases.map(normalizeCase);
+  const existingIds = new Set(normalizedCases.map((caseItem) => caseItem.id));
+  const missingDemoCases = getDemoCases().filter((caseItem) => !existingIds.has(caseItem.id));
+
+  if (!missingDemoCases.length) return normalizedCases;
+
+  const nextCases = [...normalizedCases, ...missingDemoCases];
+  saveCases(nextCases);
+  return nextCases;
+};
+
 export const getCases = () => {
   try {
     const storedCases = window.localStorage.getItem(STORAGE_KEY);
 
     if (!storedCases) {
-      const initialCases = cloneCases(mockCases).map(normalizeCase);
+      const initialCases = getDemoCases();
       saveCases(initialCases);
       return initialCases;
     }
 
     const parsedCases = JSON.parse(storedCases);
-    return Array.isArray(parsedCases) ? parsedCases.map(normalizeCase) : [];
+    return Array.isArray(parsedCases) ? upgradeLocalDemo(parsedCases) : getDemoCases();
   } catch (error) {
     console.warn('No se pudieron cargar los expedientes locales.', error);
-    return cloneCases(mockCases).map(normalizeCase);
+    return getDemoCases();
   }
 };
 
@@ -58,6 +85,13 @@ export const loadCases = async () => {
     }
 
     const normalizedCases = cases.map(normalizeCase);
+    if (isOldDemoState(normalizedCases)) {
+      const demoCases = getDemoCases();
+      await replaceSupabaseCases(demoCases);
+      saveCases(demoCases);
+      return { cases: demoCases, source: 'supabase-seeded', error: null };
+    }
+
     saveCases(normalizedCases);
     return { cases: normalizedCases, source: 'supabase', error: null };
   } catch (error) {
@@ -110,7 +144,7 @@ export const updateCaseAsync = async (cases, caseId, changes) => {
 };
 
 export const resetCases = () => {
-  const initialCases = cloneCases(mockCases).map(normalizeCase);
+  const initialCases = getDemoCases();
   saveCases(initialCases);
   return initialCases;
 };

@@ -208,10 +208,12 @@ export const analyzeOfficialRegistryItem = async ({ item, cases }) => {
   return cleanAssistantText(text);
 };
 
-const buildSpecializedAssistantPrompt = ({ bot, question }) => `
+const buildSpecializedAssistantPrompt = ({ bot, question, promptContext, attachmentContext }) => `
 Eres ${bot.name}, un asistente legal especializado para un estudio juridico peruano.
 Especialidad declarada: ${bot.description || 'Asistencia legal general'}.
 Documentos de referencia disponibles segun el sistema: ${bot.docs || 0}.
+${promptContext ? `\nInstrucciones o prompts seleccionados para este asistente:\n${promptContext}\n` : ''}
+${attachmentContext ? `\nDocumento adjunto cargado por el usuario:\n${attachmentContext}\n` : ''}
 
 Responde en espanol claro, profesional y util.
 No uses Markdown. No uses asteriscos para negritas. Usa texto limpio.
@@ -219,12 +221,20 @@ Si el usuario saluda, saluda brevemente y ofrece formas concretas de ayuda segun
 Si falta informacion para analizar un caso, pide los datos necesarios.
 No inventes documentos, normas, plazos ni hechos no entregados.
 No presentes la respuesta como asesoria legal definitiva; indica que es analisis preliminar para revision de un abogado.
+Cuando haya documento adjunto y el usuario pida resumen o analisis, responde ordenado:
+1. Resumen breve
+2. Datos clave encontrados
+3. Riesgos o puntos de atencion
+4. Informacion faltante
+5. Siguientes pasos recomendados
+Si el usuario pide extraer datos, organiza por partes, fechas, montos, obligaciones y observaciones.
+Responde completo: no cortes frases ni dejes campos a medias.
 
 Pregunta del usuario:
 ${question}
 `;
 
-export const askGeminiSpecializedAssistant = async ({ bot, question }) => {
+export const askGeminiSpecializedAssistant = async ({ bot, question, attachmentContext = '' }) => {
   if (!isGeminiConfigured) {
     throw new Error('Gemini no esta configurado.');
   }
@@ -238,13 +248,22 @@ export const askGeminiSpecializedAssistant = async ({ bot, question }) => {
         contents: [
           {
             role: 'user',
-            parts: [{ text: buildSpecializedAssistantPrompt({ bot, question }) }],
+            parts: [
+              {
+                text: buildSpecializedAssistantPrompt({
+                  bot,
+                  question,
+                  promptContext: bot.promptContext || '',
+                  attachmentContext,
+                }),
+              },
+            ],
           },
         ],
         generationConfig: {
           temperature: 0.25,
           topP: 0.9,
-          maxOutputTokens: 1000,
+          maxOutputTokens: 4096,
         },
       }),
     }

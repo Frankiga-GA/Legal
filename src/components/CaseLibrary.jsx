@@ -118,15 +118,15 @@ const CaseLibrary = ({ setActiveTab }) => {
       <div className="mx-auto max-w-7xl space-y-8">
         <header className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
-            <h2 className="text-4xl font-serif font-medium tracking-tight text-brand-ivory">Boveda de Expedientes</h2>
+            <h2 className="text-4xl font-serif font-medium tracking-tight text-brand-ivory">Expedientes</h2>
             <p className="text-sm font-light tracking-wide text-brand-accent/60">
-              Gestiona casos, documentos, vencimientos y actividad del estudio desde una sola vista.
+              Primer flujo de LUSTI: crea el caso, organiza su informacion y deja el contexto listo para documentos e IA.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               onClick={() => setActiveTab?.('ai-chat')}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-brand-accent/65 transition-all hover:border-brand-gold/25 hover:text-brand-ivory"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-5 py-3 text-sm font-semibold text-brand-accent/70 transition-colors hover:border-brand-gold/25 hover:text-brand-ivory"
             >
               <MessageSquare className="h-4 w-4" />
               Abrir asistente
@@ -134,10 +134,10 @@ const CaseLibrary = ({ setActiveTab }) => {
             </button>
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center gap-2 rounded-lg bg-brand-ivory px-6 py-3 font-semibold tracking-tight text-brand-black shadow-lg transition-all hover:bg-white"
+              className="flex items-center gap-2 rounded-lg bg-brand-ivory px-6 py-3 font-semibold tracking-tight text-brand-black transition-colors hover:bg-white"
             >
               <Plus className="h-5 w-5" />
-              Nuevo Registro
+              Crear expediente
             </button>
           </div>
         </header>
@@ -152,7 +152,7 @@ const CaseLibrary = ({ setActiveTab }) => {
           {vaultStats.map((stat) => (
             <div key={stat.label} className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-4">
               <p className="text-2xl font-serif text-brand-ivory">{stat.value}</p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-accent/45">{stat.label}</p>
+              <p className="mt-1 text-xs font-medium text-brand-accent/50">{stat.label}</p>
             </div>
           ))}
         </section>
@@ -173,14 +173,14 @@ const CaseLibrary = ({ setActiveTab }) => {
           <button
             type="button"
             onClick={handleResetCases}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-brand-accent/60 transition-all hover:bg-white/[0.05] hover:text-brand-ivory"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-5 py-4 text-sm font-semibold text-brand-accent/65 transition-colors hover:bg-white/[0.05] hover:text-brand-ivory"
           >
             <RotateCcw className="h-4 w-4" />
             Restaurar Demo
           </button>
         </div>
 
-        <div className="px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-accent/40">
+        <div className="px-2 text-xs font-medium text-brand-accent/45">
           Mostrando <span className="text-brand-ivory">{filteredCases.length}</span> de <span className="text-brand-ivory">{cases.length}</span> expedientes
           <span className="ml-3 text-brand-gold">Fuente: {formatDataSource(dataSource)}</span>
         </div>
@@ -190,13 +190,13 @@ const CaseLibrary = ({ setActiveTab }) => {
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="border-b border-white/[0.05] bg-white/[0.02]">
-                  <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-brand-accent/60">Identificador</th>
-                  <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-brand-accent/60">Cliente</th>
-                  <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-brand-accent/60">Materia</th>
-                  <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-brand-accent/60">Estado</th>
-                  <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-brand-accent/60">Actividad</th>
-                  <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-brand-accent/60">Proximo vencimiento</th>
-                  <th className="px-8 py-5 text-right text-[10px] font-bold uppercase tracking-widest text-brand-accent/60">Detalles</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-brand-accent/65">Identificador</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-brand-accent/65">Cliente</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-brand-accent/65">Materia</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-brand-accent/65">Estado</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-brand-accent/65">Actividad</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-brand-accent/65">Proximo vencimiento</th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-brand-accent/65">Detalles</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.03]">
@@ -206,7 +206,7 @@ const CaseLibrary = ({ setActiveTab }) => {
 
                     return (
                       <tr key={caso.id} className="group cursor-pointer transition-colors hover:bg-white/[0.03]" onClick={() => setSelectedCase(caso)}>
-                        <td className="px-8 py-6">
+                        <td className="px-6 py-5">
                           <div className="flex items-center gap-4">
                             <div className="rounded-lg bg-white/[0.03] p-2.5 transition-colors group-hover:bg-brand-gold/10">
                               <FileText className="h-4 w-4 text-brand-accent transition-colors group-hover:text-brand-gold" />
@@ -217,26 +217,26 @@ const CaseLibrary = ({ setActiveTab }) => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-8 py-6">
+                        <td className="px-6 py-5">
                           <div className="text-sm font-medium text-brand-ivory/80">{caso.clientName}</div>
                           <div className="mt-1 text-[10px] uppercase tracking-wider text-brand-accent/40">{caso.dni}</div>
                         </td>
-                        <td className="px-8 py-6">
-                          <span className="inline-flex rounded-full border border-white/[0.06] bg-white/[0.02] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-accent/65">
+                        <td className="px-6 py-5">
+                          <span className="inline-flex rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-1 text-xs font-medium text-brand-accent/70">
                             {caso.type}
                           </span>
                         </td>
-                        <td className="px-8 py-6">
+                        <td className="px-6 py-5">
                           <StatusBadge status={caso.status} />
                         </td>
-                        <td className="px-8 py-6">
+                        <td className="px-6 py-5">
                           <div className="flex min-w-[260px] items-center gap-3 text-brand-accent/45">
                             <ActivityPill icon={Upload} value={getCount(caso.documents)} label="docs" />
                             <ActivityPill icon={MessageSquare} value={getCount(caso.notes)} label="notas" />
                             <ActivityPill icon={CalendarClock} value={getCount(caso.importantDates)} label="fechas" />
                           </div>
                         </td>
-                        <td className="px-8 py-6">
+                        <td className="px-6 py-5">
                           {nextDate ? (
                             <div className="min-w-[210px]">
                               <div className="text-xs font-medium text-brand-ivory/75">{nextDate.title}</div>
@@ -246,7 +246,7 @@ const CaseLibrary = ({ setActiveTab }) => {
                             <span className="text-xs text-brand-accent/25">Sin fecha registrada</span>
                           )}
                         </td>
-                        <td className="px-8 py-6 text-right">
+                        <td className="px-6 py-5 text-right">
                           <button className="text-brand-accent/20 transition-colors group-hover:text-brand-gold">
                             <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
                           </button>
@@ -319,8 +319,8 @@ const FilterSelect = ({ label, value, onChange, options }) => (
 const StatusBadge = ({ status }) => (
   <div className="flex items-center gap-2">
     <div className={`h-1.5 w-1.5 rounded-full ${
-      status === 'Activo' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' :
-      status === 'Pendiente' ? 'bg-brand-gold shadow-[0_0_8px_rgba(197,160,89,0.4)]' :
+      status === 'Activo' ? 'bg-emerald-500' :
+      status === 'Pendiente' ? 'bg-brand-gold' :
       'bg-brand-accent/40'
     }`}></div>
     <span className="text-xs font-light text-brand-accent/80">{status}</span>
@@ -328,9 +328,9 @@ const StatusBadge = ({ status }) => (
 );
 
 const ActivityPill = ({ icon: Icon, value, label }) => (
-  <div className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.02] px-2.5 py-1">
+  <div className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-1">
     <Icon className="h-3.5 w-3.5 text-brand-gold/70" />
-    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-brand-accent/60">{value} {label}</span>
+    <span className="text-xs font-medium text-brand-accent/65">{value} {label}</span>
   </div>
 );
 
