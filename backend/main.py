@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import io
 import os
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 import httpx
@@ -53,6 +56,17 @@ class ChatResponse(BaseModel):
     extracted_text: str | None = None
     file_name: str | None = None
     file_type: str | None = None
+
+
+class GenerateFileRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    prompt: str | None = None
+    file_name: str | None = None
+    file_type: str | None = None
+    file_text: str | None = None
+    content: str | None = None
+    document_type: str = "informe"
+    output_format: str = Field("docx", pattern="^(docx|pdf|txt)$")
 
 
 def _read_text_from_upload(upload: UploadFile) -> str:
@@ -209,6 +223,206 @@ async def _ask_gemini(prompt_text: str) -> str:
     return extracted
 
 
+def _build_file_generation_prompt(payload: GenerateFileRequest) -> str:
+    clean_file_text = (payload.file_text or "").strip()
+    return f"""
+Eres LUSTI, un redactor legal para estudios juridicos peruanos.
+Genera el contenido final de un documento legal en espanol claro, profesional y editable.
+No uses Markdown ni asteriscos.
+No inventes datos. Si falta informacion, deja campos entre corchetes como [DATO PENDIENTE].
+
+Tipo de documento solicitado:
+{payload.document_type or 'informe'}
+
+Instruccion del usuario:
+{payload.message}
+
+Prompt adicional:
+{payload.prompt or 'Sin prompt adicional.'}
+
+Archivo base:
+Nombre: {payload.file_name or 'Sin archivo'}
+Tipo: {payload.file_type or 'Desconocido'}
+Texto extraido:
+{clean_file_text or 'Sin texto extraido.'}
+
+Estructura recomendada:
+Titulo
+Fecha
+Antecedentes
+Analisis
+Riesgos o puntos de atencion
+Solicitud, conclusion o recomendacion
+Datos faltantes
+
+Entrega solo el contenido del documento final.
+""".strip()
+
+
+def _clean_filename(value: str, extension: str) -> str:
+    base = re.sub(r"[^a-zA-Z0-9_-]+", "-", value.strip().lower()).strip("-")
+    if not base:
+        base = "documento-lusti"
+    return f"{base[:80]}.{extension}"
+
+
+def _split_document_blocks(content: str) -> list[str]:
+    blocks = [part.strip() for part in re.split(r"\n{2,}", content.strip()) if part.strip()]
+    if blocks:
+        return blocks
+    return [line.strip() for line in content.splitlines() if line.strip()]
+
+
+def _clean_final_document_content(content: str) -> str:
+    def plain(value: str) -> str:
+        normalized_value = unicodedata.normalize("NFKD", value)
+        return "".join(char for char in normalized_value if not unicodedata.combining(char)).lower()
+
+    lines = [line.strip() for line in content.replace("\r\n", "\n").replace("\r", "\n").splitlines()]
+    cleaned: list[str] = []
+    skip_until_blank = False
+    boilerplate_patterns = [
+        r"^estimad[oa]\s+(usuario|cliente|senor|senora)",
+        r"^he procesado\b",
+        r"^a continuacion\b.*\b(documento|pdf|docx|contenido)\b",
+        r"^a continuaci.n\b.*\b(documento|pdf|docx|contenido)\b",
+        r"^este (documento|analisis|an.lisis|informe) (es|tiene) .*preliminar",
+        r"^no constituye asesoria legal",
+        r"^no constituye asesor.a legal",
+        r"^se recomienda la revision",
+        r"^se recomienda la revisi.n",
+        r"^por favor,?\s+proporcione\b",
+        r"^¿?le gustaria\b",
+        r"^\??le gustar.a\b",
+    ]
+
+    for line in lines:
+        normalized = plain(line).strip(" .:")
+        if skip_until_blank:
+            if not line:
+                skip_until_blank = False
+            continue
+        if not line:
+            if cleaned and cleaned[-1] != "":
+                cleaned.append("")
+            continue
+        if line in {"---", "***"}:
+            if cleaned and cleaned[-1] != "":
+                cleaned.append("")
+            continue
+        if re.search(r"^informaci.n faltante", normalized):
+            skip_until_blank = True
+            continue
+        if normalized.startswith("siguientes pasos recomendados") or normalized.startswith("siguientes pasos"):
+            skip_until_blank = True
+            continue
+        if any(re.search(pattern, normalized, flags=re.IGNORECASE) for pattern in boilerplate_patterns):
+            continue
+        cleaned.append(line)
+
+    result = "\n".join(cleaned).strip()
+    result = re.sub(r"\n{3,}", "\n\n", result)
+    return result or content.strip()
+
+
+def _derive_document_title(content: str, fallback: str) -> tuple[str, str]:
+    blocks = _split_document_blocks(content)
+    if not blocks:
+        return fallback, content
+
+    first = blocks[0].strip().strip("#").strip()
+    is_title = (
+        4 <= len(first) <= 90
+        and not first.endswith(".")
+        and not first.lower().startswith(("nombre:", "dni:", "fecha:", "cargo:", "para:", "de:"))
+    )
+    if not is_title:
+        return fallback, content
+
+    remaining = content.strip()[len(blocks[0]):].lstrip()
+    return first, remaining
+
+
+def _build_docx_bytes(content: str, title: str) -> bytes:
+    document = Document()
+    document.add_heading(title, level=1)
+
+    for block in _split_document_blocks(content):
+        clean_block = block.strip()
+        if not clean_block:
+            continue
+
+        is_heading = (
+            len(clean_block) <= 90
+            and not clean_block.endswith(".")
+            and not clean_block.startswith(("-", "1.", "2.", "3.", "4.", "5."))
+        )
+        if is_heading:
+            document.add_heading(clean_block.rstrip(":"), level=2)
+        else:
+            for line in clean_block.splitlines():
+                stripped = line.strip()
+                if stripped:
+                    document.add_paragraph(stripped)
+
+    buffer = io.BytesIO()
+    document.save(buffer)
+    return buffer.getvalue()
+
+
+def _build_pdf_bytes(content: str, title: str) -> bytes:
+    if fitz is None:
+        raise RuntimeError("PyMuPDF no esta disponible para generar PDF")
+
+    pdf = fitz.open()
+    page = pdf.new_page(width=595, height=842)
+    margin = 54
+    y = margin
+    line_height = 14
+    max_width = 487
+
+    def write_wrapped(text: str, font_size: int = 10, bold: bool = False) -> None:
+        nonlocal page, y
+        font = "helv"
+        for raw_line in text.splitlines() or [""]:
+            line = raw_line.strip()
+            if not line:
+                y += line_height
+                continue
+            words = line.split()
+            current = ""
+            chunks = []
+            for word in words:
+                candidate = f"{current} {word}".strip()
+                if fitz.get_text_length(candidate, fontname=font, fontsize=font_size) <= max_width:
+                    current = candidate
+                else:
+                    if current:
+                        chunks.append(current)
+                    current = word
+            if current:
+                chunks.append(current)
+
+            for chunk in chunks:
+                if y > 790:
+                    page = pdf.new_page(width=595, height=842)
+                    y = margin
+                page.insert_text((margin, y), chunk, fontsize=font_size, fontname=font)
+                y += line_height + (2 if bold else 0)
+
+    write_wrapped(title, font_size=16, bold=True)
+    y += 10
+    for block in _split_document_blocks(content):
+        write_wrapped(block, font_size=10)
+        y += 8
+
+    return pdf.tobytes()
+
+
+def _build_txt_bytes(content: str) -> bytes:
+    return content.encode("utf-8")
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {
@@ -282,3 +496,43 @@ async def generate_document(
     }
 
     return output
+
+
+@app.post("/generate-file")
+async def generate_file(payload: GenerateFileRequest):
+    output_format = payload.output_format.lower()
+    document_type = (payload.document_type or "documento").strip()
+
+    content = (payload.content or "").strip()
+    if not content:
+        prompt_text = _build_file_generation_prompt(payload)
+        try:
+            content = await _ask_gemini(prompt_text)
+        except Exception as error:
+            raise HTTPException(status_code=502, detail=f"No se pudo generar el contenido con IA: {error}") from error
+
+    if not content:
+        raise HTTPException(status_code=400, detail="No hay contenido para generar el archivo")
+
+    content = _clean_final_document_content(content)
+    title, content = _derive_document_title(content, f"{document_type.title()} LUSTI")
+
+    if output_format == "docx":
+        file_bytes = _build_docx_bytes(content, title)
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    elif output_format == "pdf":
+        try:
+            file_bytes = _build_pdf_bytes(content, title)
+        except Exception as error:
+            raise HTTPException(status_code=500, detail=f"No se pudo generar PDF: {error}") from error
+        media_type = "application/pdf"
+    else:
+        file_bytes = _build_txt_bytes(content)
+        media_type = "text/plain; charset=utf-8"
+
+    filename = _clean_filename(f"{document_type}-lusti", output_format)
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "X-Lusti-Filename": filename,
+    }
+    return StreamingResponse(io.BytesIO(file_bytes), media_type=media_type, headers=headers)

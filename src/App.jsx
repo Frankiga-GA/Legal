@@ -11,10 +11,12 @@ import LandingPage from './components/LandingPage';
 import ElPeruano from './components/ElPeruano';
 import LegalMonitor from './components/LegalMonitor';
 import DriveVault from './components/DriveVault';
+import LegalPage from './components/LegalPage';
 import { getCurrentSession, onAuthStateChange, signOut } from './services/authService';
 import { getStoredDriveToken, onDriveTokenChange, onDriveTokenMessage } from './services/googleDriveService';
 
 function App() {
+  const publicPath = window.location.pathname.replace(/\/+$/, '') || '/';
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -127,6 +129,14 @@ function App() {
         </div>
       </div>
     );
+  }
+
+  if (publicPath === '/privacy') {
+    return <LegalPage type="privacy" />;
+  }
+
+  if (publicPath === '/terms') {
+    return <LegalPage type="terms" />;
   }
 
   if (isLanding && !session) {

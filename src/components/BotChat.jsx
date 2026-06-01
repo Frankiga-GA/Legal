@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Bot, Copy, Download, FileText, FolderOpen, Layers3, Save, Search, Send, Sparkles, User, X } from 'lucide-react';
 import { askGeminiSpecializedAssistant, isGeminiConfigured } from '../services/geminiService';
 import { downloadDriveFileAsFile, getStoredDriveToken, isSupportedTemplateFile } from '../services/googleDriveService';
-import { requestDocumentChat, uploadDocumentToBackend } from '../services/documentBackendService';
+import { generateDocumentFile, requestDocumentChat, uploadDocumentToBackend } from '../services/documentBackendService';
 
 const variablePattern = /\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}/g;
 const examplePrompts = [
@@ -56,6 +56,33 @@ const dataUrlToFile = (dataUrl, fileName = 'archivo.pdf') => {
   }
 };
 
+const inferDocumentType = (message = '', fileName = '') => {
+  const text = `${message} ${fileName}`.toLowerCase();
+  if (text.includes('carta notarial')) return 'carta-notarial';
+  if (text.includes('contrato')) return 'contrato';
+  if (text.includes('solicitud')) return 'solicitud';
+  if (text.includes('resumen')) return 'resumen-ejecutivo';
+  if (text.includes('riesgo') || text.includes('analisis') || text.includes('analiza')) return 'informe-legal';
+  return 'documento-legal';
+};
+
+const detectOutputFormatIntent = (message = '') => {
+  const text = message.toLowerCase();
+  const asksForFile = /(genera|generame|crear|crea|haz|hacer|exporta|descarga|prepara|pasame|dame)/.test(text);
+  if (!asksForFile) return '';
+  if (/\bpdf\b/.test(text)) return 'pdf';
+  if (/\bdocx\b|\bword\b/.test(text)) return 'docx';
+  if (/\btxt\b|\btexto\b/.test(text)) return 'txt';
+  return '';
+};
+
+const shouldExposeDocumentActions = ({ message = '', hasTemplate = false, hasFile = false }) => {
+  const text = message.toLowerCase();
+  if (detectOutputFormatIntent(message)) return true;
+  if (hasTemplate || hasFile) return true;
+  return /(resume|resumen|analiza|analisis|extrae|genera|redacta|carta|informe|contrato|plantilla|riesgo|demanda|documento|solicitud|notarial)/.test(text);
+};
+
 const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
   const availableTemplates = useMemo(() => bot.allTemplates || bot.templates || [], [bot.allTemplates, bot.templates]);
   const availableFileTemplates = useMemo(
@@ -84,7 +111,10 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
   const [templateValues, setTemplateValues] = useState({});
   const [generatedDocument, setGeneratedDocument] = useState('');
   const [generatedFiles, setGeneratedFiles] = useState([]);
+  const [canExportResponse, setCanExportResponse] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
+  const [fileGenerationStatus, setFileGenerationStatus] = useState('');
+  const [lastDocumentContext, setLastDocumentContext] = useState(null);
   const [backendStatus, setBackendStatus] = useState('');
   const [selectedFileTemplateExtractedText, setSelectedFileTemplateExtractedText] = useState('');
   const messagesEndRef = useRef(null);
@@ -145,6 +175,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
     if (!selectedTemplate) {
       setTemplateValues({});
       setGeneratedDocument('');
+      setCanExportResponse(false);
       setSaveStatus('');
       return;
     }
@@ -163,6 +194,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
     const runExtraction = async () => {
       setSelectedFileTemplateExtractedText('');
       setGeneratedDocument('');
+      setCanExportResponse(false);
       setSaveStatus('');
 
       try {
@@ -170,6 +202,8 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
           const localText = selectedFileTemplate.fileText.trim();
           setSelectedFileTemplateExtractedText(localText);
           setGeneratedDocument('');
+          setCanExportResponse(false);
+          setFileGenerationStatus('');
           setBackendStatus(`Archivo listo para procesar (${localText.length} caracteres)`);
           return;
         }
@@ -178,6 +212,8 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
           const extracted = await resolveFileTemplateText(selectedFileTemplate);
           setSelectedFileTemplateExtractedText(extracted);
           setGeneratedDocument('');
+          setCanExportResponse(false);
+          setFileGenerationStatus('');
           setBackendStatus(
             extracted
               ? `Archivo procesado por Python (${extracted.length} caracteres)`
@@ -230,6 +266,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
 
     if (!templateVariables.length) {
       setGeneratedDocument(fillTemplate(selectedTemplate, {}));
+      setCanExportResponse(true);
       setMessages((prev) => [...prev, { role: 'ai', content: `La plantilla "${selectedTemplate.name}" no tiene variables. Ya genere el documento.` }]);
       return true;
     }
@@ -237,6 +274,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
     const nextMissing = missingVariables[0];
     if (!nextMissing) {
       setGeneratedDocument(fillTemplate(selectedTemplate, templateValues));
+      setCanExportResponse(true);
       setMessages((prev) => [...prev, { role: 'ai', content: 'Ya estan completas todas las variables. Abajo te dejo el documento editable.' }]);
       return true;
     }
@@ -247,6 +285,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
     const stillMissing = templateVariables.find((key) => !String(updated[key] || '').trim());
     if (!stillMissing) {
       setGeneratedDocument(fillTemplate(selectedTemplate, updated));
+      setCanExportResponse(true);
       setMessages((prev) => [...prev, { role: 'ai', content: `Perfecto. Ya complete la plantilla "${selectedTemplate.name}". Puedes editar el documento final abajo.` }]);
     } else {
       setMessages((prev) => [...prev, { role: 'ai', content: `Gracias. Ahora necesito: ${stillMissing}.` }]);
@@ -259,6 +298,14 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
     if (!input.trim() || isTyping) return;
 
     const userMessage = input.trim();
+    const requestedOutputFormat = detectOutputFormatIntent(userMessage);
+    const aiQuestion = requestedOutputFormat
+      ? [
+          userMessage,
+          '',
+          `El sistema LUSTI puede generar archivos ${requestedOutputFormat.toUpperCase()} despues de tu respuesta. Redacta exclusivamente el contenido final del documento solicitado. No saludes, no expliques el proceso, no escribas "estimado usuario", no digas "a continuacion", no incluyas disclaimers ni recomendaciones externas. Empieza con el titulo real del documento y luego el cuerpo listo para entregar.`,
+        ].join('\n')
+      : userMessage;
     const attachmentFileName = selectedFileTemplate?.name || '';
     const attachmentFileType = selectedFileTemplate?.fileType || '';
     let attachmentFileText = (selectedFileTemplateExtractedText || '').trim();
@@ -270,6 +317,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
         attachmentFileText = await resolveFileTemplateText(selectedFileTemplate);
         setSelectedFileTemplateExtractedText(attachmentFileText);
         setGeneratedDocument('');
+        setCanExportResponse(false);
         setBackendStatus(
           attachmentFileText
             ? `Archivo procesado por Python (${attachmentFileText.length} caracteres)`
@@ -294,17 +342,26 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
       { role: 'user', content: userMessage },
     ]);
     setInput('');
+    setFileGenerationStatus('');
+    setCanExportResponse(false);
     if (selectedFileTemplate) {
-      setSelectedFileTemplateId(null);
-      setSaveStatus('');
-    }
+      setLastDocumentContext({
+        message: userMessage,
+        fileName: attachmentFileName,
+        fileType: attachmentFileType,
+        fileText: attachmentFileText,
+        documentType: inferDocumentType(userMessage, attachmentFileName),
+      });
+        setSelectedFileTemplateId(null);
+        setSaveStatus('');
+      }
     setIsTyping(true);
 
     try {
       if (selectedFileTemplate) {
         setBackendStatus(
           attachmentFileText
-            ? `Texto extraído listo (${attachmentFileText.length} caracteres). La IA lo usará como contexto.`
+            ? `Texto extraido listo (${attachmentFileText.length} caracteres). La IA lo usará como contexto.`
             : 'Archivo recibido, sin texto extraíble'
         );
 
@@ -322,7 +379,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
         let responseContent = '';
         try {
           const backendResponse = await requestDocumentChat({
-            message: userMessage,
+            message: aiQuestion,
             prompt: bot.promptContext || bot.description || '',
             fileName: attachmentFileName,
             fileType: attachmentFileType,
@@ -340,32 +397,72 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
           responseContent = isGeminiConfigured
             ? await askGeminiSpecializedAssistant({
                 bot,
-                question: userMessage,
+                question: aiQuestion,
                 attachmentContext: [
                   `Archivo adjunto: ${attachmentFileName}`,
                   `Tipo: ${attachmentFileType || 'Archivo'}`,
-                  'Texto extraído:',
+                  'Texto extraido:',
                   attachmentFileText,
                 ].join('\n'),
               })
             : buildLocalAssistantResponse(userMessage);
         }
 
+        const documentContext = {
+          message: userMessage,
+          fileName: attachmentFileName,
+          fileType: attachmentFileType,
+          fileText: attachmentFileText,
+          documentType: inferDocumentType(userMessage, attachmentFileName),
+        };
         setGeneratedDocument(responseContent);
+        setCanExportResponse(shouldExposeDocumentActions({
+          message: userMessage,
+          hasFile: true,
+        }));
+        setLastDocumentContext(documentContext);
         setMessages((prev) => [...prev, { role: 'ai', content: responseContent }]);
+        if (requestedOutputFormat) {
+          await handleGenerateFile(requestedOutputFormat, {
+            auto: true,
+            content: responseContent,
+            context: documentContext,
+          });
+        }
         return;
       }
 
       const usedTemplate = runTemplateFlow(userMessage);
       if (!usedTemplate) {
         const responseContent = isGeminiConfigured
-          ? await askGeminiSpecializedAssistant({
-              bot,
-              question: userMessage,
+            ? await askGeminiSpecializedAssistant({
+                bot,
+              question: aiQuestion,
               attachmentContext: attachmentFileText || attachmentFileName || '',
             })
-          : buildLocalAssistantResponse(userMessage);
+            : buildLocalAssistantResponse(userMessage);
+        const shouldExport = shouldExposeDocumentActions({
+          message: userMessage,
+          hasTemplate: Boolean(selectedTemplate),
+        });
+        const documentContext = {
+          message: userMessage,
+          fileName: '',
+          fileType: '',
+          fileText: '',
+          documentType: inferDocumentType(userMessage, selectedTemplate?.name || ''),
+        };
         setMessages((prev) => [...prev, { role: 'ai', content: responseContent }]);
+        setGeneratedDocument(shouldExport ? responseContent : '');
+        setCanExportResponse(shouldExport);
+        setLastDocumentContext(shouldExport ? documentContext : null);
+        if (requestedOutputFormat && shouldExport) {
+          await handleGenerateFile(requestedOutputFormat, {
+            auto: true,
+            content: responseContent,
+            context: documentContext,
+          });
+        }
       }
     } catch (error) {
       console.warn('Gemini no pudo responder en asistente especializado. Usando fallback local.', error);
@@ -389,6 +486,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
     setIsTemplatePickerOpen(false);
     setTemplateValues({});
     setGeneratedDocument('');
+    setCanExportResponse(false);
     setMessages((prev) => [...prev, { role: 'ai', content: `Elegiste "${template.name}". Escribe el primer dato para empezar.` }]);
   };
 
@@ -398,12 +496,14 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
     setIsTemplatePickerOpen(false);
     setTemplateValues({});
     setGeneratedDocument(template.fileText || decodeTextDataUrl(template.fileDataUrl) || '');
+    setCanExportResponse(false);
     setIsTemplateDrawerOpen(false);
   };
 
   const clearSelectedFileTemplate = () => {
     setSelectedFileTemplateId(null);
     setGeneratedDocument('');
+    setCanExportResponse(false);
     setSaveStatus('');
   };
 
@@ -418,15 +518,65 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
     await navigator.clipboard.writeText(generatedDocument);
   };
 
+  const triggerDownload = (url, fileName) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+  };
+
   const downloadDocument = () => {
     if (!generatedDocument) return;
     const blob = new Blob([generatedDocument], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${selectedTemplate?.name || 'documento'}.txt`;
-    a.click();
+    triggerDownload(url, `${selectedTemplate?.name || 'documento'}.txt`);
     URL.revokeObjectURL(url);
+  };
+
+  const downloadGeneratedFile = (file) => {
+    if (!file?.url) return;
+    triggerDownload(file.url, file.title);
+  };
+
+  const handleGenerateFile = async (outputFormat, options = {}) => {
+    const sourceContent = String(options.content ?? generatedDocument).trim();
+    if (!sourceContent) return null;
+
+    setFileGenerationStatus(`Generando ${outputFormat.toUpperCase()}...`);
+    try {
+      const context = options.context || lastDocumentContext || {};
+      const result = await generateDocumentFile({
+        message: context.message || `Genera un ${outputFormat} con este contenido.`,
+        prompt: bot.promptContext || bot.description || '',
+        fileName: context.fileName || selectedFileTemplate?.name || selectedTemplate?.name || '',
+        fileType: context.fileType || selectedFileTemplate?.fileType || '',
+        fileText: context.fileText || selectedFileTemplateExtractedText || '',
+        content: sourceContent,
+        documentType: context.documentType || inferDocumentType(context.message || sourceContent, selectedTemplate?.name || ''),
+        outputFormat,
+      });
+
+      const url = URL.createObjectURL(result.blob);
+      const generatedFile = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        title: result.fileName,
+        preview: sourceContent.slice(0, 180),
+        type: outputFormat.toUpperCase(),
+        updatedAt: new Date().toISOString(),
+        url,
+        mimeType: result.blob.type,
+      };
+      setGeneratedFiles((current) => [generatedFile, ...current].slice(0, 6));
+      if (!options.auto) {
+        triggerDownload(url, result.fileName);
+      }
+      setFileGenerationStatus(`${outputFormat.toUpperCase()} generado y agregado a documentos.`);
+      return generatedFile;
+    } catch (error) {
+      console.warn('No se pudo generar el archivo.', error);
+      setFileGenerationStatus(`No se pudo generar ${outputFormat.toUpperCase()}: ${error?.message || 'error desconocido'}`);
+      return null;
+    }
   };
 
   const saveDocument = async () => {
@@ -559,58 +709,55 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="mt-8 rounded-lg border border-white/[0.05] bg-white/[0.02] p-4 sm:p-5 lg:p-6">
+          <div className="mt-5 rounded-lg border border-white/[0.05] bg-white/[0.018] p-3">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-gold">
-                  <Sparkles className="h-4 w-4" />
+                  <Sparkles className="h-3.5 w-3.5" />
                   Respuesta asistida
                 </div>
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-brand-accent/35">
                   {selectedTemplate ? selectedTemplate.name : 'Sin plantilla activa'}
-                  <span>Â·</span>
+                  <span>•</span>
                 {selectedFileTemplate ? selectedFileTemplate.name : 'Sin formato activo'}
               </div>
             </div>
 
             {backendStatus ? (
-              <div className="mb-3 rounded-lg border border-emerald-400/15 bg-emerald-400/5 px-4 py-3 text-[11px] font-medium text-emerald-300">
+              <div className="mb-2 inline-flex max-w-full rounded-md border border-emerald-400/15 bg-emerald-400/5 px-2.5 py-1 text-[10px] font-semibold text-emerald-300">
                 {backendStatus}
               </div>
             ) : null}
 
             {selectedFileTemplate ? (
-              <div className="mb-3 rounded-lg border border-white/[0.05] bg-white/[0.02] px-4 py-3">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-brand-gold">
-                    Texto extraÃ­do
-                  </span>
-                  <span className="text-[10px] uppercase tracking-widest text-brand-accent/35">
-                    {selectedFileTemplateExtractedText ? `${selectedFileTemplateExtractedText.length} caracteres` : 'pendiente'}
-                  </span>
-                </div>
-                <p className="max-h-32 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-brand-ivory/70">
-                  {selectedFileTemplateExtractedText
-                    ? `${selectedFileTemplateExtractedText.slice(0, 1200)}${selectedFileTemplateExtractedText.length > 1200 ? '...' : ''}`
-                    : 'Leyendo archivo... si el documento es un PDF escaneado puede requerir OCR.'}
-                </p>
+              <div className="mb-2 flex max-w-full items-center gap-2 rounded-md border border-white/[0.05] bg-white/[0.02] px-3 py-1.5 text-[10px] text-brand-accent/45">
+                <FileText className="h-3.5 w-3.5 flex-shrink-0 text-brand-gold/70" />
+                <span className="truncate text-brand-ivory/75">{selectedFileTemplate.name}</span>
+                <span className="flex-shrink-0">
+                  {selectedFileTemplateExtractedText ? `${selectedFileTemplateExtractedText.length} caracteres` : 'leyendo'}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearSelectedFileTemplate}
+                  className="ml-auto inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-brand-accent/45 transition-colors hover:bg-white/[0.06] hover:text-brand-ivory"
+                  aria-label="Quitar archivo"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
             ) : null}
 
-            <div className="mb-4 rounded-lg border border-white/[0.05] bg-white/[0.015] p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold text-brand-gold">Prueba con una tarea real</p>
-                  <p className="mt-1 text-xs text-brand-accent/45">Estos prompts muestran valor legal concreto en la demo.</p>
-                </div>
-                <Search className="h-4 w-4 text-brand-accent/35" />
+            <div className="mb-2 rounded-md border border-white/[0.05] bg-white/[0.012] px-2.5 py-1.5">
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <p className="text-[11px] font-semibold text-brand-gold">Tareas rapidas</p>
+                <Search className="h-3.5 w-3.5 text-brand-accent/35" />
               </div>
-              <div className="flex flex-wrap gap-2">
-                {examplePrompts.map((prompt) => (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {examplePrompts.slice(0, 4).map((prompt) => (
                   <button
                     key={prompt}
                     type="button"
                     onClick={() => setInput(prompt)}
-                    className="rounded-md border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-left text-xs font-medium text-brand-ivory/75 transition-colors hover:border-brand-gold/30 hover:text-brand-ivory"
+                    className="shrink-0 rounded-md border border-white/[0.06] bg-white/[0.015] px-2.5 py-1 text-left text-[10px] font-medium text-brand-ivory/65 transition-colors hover:border-brand-gold/30 hover:text-brand-ivory"
                   >
                     {prompt}
                   </button>
@@ -619,59 +766,95 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
             </div>
 
             <div className="group relative">
-            {selectedFileTemplate ? (
-              <div className="mb-3 inline-flex max-w-full items-center gap-3 rounded-lg border border-white/[0.05] bg-white/[0.03] px-3 py-2.5">
-                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-rose-500/90 text-white">
-                    <FileText className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-brand-ivory">{selectedFileTemplate.name}</div>
-                    <div className="text-[10px] uppercase tracking-widest text-brand-accent/35">
-                      {selectedFileTemplate.fileSize ? `${Math.round(selectedFileTemplate.fileSize / 1024)} KB` : 'Archivo'}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={clearSelectedFileTemplate}
-                    className="ml-1 inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-brand-accent/40 transition-colors hover:bg-white/[0.06] hover:text-brand-ivory"
-                    aria-label="Quitar archivo"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : null}
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={selectedFileTemplate ? `Escribe los datos para completar "${selectedFileTemplate.name}"...` : `Escribe una consulta para ${bot.name}...`}
-                className="w-full rounded-lg border border-white/[0.05] bg-white/[0.02] py-4 pl-5 pr-28 text-sm font-light text-brand-ivory transition-colors placeholder:text-brand-accent/10 focus:border-brand-gold/40 focus:bg-white/[0.04] focus:outline-none sm:py-5 sm:pl-6 sm:pr-32 sm:text-base"
+                className="w-full rounded-lg border border-white/[0.05] bg-white/[0.02] py-3 pl-4 pr-24 text-sm font-light text-brand-ivory transition-colors placeholder:text-brand-accent/15 focus:border-brand-gold/40 focus:bg-white/[0.04] focus:outline-none sm:pr-28"
               />
               <button
                 type="button"
                 onClick={() => setIsTemplatePickerOpen(true)}
-                className="absolute right-16 top-1/2 -translate-y-1/2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-brand-ivory transition-all hover:border-brand-gold/30 hover:text-brand-gold sm:right-20 sm:px-4 sm:py-2 sm:text-[11px]"
+                className="absolute right-14 top-1/2 -translate-y-1/2 rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-brand-ivory transition-all hover:border-brand-gold/30 hover:text-brand-gold sm:right-16"
               >
                 Plantilla
               </button>
               <button
                 onClick={handleSend}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 text-brand-accent transition-colors hover:text-brand-gold disabled:opacity-10 sm:right-5 sm:p-3"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-brand-accent transition-colors hover:text-brand-gold disabled:opacity-10"
                 disabled={!input.trim() || isTyping}
               >
-                <Send className="h-5 w-5 sm:h-6 sm:w-6" />
+                <Send className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.24em] text-brand-accent/20">
-              <span>Asistencia documental generativa</span>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-brand-accent/30">
+              <span>IA documental</span>
               <button type="button" onClick={() => setIsTemplateDrawerOpen(true)} className="text-brand-accent/35 transition-colors hover:text-brand-ivory">
                 Ver recursos
               </button>
             </div>
 
-            {saveStatus ? <div className="mt-4 rounded-xl border border-white/[0.05] bg-white/[0.02] p-4 text-xs text-brand-ivory/70">{saveStatus}</div> : null}
+            {canExportResponse && generatedDocument ? (
+              <div className="mt-2 rounded-md border border-white/[0.05] bg-white/[0.012] px-2.5 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold text-brand-ivory">Exportar respuesta</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={copyDocument}
+                      className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[10px] font-semibold text-brand-ivory/75 transition-colors hover:border-brand-gold/30 hover:text-brand-ivory"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      Copiar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={downloadDocument}
+                      className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[10px] font-semibold text-brand-ivory/75 transition-colors hover:border-brand-gold/30 hover:text-brand-ivory"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      TXT
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateFile('docx')}
+                      disabled={Boolean(fileGenerationStatus?.startsWith('Generando'))}
+                      className="inline-flex items-center gap-1 rounded-md bg-brand-ivory px-2 py-1 text-[10px] font-bold text-brand-black transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      DOCX
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateFile('pdf')}
+                      disabled={Boolean(fileGenerationStatus?.startsWith('Generando'))}
+                      className="inline-flex items-center gap-1 rounded-md bg-brand-gold px-2 py-1 text-[10px] font-bold text-brand-black transition-colors hover:bg-brand-ivory disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveDocument}
+                      disabled={!onSaveGeneratedDocument}
+                      className="inline-flex items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.02] px-2 py-1 text-[10px] font-bold text-brand-ivory transition-colors hover:border-brand-gold/30 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      Guardar
+                    </button>
+                  </div>
+                </div>
+
+                {fileGenerationStatus ? (
+                  <p className="mt-1.5 truncate text-[10px] text-brand-accent/50">{fileGenerationStatus}</p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {saveStatus ? <div className="mt-2 rounded-md border border-white/[0.05] bg-white/[0.02] px-3 py-2 text-[11px] text-brand-ivory/70">{saveStatus}</div> : null}
           </div>
 
             <div className="mt-4 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.2em] text-brand-accent/30">
@@ -706,15 +889,29 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
                 <div className="space-y-2">
                   {generatedFiles.length ? generatedFiles.map((file) => (
                     <div key={file.id} className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2">
-                      <div className="text-sm text-brand-ivory">{file.title}</div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 text-sm text-brand-ivory">
+                          <span className="block truncate">{file.title}</span>
+                        </div>
+                        {file.url ? (
+                          <button
+                            type="button"
+                            onClick={() => downloadGeneratedFile(file)}
+                            className="inline-flex flex-shrink-0 items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[10px] font-semibold text-brand-ivory/70 transition-colors hover:border-brand-gold/30 hover:text-brand-ivory"
+                          >
+                            <Download className="h-3 w-3" />
+                            Descargar
+                          </button>
+                        ) : null}
+                      </div>
                       <div className="mt-1 text-[10px] uppercase tracking-widest text-brand-accent/35">
-                        {file.type} Â· {new Date(file.updatedAt).toLocaleString()}
+                        {file.type} • {new Date(file.updatedAt).toLocaleString()}
                       </div>
                       <p className="mt-2 line-clamp-3 text-xs font-light text-brand-accent/40">{file.preview}</p>
                     </div>
                   )) : (
                     <div className="rounded-xl border border-dashed border-white/[0.08] bg-white/[0.02] p-4 text-sm text-brand-accent/35">
-                      Los documentos editados o generados por la IA aparecerÃ¡n aquÃ­.
+                      Los documentos editados o generados por la IA apareceran aqui.
                     </div>
                   )}
                 </div>

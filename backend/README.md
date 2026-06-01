@@ -8,6 +8,7 @@ Backend en Python para recibir archivos desde React, extraer texto y preparar el
 - `POST /upload`
 - `POST /chat`
 - `POST /generate-document`
+- `POST /generate-file`
 
 ## Arranque local
 
@@ -35,8 +36,16 @@ cd backend
 .\start_backend.ps1
 ```
 
-## Proximo paso
+## Produccion
 
-- Implementar extraccion real de PDF y DOCX.
-- Conectar `src/services/documentBackendService.js` con este backend.
-- Mover la llamada a la IA para que se haga desde Python.
+Despliega este directorio como servicio Python y configura la URL publica en el frontend:
+
+```env
+VITE_DOCUMENT_BACKEND_URL=https://api.tu-dominio.com
+```
+
+Comando sugerido:
+
+```bash
+uvicorn main:app --host 0.0.0.0 --port $PORT
+```

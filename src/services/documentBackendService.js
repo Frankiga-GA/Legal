@@ -75,3 +75,45 @@ export const generateDocumentWithBackend = async ({ message, prompt = '', file }
 
   return handleJsonResponse(response, '/generate-document');
 };
+
+export const generateDocumentFile = async ({
+  message,
+  prompt = '',
+  fileName = '',
+  fileType = '',
+  fileText = '',
+  content = '',
+  documentType = 'documento',
+  outputFormat = 'docx',
+}) => {
+  const response = await fetchWithTimeout(`${backendUrl}/generate-file`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message,
+      prompt,
+      file_name: fileName,
+      file_type: fileType,
+      file_text: fileText,
+      content,
+      document_type: documentType,
+      output_format: outputFormat,
+    }),
+  }, 300000);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'No se pudo generar el archivo.');
+  }
+
+  const blob = await response.blob();
+  const headerName = response.headers.get('X-Lusti-Filename');
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="?([^"]+)"?/i);
+  return {
+    blob,
+    fileName: headerName || match?.[1] || `documento-lusti.${outputFormat}`,
+  };
+};
