@@ -119,10 +119,10 @@ export const onDriveTokenChange = (callback) => {
   return () => window.removeEventListener(DRIVE_TOKEN_CHANGED_EVENT, handler);
 };
 
-const buildDriveListUrl = (query) => {
+const buildDriveListUrl = (query, pageSize = '50') => {
   const url = new URL('https://www.googleapis.com/drive/v3/files');
   url.searchParams.set('q', query);
-  url.searchParams.set('pageSize', '50');
+  url.searchParams.set('pageSize', pageSize);
   url.searchParams.set('fields', 'files(id,name,mimeType,modifiedTime,webViewLink,size,parents)');
   url.searchParams.set('includeItemsFromAllDrives', 'true');
   url.searchParams.set('supportsAllDrives', 'true');
@@ -149,8 +149,8 @@ export const isSupportedPromptFile = (file) => DRIVE_TEXT_MIME_TYPES.has(file?.m
 
 export const isSupportedTemplateFile = (file) => DRIVE_TEMPLATE_MIME_TYPES.has(file?.mimeType || '');
 
-const fetchDrive = async (token, query) => {
-  const response = await fetch(buildDriveListUrl(query), {
+const fetchDrive = async (token, query, pageSize) => {
+  const response = await fetch(buildDriveListUrl(query, pageSize), {
     headers: {
       Authorization: `Bearer ${token.access_token}`,
     },
@@ -183,6 +183,12 @@ export const listDriveFolders = async (token = getStoredDriveToken()) => {
 export const listDriveFiles = async (token = getStoredDriveToken()) => {
   if (!token?.access_token) return [];
   return fetchDrive(token, "trashed = false");
+};
+
+export const listDriveChildren = async (folderId = 'root', token = getStoredDriveToken()) => {
+  if (!token?.access_token) return [];
+  const safeFolderId = String(folderId || 'root').replace(/'/g, "\\'");
+  return fetchDrive(token, `'${safeFolderId}' in parents and trashed = false`, '100');
 };
 
 export const downloadDriveFileAsFile = async (file, token = getStoredDriveToken()) => {

@@ -1,7 +1,18 @@
 // src/components/CreateCaseModal.jsx
 import { useEffect, useMemo, useState } from 'react';
-import { X, FileText, User, Upload, Paperclip, HardDrive, RefreshCw, ExternalLink } from 'lucide-react';
-import { getStoredDriveToken, listDriveFiles, listDriveFolders } from '../services/googleDriveService';
+import { X, FileText, User, Upload, Paperclip, HardDrive, RefreshCw, ExternalLink, ChevronLeft, FolderOpen } from 'lucide-react';
+import { getStoredDriveToken, listDriveChildren } from '../services/googleDriveService';
+
+const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
+
+const isDriveFolder = (item) => item?.mimeType === FOLDER_MIME_TYPE;
+
+const sortDriveItems = (items = []) =>
+  [...items].sort((a, b) => {
+    if (isDriveFolder(a) && !isDriveFolder(b)) return -1;
+    if (!isDriveFolder(a) && isDriveFolder(b)) return 1;
+    return String(a?.name || '').localeCompare(String(b?.name || ''), 'es', { sensitivity: 'base' });
+  });
 
 const CreateCaseModal = ({ onClose, onSave }) => {
   const [formData, setFormData] = useState({
@@ -15,9 +26,8 @@ const CreateCaseModal = ({ onClose, onSave }) => {
   });
 
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [selectedDriveFolderId, setSelectedDriveFolderId] = useState('');
-  const [driveFolders, setDriveFolders] = useState([]);
-  const [driveFiles, setDriveFiles] = useState([]);
+  const [driveItems, setDriveItems] = useState([]);
+  const [drivePath, setDrivePath] = useState([{ id: 'root', name: 'Mi unidad' }]);
   const [driveLoading, setDriveLoading] = useState(false);
   const [driveError, setDriveError] = useState('');
 
@@ -40,11 +50,10 @@ const CreateCaseModal = ({ onClose, onSave }) => {
     setSelectedFiles((prev) => [...prev, ...newFiles]);
   };
 
-  const loadDriveFiles = async () => {
+  const loadDriveFiles = async (folderId = drivePath.at(-1)?.id || 'root', nextPath = drivePath) => {
     const token = getStoredDriveToken();
     if (!token?.access_token) {
-      setDriveFolders([]);
-      setDriveFiles([]);
+      setDriveItems([]);
       setDriveError('');
       return;
     }
@@ -53,29 +62,12 @@ const CreateCaseModal = ({ onClose, onSave }) => {
     setDriveError('');
 
     try {
-      const [folders, files] = await Promise.all([listDriveFolders(token), listDriveFiles(token)]);
-      setDriveFolders(
-        folders
-          .filter((folder) => folder.mimeType === 'application/vnd.google-apps.folder')
-          .sort((a, b) => {
-            const aTime = a?.modifiedTime ? new Date(a.modifiedTime).getTime() : 0;
-            const bTime = b?.modifiedTime ? new Date(b.modifiedTime).getTime() : 0;
-            return bTime - aTime;
-          })
-      );
-      setDriveFiles(
-        files
-          .filter((file) => file.mimeType !== 'application/vnd.google-apps.folder')
-          .sort((a, b) => {
-            const aTime = a?.modifiedTime ? new Date(a.modifiedTime).getTime() : 0;
-            const bTime = b?.modifiedTime ? new Date(b.modifiedTime).getTime() : 0;
-            return bTime - aTime;
-          })
-      );
+      const items = await listDriveChildren(folderId, token);
+      setDrivePath(nextPath);
+      setDriveItems(sortDriveItems(items));
     } catch (error) {
       setDriveError(error?.message || 'No se pudieron cargar los archivos de Drive.');
-      setDriveFolders([]);
-      setDriveFiles([]);
+      setDriveItems([]);
     } finally {
       setDriveLoading(false);
     }
@@ -86,17 +78,18 @@ const CreateCaseModal = ({ onClose, onSave }) => {
   }, []);
 
   const driveTokenAvailable = useMemo(() => Boolean(getStoredDriveToken()?.access_token), []);
-  const selectedDriveFolder = useMemo(
-    () => driveFolders.find((folder) => folder.id === selectedDriveFolderId) || null,
-    [driveFolders, selectedDriveFolderId]
-  );
-  const filteredDriveFiles = useMemo(
-    () =>
-      selectedDriveFolderId
-        ? driveFiles.filter((file) => Array.isArray(file.parents) && file.parents.includes(selectedDriveFolderId))
-        : [],
-    [driveFiles, selectedDriveFolderId]
-  );
+  const currentDriveFolder = drivePath.at(-1) || { id: 'root', name: 'Mi unidad' };
+  const canGoBackInDrive = drivePath.length > 1;
+
+  const openDriveFolder = (folder) => {
+    loadDriveFiles(folder.id, [...drivePath, { id: folder.id, name: folder.name }]);
+  };
+
+  const goBackInDrive = () => {
+    if (!canGoBackInDrive) return;
+    const nextPath = drivePath.slice(0, -1);
+    loadDriveFiles(nextPath.at(-1)?.id || 'root', nextPath);
+  };
 
   const addDriveFile = (file) => {
     setSelectedFiles((current) => [
@@ -274,35 +267,55 @@ const CreateCaseModal = ({ onClose, onSave }) => {
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="space-y-2">
-                  <label className="block text-[10px] uppercase tracking-widest text-brand-accent/35">
-                    Selecciona la carpeta del expediente
-                  </label>
-                  <select
-                    value={selectedDriveFolderId}
-                    onChange={(e) => setSelectedDriveFolderId(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-sm text-brand-ivory outline-none transition-colors focus:border-brand-gold/40"
-                  >
-                    <option value="" className="bg-brand-dark">
-                      Elegir carpeta
-                    </option>
-                    {driveFolders.map((folder) => (
-                      <option key={folder.id} value={folder.id} className="bg-brand-dark">
+                <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-widest text-brand-accent/35">Ubicacion actual</p>
+                      <p className="mt-1 truncate text-sm font-medium text-brand-ivory">{currentDriveFolder.name}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={goBackInDrive}
+                        disabled={!canGoBackInDrive || driveLoading}
+                        className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] uppercase tracking-widest text-brand-accent/55 transition-colors hover:text-brand-ivory disabled:cursor-not-allowed disabled:opacity-35"
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                        Atras
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => loadDriveFiles()}
+                        disabled={driveLoading}
+                        className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[10px] uppercase tracking-widest text-brand-accent/55 transition-colors hover:text-brand-ivory disabled:cursor-not-allowed disabled:opacity-35"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Refrescar
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 text-[10px] uppercase tracking-widest text-brand-accent/35">
+                    {drivePath.map((folder, index) => (
+                      <button
+                        key={folder.id}
+                        type="button"
+                        onClick={() => loadDriveFiles(folder.id, drivePath.slice(0, index + 1))}
+                        className="rounded-full border border-white/[0.06] bg-white/[0.025] px-2.5 py-1 transition-colors hover:border-brand-gold/25 hover:text-brand-ivory"
+                      >
                         {folder.name}
-                      </option>
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-brand-accent/35">
-                  <span>{selectedDriveFolder ? `Carpeta: ${selectedDriveFolder.name}` : 'Sin carpeta seleccionada'}</span>
+                  <span>{driveItems.length ? `${driveItems.length} elementos visibles` : 'Carpeta sin elementos visibles'}</span>
                   <button
                     type="button"
-                    onClick={loadDriveFiles}
+                    onClick={() => loadDriveFiles('root', [{ id: 'root', name: 'Mi unidad' }])}
                     className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 hover:text-brand-ivory"
                   >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    Refrescar
+                    Ir al inicio
                   </button>
                 </div>
 

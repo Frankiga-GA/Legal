@@ -9,4 +9,4 @@ if (-not (Test-Path ".\.venv")) {
 & .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements.txt
-uvicorn main:app --reload --host 127.0.0.1 --port 8000
+uvicorn main:app --host 127.0.0.1 --port 8001

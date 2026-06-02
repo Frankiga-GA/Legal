@@ -14,10 +14,12 @@ import {
   X,
 } from 'lucide-react';
 import { askGeminiAboutCase, isGeminiConfigured } from '../services/geminiService';
+import { uploadDocumentToBackend } from '../services/documentBackendService';
 
 const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
   const [activeTab, setActiveTab] = useState('summary');
   const [noteText, setNoteText] = useState('');
+  const [documentUploadStatus, setDocumentUploadStatus] = useState('');
   const [deadlineForm, setDeadlineForm] = useState({
     title: '',
     date: '',
@@ -39,9 +41,29 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
   const importantDates = Array.isArray(caseData.importantDates) ? caseData.importantDates : [];
   const officialReferences = Array.isArray(caseData.officialReferences) ? caseData.officialReferences : [];
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    setDocumentUploadStatus(`Leyendo ${file.name}...`);
+    let extractedText = '';
+    let excerpt = 'Archivo subido por el usuario. No se pudo extraer texto util automaticamente.';
+
+    try {
+      const backendResponse = await uploadDocumentToBackend(file);
+      extractedText = String(backendResponse?.extracted_text || '').trim();
+      excerpt = extractedText
+        ? `Texto extraido por Python (${extractedText.length} caracteres): ${extractedText.slice(0, 280)}${extractedText.length > 280 ? '...' : ''}`
+        : 'Archivo subido por el usuario. El backend no encontro texto extraible.';
+      setDocumentUploadStatus(
+        extractedText
+          ? `Documento leido: ${extractedText.length} caracteres disponibles para la IA.`
+          : 'Documento subido, pero sin texto extraible.'
+      );
+    } catch (error) {
+      console.warn('No se pudo extraer texto del documento del expediente.', error);
+      setDocumentUploadStatus(`Documento subido, pero no se pudo leer: ${error?.message || 'error desconocido'}`);
+    }
 
     const newDoc = {
       id: Date.now(),
@@ -49,8 +71,8 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
       size: (file.size / 1024).toFixed(2) + ' KB',
       date: new Date().toISOString().split('T')[0],
       type: file.type,
-      excerpt: 'Archivo subido por el usuario. Para que la IA lea contenido completo, registra el texto del documento en la carga documental avanzada.',
-      content: '',
+      excerpt,
+      content: extractedText,
     };
 
     onUpdate(caseData.id, {
@@ -252,6 +274,11 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
                 <input type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={handleFileUpload} className="hidden" />
               </label>
             </div>
+            {documentUploadStatus ? (
+              <p className="rounded-lg border border-brand-gold/15 bg-brand-gold/[0.04] px-4 py-3 text-xs text-brand-accent/70">
+                {documentUploadStatus}
+              </p>
+            ) : null}
 
             <div className="space-y-3">
               {documents.length > 0 ? (
