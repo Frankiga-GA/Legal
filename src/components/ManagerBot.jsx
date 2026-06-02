@@ -1,8 +1,8 @@
-﻿import { useEffect, useMemo, useState } from 'react';
-import { Bot, Edit3, FileText, FolderOpen, Plus, Search, Sparkles, Trash2, Upload, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Bot, ChevronRight, Edit3, FileText, FolderOpen, Plus, Search, Sparkles, Trash2, Upload, X } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '../utils/supabase';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
-import { getStoredDriveToken, isSupportedPromptFile, isSupportedTemplateFile, listDriveFiles, listDriveFolders, onDriveTokenMessage } from '../services/googleDriveService';
+import { getStoredDriveToken, isSupportedPromptFile, isSupportedTemplateFile, listDriveFiles, listDriveFolders, listDriveChildren, onDriveTokenMessage } from '../services/googleDriveService';
 import { ensureDefaultOrganization } from '../services/organizationService';
 import BotChat from './BotChat';
 
@@ -132,6 +132,13 @@ const ManagerBot = () => {
   const [driveFolders, setDriveFolders] = useState([]);
   const [driveFiles, setDriveFiles] = useState([]);
   const [isLoadingDriveFolders, setIsLoadingDriveFolders] = useState(false);
+  const [folderNameCache, setFolderNameCache] = useState({});
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerField, setPickerField] = useState(''); // 'promptFolderId' | 'templateFolderId'
+  const [pickerCurrentFolderId, setPickerCurrentFolderId] = useState('root');
+  const [pickerHistory, setPickerHistory] = useState([]);
+  const [pickerFolders, setPickerFolders] = useState([]);
+  const [isPickerLoading, setIsPickerLoading] = useState(false);
   const [hasHydratedData, setHasHydratedData] = useState(false);
   const [assistantSaveStatus, setAssistantSaveStatus] = useState('');
   const [newAssistant, setNewAssistant] = useState({ name: '', description: '', templates: [], selectedPromptFileIds: [], promptFolderId: '', templateFolderId: '', driveFolderId: '' });
@@ -142,6 +149,16 @@ const ManagerBot = () => {
     applyLocalFallbackData(setAssistants, setTemplates, setFileTemplates);
     setHasHydratedData(true);
   }, []);
+
+  useEffect(() => {
+    if (driveFolders.length > 0) {
+      const cache = {};
+      driveFolders.forEach((f) => {
+        if (f && f.id) cache[f.id] = f.name;
+      });
+      setFolderNameCache((prev) => ({ ...prev, ...cache }));
+    }
+  }, [driveFolders]);
 
   useEffect(() => {
     let cancelled = false;
@@ -200,6 +217,83 @@ const ManagerBot = () => {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+
+    setIsPickerLoading(true);
+    try {
+      let filtered = [];
+      if (pickerCurrentFolderId === 'root') {
+        filtered = driveFolders.filter((folder) => {
+          if (!folder.parents || folder.parents.length === 0) return true;
+          if (folder.parents.includes('root')) return true;
+          return !driveFolders.some((f) => folder.parents.includes(f.id));
+        });
+      } else {
+        filtered = driveFolders.filter((folder) => {
+          return folder.parents && folder.parents.includes(pickerCurrentFolderId);
+        });
+      }
+      setPickerFolders(filtered);
+    } catch (err) {
+      console.warn('Error al filtrar carpetas locales', err);
+      setPickerFolders([]);
+    } finally {
+      setIsPickerLoading(false);
+    }
+  }, [pickerOpen, pickerCurrentFolderId, driveFolders]);
+
+  const handleEnterPickerFolder = (folder) => {
+    setPickerHistory((prev) => [...prev, { id: folder.id, name: folder.name }]);
+    setPickerCurrentFolderId(folder.id);
+  };
+
+  const handlePickerNavigate = (folderId, index) => {
+    if (folderId === 'root') {
+      setPickerHistory([]);
+      setPickerCurrentFolderId('root');
+    } else {
+      setPickerHistory((prev) => prev.slice(0, index + 1));
+      setPickerCurrentFolderId(folderId);
+    }
+  };
+
+  const handleConfirmPickerSelection = () => {
+    const selectedId = pickerCurrentFolderId === 'root' ? '' : pickerCurrentFolderId;
+    
+    if (pickerCurrentFolderId !== 'root' && pickerHistory.length > 0) {
+      const lastFolder = pickerHistory[pickerHistory.length - 1];
+      setFolderNameCache((prev) => ({ ...prev, [lastFolder.id]: lastFolder.name }));
+    }
+
+    setNewAssistant((prev) => ({
+      ...prev,
+      [pickerField]: selectedId,
+    }));
+    
+    setPickerOpen(false);
+  };
+
+  const openFolderPicker = (field) => {
+    setPickerField(field);
+    const initialFolderId = newAssistant[field] || 'root';
+    setPickerCurrentFolderId(initialFolderId);
+    
+    if (initialFolderId === 'root') {
+      setPickerHistory([]);
+    } else {
+      const folderName = folderNameCache[initialFolderId] || 'Carpeta';
+      setPickerHistory([{ id: initialFolderId, name: folderName }]);
+    }
+    
+    setPickerOpen(true);
+  };
+
+  const getFolderName = (folderId) => {
+    if (!folderId) return 'Sin carpeta asignada';
+    return folderNameCache[folderId] || `Carpeta (${folderId.slice(0, 8)})`;
+  };
 
   useEffect(() => {
     const refreshDrive = async () => {
@@ -736,22 +830,41 @@ const ManagerBot = () => {
     a.click();
   };
 
-  const openAssistant = (assistant) => {
+  const openAssistant = async (assistant) => {
+    setIsLoadingDriveFolders(true);
+    let promptFiles = [];
+    let templateFiles = [];
+    let selectedPromptFiles = [];
+
+    const token = getStoredDriveToken();
+    try {
+      if (token) {
+        const [promptFolderChildren, templateFolderChildren, allFiles] = await Promise.all([
+          assistant.promptFolderId ? listDriveChildren(assistant.promptFolderId, token) : Promise.resolve([]),
+          assistant.templateFolderId ? listDriveChildren(assistant.templateFolderId, token) : Promise.resolve([]),
+          assistant.selectedPromptFileIds?.length ? listDriveFiles(token) : Promise.resolve([])
+        ]);
+
+        promptFiles = promptFolderChildren.filter(isSupportedPromptFile);
+        templateFiles = templateFolderChildren.filter(isSupportedTemplateFile);
+        selectedPromptFiles = allFiles.filter((file) => assistant.selectedPromptFileIds?.includes(file.id));
+
+        const newCache = {};
+        if (assistant.promptFolderId) newCache[assistant.promptFolderId] = folderNameCache[assistant.promptFolderId] || 'Carpeta de Prompts';
+        if (assistant.templateFolderId) newCache[assistant.templateFolderId] = folderNameCache[assistant.templateFolderId] || 'Carpeta de Plantillas';
+        setFolderNameCache(prev => ({ ...prev, ...newCache }));
+      }
+    } catch (err) {
+      console.warn('Error al cargar archivos de Drive para el asistente', err);
+    } finally {
+      setIsLoadingDriveFolders(false);
+    }
+
     const assistantTemplates = templates.filter((template) => assistant.templates.includes(template.id));
     const driveFolder = driveFolders.find((folder) => folder.id === assistant.driveFolderId) || null;
-    const promptFolder = driveFolders.find((folder) => folder.id === assistant.promptFolderId) || null;
-    const templateFolder = driveFolders.find((folder) => folder.id === assistant.templateFolderId) || null;
-    const selectedPromptFiles = assistant.selectedPromptFileIds?.length
-      ? driveFiles.filter((file) => assistant.selectedPromptFileIds.includes(file.id))
-      : [];
-    const templateFiles = driveFiles.filter((file) => {
-      if (!templateFolder?.id) return true;
-      return Array.isArray(file.parents) && file.parents.includes(templateFolder.id) && isSupportedTemplateFile(file);
-    });
-    const promptFiles = driveFiles.filter((file) => {
-      if (!promptFolder?.id) return true;
-      return Array.isArray(file.parents) && file.parents.includes(promptFolder.id) && isSupportedPromptFile(file);
-    });
+    const promptFolder = driveFolders.find((folder) => folder.id === assistant.promptFolderId) || (assistant.promptFolderId ? { id: assistant.promptFolderId, name: getFolderName(assistant.promptFolderId) } : null);
+    const templateFolder = driveFolders.find((folder) => folder.id === assistant.templateFolderId) || (assistant.templateFolderId ? { id: assistant.templateFolderId, name: getFolderName(assistant.templateFolderId) } : null);
+
     setActiveBot({
       id: assistant.id,
       name: assistant.name,
@@ -1149,19 +1262,18 @@ const ManagerBot = () => {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/60">Carpeta de prompts</label>
-                    <select
-                      value={newAssistant.promptFolderId || ''}
-                      onChange={(e) => setNewAssistant({ ...newAssistant, promptFolderId: e.target.value })}
-                      className="w-full rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-brand-ivory outline-none transition-all focus:border-brand-gold/40"
-                      disabled={isLoadingDriveFolders}
-                    >
-                      <option value="">Sin carpeta de prompts</option>
-                      {driveFolders.map((folder) => (
-                        <option key={folder.id} value={folder.id} className="bg-brand-dark">
-                          {folder.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <div className="flex-1 truncate rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-sm text-brand-ivory/80">
+                        {getFolderName(newAssistant.promptFolderId)}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openFolderPicker('promptFolderId')}
+                        className="rounded-lg border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-[11px] font-bold uppercase tracking-widest text-brand-gold hover:border-brand-gold/30 hover:bg-white/[0.04]"
+                      >
+                        Seleccionar
+                      </button>
+                    </div>
                     <p className="text-[10px] uppercase tracking-widest text-brand-accent/35">
                       Esa carpeta alimenta el bloque de prompts del asistente.
                     </p>
@@ -1169,19 +1281,18 @@ const ManagerBot = () => {
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/60">Carpeta de plantillas</label>
-                    <select
-                      value={newAssistant.templateFolderId || ''}
-                      onChange={(e) => setNewAssistant({ ...newAssistant, templateFolderId: e.target.value })}
-                      className="w-full rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-brand-ivory outline-none transition-all focus:border-brand-gold/40"
-                      disabled={isLoadingDriveFolders}
-                    >
-                      <option value="">Sin carpeta de plantillas</option>
-                      {driveFolders.map((folder) => (
-                        <option key={folder.id} value={folder.id} className="bg-brand-dark">
-                          {folder.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <div className="flex-1 truncate rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-sm text-brand-ivory/80">
+                        {getFolderName(newAssistant.templateFolderId)}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openFolderPicker('templateFolderId')}
+                        className="rounded-lg border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-[11px] font-bold uppercase tracking-widest text-brand-gold hover:border-brand-gold/30 hover:bg-white/[0.04]"
+                      >
+                        Seleccionar
+                      </button>
+                    </div>
                     <p className="text-[10px] uppercase tracking-widest text-brand-accent/35">
                       Esa carpeta alimenta las plantillas que verá el chat.
                     </p>
@@ -1270,6 +1381,97 @@ const ManagerBot = () => {
                   {assistantSaveStatus === 'error' && 'No se pudo guardar. Revisa el mensaje de error.'}
                 </p>
               </form>
+            </div>
+          </div>
+        )}
+
+        {pickerOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-brand-black/90 p-4 backdrop-blur-md">
+            <div className="w-full max-w-xl rounded-lg border border-white/[0.08] bg-brand-dark p-6 shadow-2xl">
+              <div className="mb-4 flex items-start justify-between">
+                <div>
+                  <h4 className="text-xl font-serif text-brand-ivory">Seleccionar carpeta de Drive</h4>
+                  <p className="mt-1 text-xs text-brand-accent/40">
+                    Navega por las carpetas y haz clic en "Confirmar selección".
+                  </p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setPickerOpen(false)} 
+                  className="text-brand-accent/40 transition-colors hover:text-brand-ivory"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Breadcrumbs */}
+              <div className="mb-4 flex flex-wrap items-center gap-1.5 text-xs text-brand-accent/60 bg-white/[0.02] p-2.5 rounded-lg border border-white/[0.04]">
+                <button
+                  type="button"
+                  onClick={() => handlePickerNavigate('root', -1)}
+                  className="hover:text-brand-gold font-medium"
+                >
+                  Inicio
+                </button>
+                {pickerHistory.map((folder, index) => (
+                  <span key={folder.id} className="flex items-center gap-1.5">
+                    <ChevronRight className="h-3.5 w-3.5" />
+                    <button
+                      type="button"
+                      onClick={() => handlePickerNavigate(folder.id, index)}
+                      className="hover:text-brand-gold font-medium"
+                    >
+                      {folder.name}
+                    </button>
+                  </span>
+                ))}
+              </div>
+
+              {/* Folder list */}
+              <div className="custom-scrollbar max-h-60 min-h-[160px] overflow-y-auto space-y-2 border border-white/[0.06] bg-white/[0.01] p-3 rounded-lg">
+                {isPickerLoading ? (
+                  <div className="flex h-32 items-center justify-center">
+                    <div className="h-6 w-6 rounded-full border-2 border-brand-gold/30 border-t-brand-gold animate-spin"></div>
+                  </div>
+                ) : pickerFolders.length > 0 ? (
+                  pickerFolders.map((folder) => (
+                    <button
+                      key={folder.id}
+                      type="button"
+                      onClick={() => handleEnterPickerFolder(folder)}
+                      className="flex w-full items-center justify-between rounded-lg border border-white/[0.04] bg-white/[0.015] p-3 text-left hover:border-brand-gold/30 hover:bg-white/[0.03]"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FolderOpen className="h-4 w-4 shrink-0 text-brand-gold" />
+                        <span className="truncate text-sm text-brand-ivory">{folder.name}</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-brand-accent/40" />
+                    </button>
+                  ))
+                ) : (
+                  <div className="flex h-32 flex-col items-center justify-center text-center p-4">
+                    <FolderOpen className="h-8 w-8 text-brand-accent/15 mb-2" />
+                    <p className="text-xs text-brand-accent/35">No hay subcarpetas dentro de esta ubicación.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(false)}
+                  className="flex-1 rounded-lg border border-white/[0.08] px-4 py-3 text-xs font-bold uppercase tracking-widest text-brand-ivory transition-all hover:border-brand-gold/30"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmPickerSelection}
+                  className="flex-1 rounded-lg bg-brand-gold px-4 py-3 text-xs font-bold uppercase tracking-widest text-brand-black transition-all hover:bg-white"
+                >
+                  Confirmar selección
+                </button>
+              </div>
             </div>
           </div>
         )}

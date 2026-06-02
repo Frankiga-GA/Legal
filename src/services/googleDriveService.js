@@ -177,7 +177,7 @@ const fetchDrive = async (token, query, pageSize) => {
 
 export const listDriveFolders = async (token = getStoredDriveToken()) => {
   if (!token?.access_token) return [];
-  return fetchDrive(token, "mimeType = 'application/vnd.google-apps.folder' and trashed = false");
+  return fetchDrive(token, "mimeType = 'application/vnd.google-apps.folder' and trashed = false", '150');
 };
 
 export const listDriveFiles = async (token = getStoredDriveToken()) => {
