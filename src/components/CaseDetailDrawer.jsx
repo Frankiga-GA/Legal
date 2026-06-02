@@ -9,6 +9,7 @@ import {
   ExternalLink,
   MessageSquare,
   Plus,
+  Trash2,
   Upload,
   User,
   X,
@@ -16,7 +17,7 @@ import {
 import { askGeminiAboutCase, isGeminiConfigured } from '../services/geminiService';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
 
-const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
+const CaseDetailDrawer = ({ caseData, onClose, onUpdate, onDelete }) => {
   const [activeTab, setActiveTab] = useState('summary');
   const [noteText, setNoteText] = useState('');
   const [documentUploadStatus, setDocumentUploadStatus] = useState('');
@@ -80,6 +81,15 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
     });
 
     e.target.value = '';
+  };
+
+  const handleDeleteDoc = (docId) => {
+    if (!window.confirm("¿Estás seguro de que deseas eliminar este documento de este expediente?")) {
+      return;
+    }
+    onUpdate(caseData.id, {
+      documents: documents.filter((doc) => doc.id !== docId),
+    });
   };
 
   const handleAddNote = (e) => {
@@ -189,9 +199,20 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
             <h3 className="truncate text-3xl font-serif font-medium tracking-tight text-brand-ivory">{caseData.id}</h3>
             <p className="mt-2 text-sm text-brand-accent/60">{caseData.clientName}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-brand-accent/40 transition-colors hover:bg-white/[0.05] hover:text-brand-ivory">
-            <X className="h-6 w-6" />
-          </button>
+          <div className="flex items-center gap-1">
+            {onDelete && (
+              <button 
+                onClick={() => onDelete(caseData.id)} 
+                title="Eliminar expediente"
+                className="rounded-lg p-2 text-red-400/50 transition-colors hover:bg-red-500/10 hover:text-red-400"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            )}
+            <button onClick={onClose} className="rounded-lg p-2 text-brand-accent/40 transition-colors hover:bg-white/[0.05] hover:text-brand-ivory">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-4 gap-3">
@@ -283,7 +304,7 @@ const CaseDetailDrawer = ({ caseData, onClose, onUpdate }) => {
             <div className="space-y-3">
               {documents.length > 0 ? (
                 documents.map((doc, idx) => (
-                  <DocumentRow key={doc.id || `${doc.name}-${idx}`} doc={doc} />
+                  <DocumentRow key={doc.id || `${doc.name}-${idx}`} doc={doc} onDeleteDoc={handleDeleteDoc} />
                 ))
               ) : (
                 <EmptyState icon={Upload} text="Todavia no hay documentos vinculados." />
@@ -499,7 +520,7 @@ const InfoCard = ({ icon: Icon, label, value }) => (
   </div>
 );
 
-const DocumentRow = ({ doc }) => (
+const DocumentRow = ({ doc, onDeleteDoc }) => (
   <div className="group rounded-lg border border-white/[0.06] bg-white/[0.015] p-4 transition-colors hover:bg-white/[0.03]">
     <div className="flex items-center justify-between gap-4">
       <div className="flex min-w-0 items-center gap-3">
@@ -511,7 +532,22 @@ const DocumentRow = ({ doc }) => (
           <p className="mt-1 text-xs text-brand-accent/35">{doc.size || 'Archivo vinculado'}</p>
         </div>
       </div>
-      <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-accent/35">{doc.date}</span>
+      <div className="flex items-center gap-3 shrink-0">
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-accent/35">{doc.date}</span>
+        {onDeleteDoc && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteDoc(doc.id);
+            }}
+            className="rounded p-1 text-brand-accent/20 transition-colors hover:bg-red-500/10 hover:text-red-400 group-hover:text-brand-accent/40"
+            title="Eliminar documento"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
     </div>
     {doc.excerpt && (
       <p className="mt-3 border-t border-white/[0.04] pt-3 text-xs font-light leading-5 text-brand-accent/55">

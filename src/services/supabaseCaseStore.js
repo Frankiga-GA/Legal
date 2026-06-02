@@ -140,3 +140,28 @@ export const replaceSupabaseCases = async (cases) => {
 
   return { error, skipped: false };
 };
+
+export const deleteSupabaseCase = async (caseId) => {
+  if (!canUseSupabaseCases()) return { error: null, skipped: true };
+
+  const { organizationId, user } = await ensureDefaultOrganization();
+  const userId = user?.id || await getCurrentUserId();
+  if (!userId) return { error: null, skipped: true };
+
+  const deleteQuery = supabase.from(TABLE_NAME).delete().eq('id', caseId);
+  const { error } = organizationId
+    ? await deleteQuery.eq('organization_id', organizationId)
+    : await deleteQuery.eq('user_id', userId);
+
+  if (error && organizationId && isMissingOrganizationColumn(error)) {
+    const fallbackDelete = await supabase
+      .from(TABLE_NAME)
+      .delete()
+      .eq('id', caseId)
+      .eq('user_id', userId);
+
+    return { error: fallbackDelete.error, skipped: false };
+  }
+
+  return { error, skipped: false };
+};

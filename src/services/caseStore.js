@@ -1,6 +1,6 @@
 import { mockCases } from '../data/mockData';
 import { demoDocumentsByCaseId } from '../data/demoDocuments';
-import { fetchSupabaseCases, replaceSupabaseCases, upsertSupabaseCase } from './supabaseCaseStore';
+import { fetchSupabaseCases, replaceSupabaseCases, upsertSupabaseCase, deleteSupabaseCase } from './supabaseCaseStore';
 
 const STORAGE_KEY = 'lusti-cases';
 const DEMO_CASE_IDS = new Set(mockCases.map((caseItem) => caseItem.id));
@@ -154,4 +154,17 @@ export const resetCasesAsync = async () => {
   const { error } = await replaceSupabaseCases(initialCases);
   if (error) console.warn('No se pudo restaurar la demo en Supabase.', error.message);
   return { cases: initialCases, error };
+};
+
+export const deleteCase = (cases, caseId) => {
+  const nextCases = cases.filter((caseItem) => caseItem.id !== caseId);
+  saveCases(nextCases);
+  return nextCases;
+};
+
+export const deleteCaseAsync = async (cases, caseId) => {
+  const nextCases = deleteCase(cases, caseId);
+  const { error } = await deleteSupabaseCase(caseId);
+  if (error) console.warn('No se pudo eliminar el expediente de Supabase.', error.message);
+  return { cases: nextCases, error };
 };

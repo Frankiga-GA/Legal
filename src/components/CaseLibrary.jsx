@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import CaseDetailDrawer from './CaseDetailDrawer';
 import CreateCaseModal from './CreateCaseModal';
-import { addCaseAsync, getCases, loadCases, resetCasesAsync, updateCaseAsync } from '../services/caseStore';
+import { addCaseAsync, deleteCaseAsync, getCases, loadCases, resetCasesAsync, updateCaseAsync } from '../services/caseStore';
 
 const CaseLibrary = ({ setActiveTab }) => {
   const [cases, setCases] = useState(() => getCases());
@@ -43,6 +43,19 @@ const CaseLibrary = ({ setActiveTab }) => {
     setStatusMessage(result.error
       ? 'Expediente actualizado localmente. Supabase no respondio.'
       : 'Expediente actualizado.'
+    );
+  };
+
+  const handleDeleteCase = async (caseId) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar el expediente ${caseId}? Esta acción borrará permanentemente todos sus documentos y datos.`)) {
+      return;
+    }
+    const result = await deleteCaseAsync(cases, caseId);
+    setCases(result.cases);
+    setSelectedCase(null);
+    setStatusMessage(result.error
+      ? 'Expediente eliminado localmente. Supabase no respondió.'
+      : `Expediente ${caseId} eliminado.`
     );
   };
 
@@ -280,6 +293,7 @@ const CaseLibrary = ({ setActiveTab }) => {
             caseData={selectedCase}
             onClose={() => setSelectedCase(null)}
             onUpdate={handleUpdateCase}
+            onDelete={handleDeleteCase}
           />
         </>
       )}
