@@ -18,6 +18,9 @@ const mergeDemoDocuments = (caseData) => {
 
 const normalizeCase = (caseData) => ({
   ...caseData,
+  latestProgress: caseData.latestProgress || 'Sin avance registrado.',
+  hearingLink: caseData.hearingLink || '',
+  urgency: caseData.urgency || 'Media',
   documents: mergeDemoDocuments(caseData),
   notes: Array.isArray(caseData.notes) ? caseData.notes : [],
   importantDates: Array.isArray(caseData.importantDates) ? caseData.importantDates : [],

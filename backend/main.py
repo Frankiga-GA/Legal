@@ -7,7 +7,7 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -27,19 +27,52 @@ try:
 except ImportError:
     pytesseract = None
 
+from auth import (  # noqa: E402
+    CurrentUser,
+    current_user,
+)
+
 BACKEND_DIR = Path(__file__).resolve().parent
+
+# El backend SOLO lee secretos desde `backend/.env`. No debe leer el `.env`
+# de la raiz porque ese archivo contiene claves publicas del frontend.
+# Si necesitamos una variable en ambos lados, duplicar la entrada en los
+# dos archivos .env correspondientes. Ver SECURITY.md seccion 2.
 load_dotenv(BACKEND_DIR / ".env")
-load_dotenv(BACKEND_DIR.parent / ".env", override=False)
 
 
-app = FastAPI(title="LUSTI Document Backend", version="0.1.0")
+app = FastAPI(title="LUSTI Document Backend", version="0.2.0")
+
+
+# =============================================================================
+# CORS estricto
+# =============================================================================
+# Origenes leidos desde `ALLOWED_ORIGINS` (CSV) en backend/.env.
+# En produccion, el comodin "*" NO esta permitido (incompatible con
+# allow_credentials=True, ademas de ser un riesgo de seguridad).
+# =============================================================================
+
+def _parse_allowed_origins() -> list[str]:
+    raw = os.getenv("ALLOWED_ORIGINS", "").strip()
+    if not raw:
+        # En desarrollo: solo localhost. En produccion: configurar la env.
+        return ["http://localhost:5173", "http://127.0.0.1:5173"]
+    origins = [item.strip() for item in raw.split(",") if item.strip()]
+    if "*" in origins:
+        raise RuntimeError(
+            "ALLOWED_ORIGINS no puede contener '*'. Configura los origenes explicitos."
+        )
+    return origins
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_parse_allowed_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-Id"],
+    expose_headers=["X-Lusti-Filename"],
+    max_age=600,
 )
 
 
@@ -67,6 +100,17 @@ class GenerateFileRequest(BaseModel):
     content: str | None = None
     document_type: str = "informe"
     output_format: str = Field("docx", pattern="^(docx|pdf|txt)$")
+
+
+class RawAskRequest(BaseModel):
+    prompt: str = Field(..., min_length=1)
+    temperature: float = Field(0.25, ge=0.0, le=2.0)
+    max_output_tokens: int = Field(2048, ge=64, le=8192)
+    response_json: bool = False
+
+
+class RawAskResponse(BaseModel):
+    text: str
 
 
 def _read_text_from_upload(upload: UploadFile) -> str:
@@ -184,42 +228,50 @@ Reglas finales:
 """.strip()
 
 
-async def _ask_gemini(prompt_text: str) -> str:
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
-    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+async def _ask_gemini(
+    prompt_text: str,
+    *,
+    temperature: float = 0.25,
+    max_output_tokens: int = 4096,
+    response_json: bool = False,
+) -> str:
+    """Llama a Groq (OpenAI-compatible) usando GROQ_API_KEY."""
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY no esta configurada")
+        raise RuntimeError("GROQ_API_KEY no esta configurada en el backend.")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    url = "https://api.groq.com/openai/v1/chat/completions"
+
     payload: dict[str, Any] = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": prompt_text}],
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.25,
-            "topP": 0.9,
-            "maxOutputTokens": 4096,
-        },
+        "model": model,
+        "messages": [{"role": "user", "content": prompt_text}],
+        "temperature": temperature,
+        "max_tokens": max_output_tokens,
+        "top_p": 0.9,
+    }
+    if response_json:
+        payload["response_format"] = {"type": "json_object"}
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
     }
 
     async with httpx.AsyncClient(timeout=90) as client:
-        response = await client.post(url, json=payload)
+        response = await client.post(url, json=payload, headers=headers)
 
     if response.status_code >= 400:
-        raise RuntimeError(response.text)
+        raise RuntimeError(f"Groq {response.status_code}: {response.text}")
 
     data = response.json()
-    text = (
-        data.get("candidates", [{}])[0]
-        .get("content", {})
-        .get("parts", [])
-    )
-    extracted = "\n".join(part.get("text", "") for part in text if part.get("text")).strip()
+    choices = data.get("choices") or []
+    if not choices:
+        raise RuntimeError(f"Groq devolvio respuesta vacia: {data}")
+    extracted = (choices[0].get("message") or {}).get("content") or ""
+    extracted = extracted.strip()
     if not extracted:
-        raise RuntimeError("Gemini devolvio una respuesta vacia")
+        raise RuntimeError("Groq devolvio contenido vacio")
     return extracted
 
 
@@ -427,14 +479,32 @@ def _build_txt_bytes(content: str) -> bytes:
 def health() -> dict[str, str]:
     return {
         "status": "ok",
-        "gemini_configured": "yes" if (os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")) else "no",
-        "gemini_model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        "groq_configured": "yes" if os.getenv("GROQ_API_KEY") else "no",
+        "groq_model": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+        "auth_required": "yes" if os.getenv("SUPABASE_JWT_SECRET") else "no",
+        "version": app.version,
+    }
+
+
+@app.get("/me")
+def me(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
+    return {
+        "user_id": user.user_id,
+        "email": user.email,
+        "role": user.role,
     }
 
 
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)) -> dict[str, str]:
-    extracted_text = _read_text_from_upload(file)
+async def upload_file(
+    file: UploadFile = File(...),
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, str]:
+    try:
+        extracted_text = _read_text_from_upload(file)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
     return {
         "file_name": file.filename or "",
         "file_type": file.content_type or "application/octet-stream",
@@ -442,8 +512,30 @@ async def upload_file(file: UploadFile = File(...)) -> dict[str, str]:
     }
 
 
+
+@app.post("/ai/raw", response_model=RawAskResponse)
+async def ai_raw(
+    payload: RawAskRequest,
+    user: CurrentUser = Depends(current_user),
+) -> RawAskResponse:
+    """Pasa un prompt completo a Gemini sin template del backend. Usado por el frontend."""
+    try:
+        text = await _ask_gemini(
+            payload.prompt,
+            temperature=payload.temperature,
+            max_output_tokens=payload.max_output_tokens,
+            response_json=payload.response_json,
+        )
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=f"No se pudo llamar a Gemini: {error}") from error
+    return RawAskResponse(text=text)
+
+
 @app.post("/chat", response_model=ChatResponse)
-async def chat(payload: ChatRequest) -> ChatResponse:
+async def chat(
+    payload: ChatRequest,
+    user: CurrentUser = Depends(current_user),
+) -> ChatResponse:
     if not payload.message.strip():
         raise HTTPException(status_code=400, detail="message is required")
 
@@ -476,6 +568,7 @@ async def generate_document(
     message: str = Form(...),
     prompt: str = Form(""),
     file: UploadFile | None = File(None),
+    user: CurrentUser = Depends(current_user),
 ):
     extracted_text = ""
     file_name = None
@@ -486,7 +579,7 @@ async def generate_document(
         file_type = file.content_type
         extracted_text = _read_text_from_upload(file)
 
-    output = {
+    return {
         "message": message,
         "prompt": prompt,
         "file_name": file_name,
@@ -495,11 +588,12 @@ async def generate_document(
         "status": "ready",
     }
 
-    return output
-
 
 @app.post("/generate-file")
-async def generate_file(payload: GenerateFileRequest):
+async def generate_file(
+    payload: GenerateFileRequest,
+    user: CurrentUser = Depends(current_user),
+):
     output_format = payload.output_format.lower()
     document_type = (payload.document_type or "documento").strip()
 
@@ -535,4 +629,5 @@ async def generate_file(payload: GenerateFileRequest):
         "Content-Disposition": f'attachment; filename="{filename}"',
         "X-Lusti-Filename": filename,
     }
+
     return StreamingResponse(io.BytesIO(file_bytes), media_type=media_type, headers=headers)

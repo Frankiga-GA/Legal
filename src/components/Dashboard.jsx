@@ -124,7 +124,7 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
                 <h1 className="text-4xl font-serif font-medium leading-tight tracking-tight text-brand-ivory md:text-5xl">
                   Tres caminos claros para operar mejor: expediente, documentos e IA.
                 </h1>
-                <p className="mt-4 max-w-2xl text-sm font-light leading-6 text-brand-accent/65">
+                <p className="mt-4 max-w-2xl text-sm font-light leading-6 text-brand-accent">
                   LUSTI concentra la venta del producto en crear casos, conectar archivos y convertir ese contexto en respuestas o documentos asistidos por IA.
                 </p>
               </div>
@@ -140,7 +140,7 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
                 <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
                   <div className="h-full rounded-full bg-brand-gold" style={{ width: `${readinessScore}%` }}></div>
                 </div>
-                <p className="text-xs leading-5 text-brand-accent/50">
+                <p className="text-xs leading-5 text-brand-accent">
                   Basado en expedientes activos, documentos con contenido y vencimientos urgentes.
                 </p>
               </div>
@@ -170,7 +170,7 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
                     <action.icon className="h-5 w-5 shrink-0" />
                     <span className="min-w-0">
                       <span className="block text-sm font-bold">{action.label}</span>
-                      <span className={`block truncate text-xs ${action.primary ? 'text-brand-black/60' : 'text-brand-accent/45'}`}>
+                      <span className={`block truncate text-xs ${action.primary ? 'text-brand-black/85 font-semibold' : 'text-brand-accent'}`}>
                         {action.description}
                       </span>
                     </span>
@@ -193,7 +193,7 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
             <div className="flex flex-col gap-3 border-b border-white/[0.05] p-5 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="text-xl font-serif text-brand-ivory">Expedientes listos para trabajar</h2>
-                <p className="mt-1 text-xs text-brand-accent/45">El primer flujo empieza aqui: crear caso y dejarlo listo para documentos e IA.</p>
+                <p className="mt-1 text-xs text-brand-accent">El primer flujo empieza aqui: crear caso y dejarlo listo para documentos e IA.</p>
               </div>
               <button
                 onClick={() => setActiveTab('library')}
@@ -213,21 +213,21 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
                   <div className="min-w-0">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <span className="font-serif text-lg text-brand-ivory">{caseItem.id}</span>
-                      <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-xs font-medium text-brand-accent/65">
+                      <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-xs font-semibold text-brand-accent">
                         {caseItem.status}
                       </span>
                     </div>
-                    <p className="text-sm font-medium text-brand-ivory/80">{caseItem.clientName}</p>
-                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-brand-accent/50">{caseItem.summary || 'Sin resumen registrado.'}</p>
+                    <p className="text-sm font-semibold text-brand-ivory">{caseItem.clientName}</p>
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-brand-accent">{caseItem.summary || 'Sin resumen registrado.'}</p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-brand-gold">Materia</p>
-                    <p className="mt-2 text-sm text-brand-ivory/75">{caseItem.type}</p>
-                    <p className="mt-3 text-xs text-brand-accent/45">{caseItem.documentsCount} docs vinculados</p>
+                    <p className="mt-2 text-sm text-brand-ivory font-medium">{caseItem.type}</p>
+                    <p className="mt-3 text-xs text-brand-accent font-semibold">{caseItem.documentsCount} docs vinculados</p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-brand-gold">Siguiente paso</p>
-                    <p className="mt-2 text-sm leading-5 text-brand-ivory/75">{caseItem.nextStep}</p>
+                    <p className="mt-2 text-sm leading-5 text-brand-ivory font-medium">{caseItem.nextStep}</p>
                   </div>
                 </button>
               )) : (
@@ -251,7 +251,7 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
                   </div>
                   <div>
                     <h2 className="text-lg font-serif text-brand-ivory">Vencimientos proximos</h2>
-                    <p className="text-xs text-brand-accent/45">Lo que debe verse antes de que sea tarde.</p>
+                    <p className="text-xs text-brand-accent">Lo que debe verse antes de que sea tarde.</p>
                   </div>
                 </div>
                 <span className="text-2xl font-serif text-red-200">{upcomingDeadlines.length}</span>
@@ -274,7 +274,7 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
               <div className="mb-5 flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-serif text-brand-ivory">IA lista para trabajar</h2>
-                  <p className="mt-1 text-xs text-brand-accent/45">Documentos con contenido usable por asistentes.</p>
+                  <p className="mt-1 text-xs text-brand-accent">Documentos con contenido usable por asistentes.</p>
                 </div>
                 <Bot className="h-5 w-5 text-brand-gold" />
               </div>
@@ -297,7 +297,7 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
             <div className="flex items-center justify-between border-b border-white/[0.05] p-5">
               <div>
                 <h2 className="text-xl font-serif text-brand-ivory">Alertas legales</h2>
-                <p className="mt-1 text-xs text-brand-accent/45">Normas, agenda interna y senales para revisar.</p>
+                <p className="mt-1 text-xs text-brand-accent">Normas, agenda interna y senales para revisar.</p>
               </div>
               <button
                 onClick={() => setActiveTab('monitor')}
@@ -315,11 +315,11 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
                       <Newspaper className="h-4 w-4" />
                       {alert.source}
                     </div>
-                    <span className="text-xs text-brand-accent/40">{alert.time}</span>
+                    <span className="text-xs text-brand-accent">{alert.time}</span>
                   </div>
                   <div>
-                    <p className="text-sm text-brand-ivory/80">{alert.title}</p>
-                    <p className="mt-1 text-xs text-brand-accent/40">{alert.type}</p>
+                    <p className="text-sm text-brand-ivory/90">{alert.title}</p>
+                    <p className="mt-1 text-xs text-brand-accent">{alert.type}</p>
                   </div>
                 </div>
               ))}
@@ -330,7 +330,7 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
             <div className="flex items-center justify-between border-b border-white/[0.05] p-5">
               <div>
                 <h2 className="text-xl font-serif text-brand-ivory">Actividad reciente</h2>
-                <p className="mt-1 text-xs text-brand-accent/45">Movimiento visible para que el producto se sienta vivo.</p>
+                <p className="mt-1 text-xs text-brand-accent">Movimiento visible para que el producto se sient vivo.</p>
               </div>
               <Clock3 className="h-5 w-5 text-brand-gold" />
             </div>
@@ -341,10 +341,10 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
                     <item.icon className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-sm text-brand-ivory/80">{item.title}</p>
-                    <p className="mt-1 text-xs text-brand-accent/40">{item.detail}</p>
+                    <p className="text-sm text-brand-ivory/90 font-medium">{item.title}</p>
+                    <p className="mt-1 text-xs text-brand-accent">{item.detail}</p>
                   </div>
-                  <div className="text-xs text-brand-accent/45 md:text-right">{item.time}</div>
+                  <div className="text-xs text-brand-accent md:text-right">{item.time}</div>
                 </div>
               ))}
             </div>
@@ -369,11 +369,11 @@ const MetricCard = ({ title, value, detail, icon: Icon, tone }) => {
         <div className={`rounded-lg p-2.5 ${toneClass}`}>
           <Icon className="h-5 w-5" />
         </div>
-        <CheckCircle2 className="h-4 w-4 text-emerald-400/70" />
+        <CheckCircle2 className="h-4 w-4 text-emerald-400" />
       </div>
       <p className="text-3xl font-serif text-brand-ivory">{value}</p>
-      <h2 className="mt-2 text-xs font-semibold text-brand-accent/70">{title}</h2>
-      <p className="mt-1 text-xs font-light text-brand-accent/40">{detail}</p>
+      <h2 className="mt-2 text-xs font-bold text-brand-accent">{title}</h2>
+      <p className="mt-1 text-xs font-medium text-brand-accent">{detail}</p>
     </div>
   );
 };
@@ -382,10 +382,10 @@ const DeadlineItem = ({ item }) => (
   <div className="rounded-lg border border-white/[0.05] bg-brand-black/30 p-4">
     <div className="flex items-start justify-between gap-3">
       <div>
-        <p className="text-sm font-medium text-brand-ivory/85">{item.title}</p>
-        <p className="mt-1 text-xs text-brand-accent/45">{item.caseId} - {item.clientName}</p>
+        <p className="text-sm font-semibold text-brand-ivory">{item.title}</p>
+        <p className="mt-1 text-xs text-brand-accent">{item.caseId} - {item.clientName}</p>
       </div>
-      <span className={`text-xs font-semibold ${getPriorityTextClass(item.priority)}`}>
+      <span className={`text-xs font-bold ${getPriorityTextClass(item.priority)}`}>
         {item.priority || 'Media'}
       </span>
     </div>
@@ -402,7 +402,7 @@ const AiSignal = ({ label, value, total }) => {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs text-brand-accent/55">{label}</span>
+        <span className="text-xs text-brand-accent font-semibold">{label}</span>
         <span className="text-xs font-bold text-brand-ivory">{value}</span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
@@ -414,13 +414,13 @@ const AiSignal = ({ label, value, total }) => {
 
 const EmptyState = ({ icon: Icon, title, text, action, onAction, compact = false }) => (
   <div className={`rounded-lg border border-dashed border-white/[0.08] bg-brand-black/20 text-center ${compact ? 'p-5' : 'p-8'}`}>
-    <Icon className="mx-auto mb-3 h-8 w-8 text-brand-accent/18" />
-    <p className="text-sm font-medium text-brand-ivory/75">{title}</p>
-    <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-brand-accent/45">{text}</p>
+    <Icon className="mx-auto mb-3 h-8 w-8 text-brand-accent" />
+    <p className="text-sm font-bold text-brand-ivory">{title}</p>
+    <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-brand-accent">{text}</p>
     {action ? (
       <button
         onClick={onAction}
-        className="mt-4 text-xs font-semibold text-brand-gold hover:text-brand-ivory"
+        className="mt-4 text-xs font-bold text-brand-gold hover:text-brand-ivory animate-pulse"
       >
         {action}
       </button>
@@ -449,7 +449,7 @@ const getUpcomingDeadlines = (cases) => {
     }))
     .filter((item) => item.date && !Number.isNaN(item.parsedDate.getTime()) && item.daysUntil >= 0)
     .sort((a, b) => a.parsedDate - b.parsedDate);
-};
+  };
 
 const buildPriorityCases = (cases, deadlines) => {
   const deadlineByCaseId = new Map(deadlines.map((item) => [item.caseId, item]));
@@ -482,14 +482,14 @@ const buildLegalAlerts = ({ upcomingDeadlines, urgentDeadlines, cases }) => [
   {
     id: 'legal-1',
     source: 'El Peruano',
-    title: 'Nueva norma laboral detectada para revision del equipo',
+    title: 'Nueva norma laboral de urgencia para revision del estudio',
     time: 'Hoy',
     type: 'Norma legal',
   },
   {
     id: 'legal-2',
     source: 'Jurisprudencia',
-    title: 'Criterio reciente podria impactar expedientes laborales activos',
+    title: 'Precedente de despido podria impactar expedientes laborales',
     time: 'Hace 2 h',
     type: 'Analisis preliminar',
   },

@@ -4,6 +4,7 @@ import { ArrowLeft, Bot, Copy, Download, FileText, FolderOpen, Layers3, Save, Se
 import { askGeminiSpecializedAssistant, isGeminiConfigured } from '../services/geminiService';
 import { downloadDriveFileAsFile, getStoredDriveToken, isSupportedTemplateFile } from '../services/googleDriveService';
 import { generateDocumentFile, requestDocumentChat, uploadDocumentToBackend } from '../services/documentBackendService';
+import { getCases } from '../services/caseStore';
 
 const variablePattern = /\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}/g;
 const examplePrompts = [
@@ -95,6 +96,8 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
   );
   const documentCount = bot.docs ?? bot.documents ?? 0;
   const driveFolder = bot.driveFolder || null;
+  const [cases] = useState(() => getCases());
+  const [selectedCaseId, setSelectedCaseId] = useState('');
 
   const [messages, setMessages] = useState([
     {
@@ -299,13 +302,34 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
 
     const userMessage = input.trim();
     const requestedOutputFormat = detectOutputFormatIntent(userMessage);
+    
+    let baseQuestion = userMessage;
+    const currentCase = selectedCaseId ? cases.find(c => c.id === selectedCaseId) : null;
+    if (currentCase) {
+      const caseContext = [
+        `[CONTEXTO DEL EXPEDIENTE SELECCIONADO POR EL USUARIO]`,
+        `Codigo de Expediente: ${currentCase.id}`,
+        `Cliente: ${currentCase.clientName}`,
+        `Materia: ${currentCase.matter}`,
+        `Estado actual: ${currentCase.status}`,
+        `Urgencia: ${currentCase.urgency}`,
+        `Avance del caso (ultima resolucion): ${currentCase.latestProgress}`,
+        `Enlace de audiencia virtual: ${currentCase.hearingLink || 'No programada'}`,
+        `Plazos/Vencimientos programados: ${currentCase.importantDates?.length ? currentCase.importantDates.map(d => `${d.title} (${d.date}, prioridad ${d.priority})`).join(', ') : 'Ninguno'}`,
+        `Notas del caso: ${currentCase.notes?.length ? currentCase.notes.map(n => n.text).join(' | ') : 'Ninguna'}`,
+        `---`,
+        `Mensaje del usuario: ${userMessage}`
+      ].join('\n');
+      baseQuestion = caseContext;
+    }
+
     const aiQuestion = requestedOutputFormat
       ? [
-          userMessage,
+          baseQuestion,
           '',
           `El sistema LUSTI puede generar archivos ${requestedOutputFormat.toUpperCase()} despues de tu respuesta. Redacta exclusivamente el contenido final del documento solicitado. No saludes, no expliques el proceso, no escribas "estimado usuario", no digas "a continuacion", no incluyas disclaimers ni recomendaciones externas. Empieza con el titulo real del documento y luego el cuerpo listo para entregar.`,
         ].join('\n')
-      : userMessage;
+      : baseQuestion;
     const attachmentFileName = selectedFileTemplate?.name || '';
     const attachmentFileType = selectedFileTemplate?.fileType || '';
     let attachmentFileText = (selectedFileTemplateExtractedText || '').trim();
@@ -466,10 +490,32 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
       }
     } catch (error) {
       console.warn('Gemini no pudo responder en asistente especializado. Usando fallback local.', error);
+      const responseContent = buildLocalAssistantResponse(userMessage);
+      const shouldExport = shouldExposeDocumentActions({
+        message: userMessage,
+        hasTemplate: Boolean(selectedTemplate),
+      });
+      const documentContext = {
+        message: userMessage,
+        fileName: '',
+        fileType: '',
+        fileText: '',
+        documentType: inferDocumentType(userMessage, selectedTemplate?.name || ''),
+      };
       setMessages((prev) => [
         ...prev,
-        { role: 'ai', content: `${buildLocalAssistantResponse(userMessage)}\n\nNota: Gemini no respondio en este intento, asi que use el analisis local de LUSTI.` },
+        { role: 'ai', content: responseContent },
       ]);
+      setGeneratedDocument(shouldExport ? responseContent : '');
+      setCanExportResponse(shouldExport);
+      setLastDocumentContext(shouldExport ? documentContext : null);
+      if (requestedOutputFormat && shouldExport) {
+        await handleGenerateFile(requestedOutputFormat, {
+          auto: true,
+          content: responseContent,
+          context: documentContext,
+        });
+      }
     } finally {
       setIsTyping(false);
     }
@@ -606,20 +652,22 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
 
   return (
     <div className="relative flex h-full flex-col bg-brand-black">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.06]"></div>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.05]"></div>
 
-        <div className="relative z-10 flex items-center justify-between gap-4 border-b border-white/[0.05] p-4 sm:p-6">
+        <div className="relative z-10 flex items-center justify-between gap-4 border-b border-white/[0.08] p-4 sm:p-6 bg-brand-dark">
         <div className="flex min-w-0 items-center gap-4">
-          <button onClick={onBack} className="rounded-xl p-3 text-brand-accent/40 transition-colors hover:bg-white/[0.05] hover:text-brand-ivory">
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="rounded-lg bg-brand-gold p-2.5">
-            <Sparkles className="h-5 w-5 text-brand-black" />
+          {onBack && (
+            <button onClick={onBack} className="rounded-xl p-3 text-brand-accent transition-colors hover:bg-white/[0.02] hover:text-brand-ivory">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          )}
+          <div className="rounded-lg bg-white/[0.02] p-2.5">
+            <Sparkles className="h-5 w-5 text-brand-gold" />
           </div>
           <div className="min-w-0">
-            <h3 className="truncate text-lg font-serif font-medium tracking-tight text-brand-ivory sm:text-xl">{bot.name}</h3>
+            <h3 className="truncate text-lg font-bold tracking-tight text-brand-ivory sm:text-xl">{bot.name}</h3>
             <p className="truncate text-[10px] font-bold uppercase tracking-widest text-brand-gold">
-              {isGeminiConfigured ? 'Gemini activo' : 'IA local'} • Contexto privado
+              {isGeminiConfigured ? 'Asistente IA activo' : 'IA local'} • Contexto privado
             </p>
             {activePromptLabel ? (
               <div className="mt-1 flex items-center gap-2">
@@ -628,30 +676,51 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
                     hasActivePrompt ? 'bg-emerald-400 text-emerald-400' : 'bg-red-400 text-red-400'
                   }`}
                 />
-                <p className="truncate text-[9px] font-bold uppercase tracking-widest text-brand-gold/80 sm:text-[10px]">
+                <p className="truncate text-[9px] font-bold uppercase tracking-widest text-brand-accent sm:text-[10px]">
                   Prompt: {activePromptLabel}
                 </p>
               </div>
             ) : null}
             {driveFolder ? (
-              <p className="mt-1 truncate text-[9px] font-bold uppercase tracking-widest text-brand-accent/35 sm:text-[10px]">
+              <p className="mt-1 truncate text-[9px] font-bold uppercase tracking-widest text-brand-accent sm:text-[10px]">
                 Drive: {driveFolder.name}
               </p>
             ) : null}
           </div>
         </div>
 
-        <button
-          onClick={() => setIsTemplatePickerOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-brand-ivory transition-all hover:border-brand-gold/30"
-        >
-          <Layers3 className="h-4 w-4" />
-          Elegir plantilla
-        </button>
+
       </div>
 
+      {/* Case Selector Dropdown Banner for General Chat */}
+      {!onBack && (
+        <div className="bg-brand-dark border-b border-white/[0.08] px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 z-10 shadow-none">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold text-brand-ivory">Consultar sobre un expediente:</span>
+            <select
+              value={selectedCaseId}
+              onChange={(e) => setSelectedCaseId(e.target.value)}
+              className="bg-brand-dark text-brand-ivory border border-white/[0.12] text-sm rounded-lg px-4 py-2 focus:border-brand-gold focus:outline-none"
+            >
+              <option value="">-- Chat General --</option>
+              {cases.map((caso) => (
+                <option key={caso.id} value={caso.id}>
+                  {caso.id} - {caso.clientName} ({caso.matter})
+                </option>
+              ))}
+            </select>
+          </div>
+          {selectedCaseId && (
+            <div className="flex items-center gap-2 rounded bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 border border-emerald-200">
+              <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+              La IA respondera usando el contexto del Expediente {selectedCaseId}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="custom-scrollbar relative z-10 flex-1 overflow-y-auto">
-        <div className="mx-auto grid min-h-full w-full max-w-[1400px] gap-6 px-4 py-5 sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-10 lg:py-10">
+        <div className={`mx-auto grid min-h-full w-full max-w-4xl gap-6 px-4 py-5 sm:px-6 sm:py-8 lg:px-10 lg:py-10`}>
           <div className="flex min-w-0 flex-col">
             <div className="flex-1 space-y-8">
             {messages.map((msg, idx) => (
@@ -661,7 +730,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
                   msg.role === 'user' ? 'flex-row-reverse' : ''
                 }`}
               >
-                <div className={`mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${msg.role === 'ai' ? 'bg-brand-ivory text-brand-black' : 'border border-white/[0.05] bg-white/[0.03] text-brand-accent/40'}`}>
+                <div className={`mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${msg.role === 'ai' ? 'bg-brand-gold text-white shadow-none' : 'border border-white/[0.08] bg-brand-dark text-brand-accent shadow-none'}`}>
                   {msg.role === 'ai' ? (
                     <Bot className="h-5 w-5" />
                   ) : msg.role === 'file' ? (
@@ -672,19 +741,19 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
                 </div>
                 <div className={`flex-1 ${msg.role === 'user' || msg.role === 'file' ? 'text-right' : ''}`}>
                   {msg.role === 'file' ? (
-                    <div className="ml-auto inline-flex w-full max-w-[520px] items-start gap-3 rounded-lg border border-white/[0.06] bg-white/[0.03] px-4 py-4 text-left">
-                      <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-rose-500/90 text-white">
+                    <div className="ml-auto inline-flex w-full max-w-[520px] items-start gap-3 rounded-lg border border-white/[0.08] bg-brand-dark px-4 py-4 text-left shadow-none">
+                      <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
                         <FileText className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-brand-gold">Archivo adjunto</div>
-                        <div className="mt-1 truncate text-sm font-semibold text-brand-ivory">{msg.fileName || 'Archivo'}</div>
-                        <div className="mt-1 text-[11px] uppercase tracking-widest text-brand-accent/30">{msg.fileType || 'Archivo'}</div>
-                        {msg.preview ? <p className="mt-3 whitespace-pre-wrap text-sm font-light leading-relaxed text-brand-ivory/75">{msg.preview}</p> : null}
+                        <div className="mt-1 truncate text-sm font-bold text-brand-ivory">{msg.fileName || 'Archivo'}</div>
+                        <div className="mt-1 text-[11px] uppercase tracking-widest text-brand-accent">{msg.fileType || 'Archivo'}</div>
+                        {msg.preview ? <p className="mt-3 whitespace-pre-wrap text-sm text-brand-accent">{msg.preview}</p> : null}
                       </div>
                     </div>
                   ) : (
-                    <div className={`inline-block max-w-full rounded-lg px-4 py-4 text-[15px] font-light leading-relaxed sm:px-5 sm:py-4 ${msg.role === 'ai' ? 'border border-white/[0.05] bg-white/[0.03] text-brand-ivory/85' : 'bg-brand-gold text-brand-black'}`}>
+                    <div className={`inline-block max-w-full rounded-2xl px-5 py-4 text-[15px] leading-relaxed shadow-none ${msg.role === 'ai' ? 'border border-white/[0.08] bg-brand-dark text-brand-ivory' : 'bg-slate-800 text-white'}`}>
                       {(msg.content || '').split('\n').map((line, i) => (
                         <p key={i} className="whitespace-pre-wrap last:mb-0">{line}</p>
                       ))}
@@ -696,29 +765,29 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
 
             {isTyping && (
               <div className="flex gap-4 sm:gap-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-ivory text-brand-black">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-gold text-white shadow-none">
                   <Bot className="h-5 w-5" />
                 </div>
-                <div className="flex items-center gap-2 opacity-30">
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-brand-ivory"></span>
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-brand-ivory delay-75"></span>
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-brand-ivory delay-150"></span>
+                <div className="flex items-center gap-2 opacity-60">
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400"></span>
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 delay-75"></span>
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 delay-150"></span>
                 </div>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="mt-5 rounded-lg border border-white/[0.05] bg-white/[0.018] p-3">
+          <div className="mt-5 rounded-2xl border border-white/[0.08] bg-brand-dark p-4 shadow-none">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-gold">
                   <Sparkles className="h-3.5 w-3.5" />
                   Respuesta asistida
                 </div>
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-brand-accent/35">
-                  {selectedTemplate ? selectedTemplate.name : 'Sin plantilla activa'}
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-brand-accent">
+                  {selectedTemplate ? selectedTemplate.name : 'Modo general'}
                   <span>•</span>
-                {selectedFileTemplate ? selectedFileTemplate.name : 'Sin formato activo'}
+                {selectedFileTemplate ? selectedFileTemplate.name : 'Chat libre'}
               </div>
             </div>
 
@@ -729,41 +798,24 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
             ) : null}
 
             {selectedFileTemplate ? (
-              <div className="mb-2 flex max-w-full items-center gap-2 rounded-md border border-white/[0.05] bg-white/[0.02] px-3 py-1.5 text-[10px] text-brand-accent/45">
-                <FileText className="h-3.5 w-3.5 flex-shrink-0 text-brand-gold/70" />
-                <span className="truncate text-brand-ivory/75">{selectedFileTemplate.name}</span>
-                <span className="flex-shrink-0">
+              <div className="mb-3 flex max-w-full items-center gap-2 rounded-lg border border-white/[0.08] bg-brand-black px-3 py-2 text-xs font-medium text-brand-ivory">
+                <FileText className="h-4 w-4 flex-shrink-0 text-brand-gold" />
+                <span className="truncate text-brand-ivory">{selectedFileTemplate.name}</span>
+                <span className="flex-shrink-0 text-brand-accent">
                   {selectedFileTemplateExtractedText ? `${selectedFileTemplateExtractedText.length} caracteres` : 'leyendo'}
                 </span>
                 <button
                   type="button"
                   onClick={clearSelectedFileTemplate}
-                  className="ml-auto inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-brand-accent/45 transition-colors hover:bg-white/[0.06] hover:text-brand-ivory"
+                  className="ml-auto inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-brand-accent transition-colors hover:bg-white/[0.05] hover:text-brand-ivory"
                   aria-label="Quitar archivo"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             ) : null}
 
-            <div className="mb-2 rounded-md border border-white/[0.05] bg-white/[0.012] px-2.5 py-1.5">
-              <div className="mb-1.5 flex items-center justify-between gap-3">
-                <p className="text-[11px] font-semibold text-brand-gold">Tareas rapidas</p>
-                <Search className="h-3.5 w-3.5 text-brand-accent/35" />
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {examplePrompts.slice(0, 4).map((prompt) => (
-                  <button
-                    key={prompt}
-                    type="button"
-                    onClick={() => setInput(prompt)}
-                    className="shrink-0 rounded-md border border-white/[0.06] bg-white/[0.015] px-2.5 py-1 text-left text-[10px] font-medium text-brand-ivory/65 transition-colors hover:border-brand-gold/30 hover:text-brand-ivory"
-                  >
-                    {prompt}
-                  </button>
-                ))}
-              </div>
-            </div>
+
 
             <div className="group relative">
               <input
@@ -771,290 +823,84 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={selectedFileTemplate ? `Escribe los datos para completar "${selectedFileTemplate.name}"...` : `Escribe una consulta para ${bot.name}...`}
-                className="w-full rounded-lg border border-white/[0.05] bg-white/[0.02] py-3 pl-4 pr-24 text-sm font-light text-brand-ivory transition-colors placeholder:text-brand-accent/15 focus:border-brand-gold/40 focus:bg-white/[0.04] focus:outline-none sm:pr-28"
+                placeholder={selectedFileTemplate ? `Escribe los datos para completar "${selectedFileTemplate.name}"...` : `Escribe tu consulta legal aquí...`}
+                className="w-full rounded-xl border border-white/[0.12] bg-brand-dark py-4 pl-5 pr-16 text-base text-brand-ivory shadow-none transition-colors placeholder:text-brand-accent focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/50 focus:outline-none"
               />
-              <button
-                type="button"
-                onClick={() => setIsTemplatePickerOpen(true)}
-                className="absolute right-14 top-1/2 -translate-y-1/2 rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-brand-ivory transition-all hover:border-brand-gold/30 hover:text-brand-gold sm:right-16"
-              >
-                Plantilla
-              </button>
+
               <button
                 onClick={handleSend}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-brand-accent transition-colors hover:text-brand-gold disabled:opacity-10"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg bg-brand-gold text-white transition-colors hover:bg-brand-gold/80 disabled:opacity-50 disabled:bg-slate-300 disabled:text-brand-accent"
                 disabled={!input.trim() || isTyping}
               >
                 <Send className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-brand-accent/30">
-              <span>IA documental</span>
-              <button type="button" onClick={() => setIsTemplateDrawerOpen(true)} className="text-brand-accent/35 transition-colors hover:text-brand-ivory">
-                Ver recursos
-              </button>
-            </div>
+
 
             {canExportResponse && generatedDocument ? (
-              <div className="mt-2 rounded-md border border-white/[0.05] bg-white/[0.012] px-2.5 py-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold text-brand-ivory">Exportar respuesta</p>
-                  <div className="flex flex-wrap gap-1.5">
+              <div className="mt-4 rounded-xl border border-white/[0.08] bg-brand-black px-4 py-3 shadow-none">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs font-bold text-brand-ivory">Exportar respuesta</p>
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={copyDocument}
-                      className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[10px] font-semibold text-brand-ivory/75 transition-colors hover:border-brand-gold/30 hover:text-brand-ivory"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.12] bg-brand-dark px-3 py-1.5 text-xs font-semibold text-brand-ivory transition-colors hover:bg-white/[0.02] hover:text-brand-ivory shadow-none"
                     >
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="h-4 w-4" />
                       Copiar
                     </button>
                     <button
                       type="button"
                       onClick={downloadDocument}
-                      className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[10px] font-semibold text-brand-ivory/75 transition-colors hover:border-brand-gold/30 hover:text-brand-ivory"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.12] bg-brand-dark px-3 py-1.5 text-xs font-semibold text-brand-ivory transition-colors hover:bg-white/[0.02] hover:text-brand-ivory shadow-none"
                     >
-                      <Download className="h-3.5 w-3.5" />
+                      <Download className="h-4 w-4" />
                       TXT
                     </button>
                     <button
                       type="button"
                       onClick={() => handleGenerateFile('docx')}
                       disabled={Boolean(fileGenerationStatus?.startsWith('Generando'))}
-                      className="inline-flex items-center gap-1 rounded-md bg-brand-ivory px-2 py-1 text-[10px] font-bold text-brand-black transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.12] bg-brand-dark px-3 py-1.5 text-xs font-semibold text-brand-ivory transition-colors hover:bg-white/[0.02] hover:text-brand-ivory shadow-none disabled:opacity-50"
                     >
-                      <FileText className="h-3.5 w-3.5" />
+                      <FileText className="h-4 w-4" />
                       DOCX
                     </button>
                     <button
                       type="button"
                       onClick={() => handleGenerateFile('pdf')}
                       disabled={Boolean(fileGenerationStatus?.startsWith('Generando'))}
-                      className="inline-flex items-center gap-1 rounded-md bg-brand-gold px-2 py-1 text-[10px] font-bold text-brand-black transition-colors hover:bg-brand-ivory disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-brand-gold px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 shadow-none disabled:opacity-50"
                     >
-                      <Download className="h-3.5 w-3.5" />
+                      <Download className="h-4 w-4" />
                       PDF
                     </button>
                     <button
                       type="button"
                       onClick={saveDocument}
                       disabled={!onSaveGeneratedDocument}
-                      className="inline-flex items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.02] px-2 py-1 text-[10px] font-bold text-brand-ivory transition-colors hover:border-brand-gold/30 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.12] bg-brand-dark px-3 py-1.5 text-xs font-semibold text-brand-ivory transition-colors hover:bg-white/[0.02] hover:text-brand-ivory shadow-none disabled:opacity-50"
                     >
-                      <Save className="h-3.5 w-3.5" />
+                      <Save className="h-4 w-4" />
                       Guardar
                     </button>
                   </div>
                 </div>
 
                 {fileGenerationStatus ? (
-                  <p className="mt-1.5 truncate text-[10px] text-brand-accent/50">{fileGenerationStatus}</p>
+                  <p className="mt-3 truncate text-[11px] font-medium text-brand-accent">{fileGenerationStatus}</p>
                 ) : null}
               </div>
             ) : null}
 
-            {saveStatus ? <div className="mt-2 rounded-md border border-white/[0.05] bg-white/[0.02] px-3 py-2 text-[11px] text-brand-ivory/70">{saveStatus}</div> : null}
+            {saveStatus ? <div className="mt-3 rounded-lg border border-white/[0.08] bg-brand-black px-4 py-2.5 text-xs font-medium text-brand-ivory shadow-none">{saveStatus}</div> : null}
           </div>
-
-            <div className="mt-4 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.2em] text-brand-accent/30">
-            {driveFolder ? (
-              <button onClick={openFileTemplate} className="rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-2 transition-colors hover:border-brand-gold/30 hover:text-brand-ivory">
-                Abrir Drive
-              </button>
-            ) : null}
-            {selectedTemplate ? (
-              <button onClick={() => setIsTemplateDrawerOpen(true)} className="rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-2 transition-colors hover:border-brand-gold/30 hover:text-brand-ivory">
-                Cambiar plantilla
-              </button>
-            ) : null}
-          </div>
-          </div>
-
-          <aside className="lg:sticky lg:top-8 lg:h-[calc(100vh-4rem)]">
-            <div className="flex h-full flex-col rounded-lg border border-white/[0.05] bg-white/[0.02] p-4 sm:p-5 lg:p-6">
-              <div className="mb-5">
-                <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-brand-gold">Instrucciones</div>
-                <h4 className="mt-2 text-lg font-serif text-brand-ivory">Contexto del asistente</h4>
-                <p className="mt-2 text-sm font-light leading-relaxed text-brand-accent/40">
-                  {bot.description || 'Este asistente trabaja con el contexto configurado y con los archivos vinculados.'}
-                </p>
-              </div>
-
-              <div className="mb-5 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <h5 className="text-[10px] font-bold uppercase tracking-[0.24em] text-brand-gold">Documentos generados</h5>
-                  <span className="text-[10px] uppercase tracking-widest text-brand-accent/35">{generatedFiles.length}</span>
-                </div>
-                <div className="space-y-2">
-                  {generatedFiles.length ? generatedFiles.map((file) => (
-                    <div key={file.id} className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 text-sm text-brand-ivory">
-                          <span className="block truncate">{file.title}</span>
-                        </div>
-                        {file.url ? (
-                          <button
-                            type="button"
-                            onClick={() => downloadGeneratedFile(file)}
-                            className="inline-flex flex-shrink-0 items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[10px] font-semibold text-brand-ivory/70 transition-colors hover:border-brand-gold/30 hover:text-brand-ivory"
-                          >
-                            <Download className="h-3 w-3" />
-                            Descargar
-                          </button>
-                        ) : null}
-                      </div>
-                      <div className="mt-1 text-[10px] uppercase tracking-widest text-brand-accent/35">
-                        {file.type} • {new Date(file.updatedAt).toLocaleString()}
-                      </div>
-                      <p className="mt-2 line-clamp-3 text-xs font-light text-brand-accent/40">{file.preview}</p>
-                    </div>
-                  )) : (
-                    <div className="rounded-xl border border-dashed border-white/[0.08] bg-white/[0.02] p-4 text-sm text-brand-accent/35">
-                      Los documentos editados o generados por la IA apareceran aqui.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] p-4">
-                <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-brand-gold">Estado</div>
-                <div className="mt-2 flex items-center gap-2 text-sm text-brand-ivory">
-                  <span
-                    className={`h-2.5 w-2.5 rounded-full shadow-[0_0_10px_currentColor] ${
-                      hasActivePrompt ? 'bg-emerald-400 text-emerald-400' : 'bg-red-400 text-red-400'
-                    }`}
-                  />
-                  <span>{activePromptLabel ? `Prompt: ${activePromptLabel}` : 'Sin prompt activo'}</span>
-                </div>
-                <div className="mt-2 text-sm text-brand-ivory">
-                  {selectedTemplate ? `Plantilla: ${selectedTemplate.name}` : 'Sin plantilla activa'}
-                </div>
-                <div className="mt-1 text-sm text-brand-ivory/70">
-                  {selectedFileTemplate ? `Formato: ${selectedFileTemplate.name}` : 'Sin formato activo'}
-                </div>
-              </div>
-            </div>
-          </aside>
         </div>
       </div>
-
-      {isTemplateDrawerOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-xl">
-          <div className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col border-l border-white/[0.05] bg-brand-black p-5 shadow-2xl sm:p-8">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-serif font-medium text-brand-ivory sm:text-2xl">Recursos guardados</h3>
-                <p className="text-sm font-light text-brand-accent/40">Plantillas y formatos disponibles para este asistente.</p>
-              </div>
-              <button onClick={() => setIsTemplateDrawerOpen(false)} className="text-brand-accent/40 transition-colors hover:text-brand-ivory">
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <div className="flex-1 space-y-6 overflow-y-auto pr-1 sm:pr-2" style={{ maxHeight: 'calc(100vh - 180px)' }}>
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-brand-gold">Plantillas del chat</h4>
-                  {availableTemplates.map((template) => {
-                  const isActive = selectedTemplateId === template.id;
-                  return (
-                    <button
-                      key={template.id}
-                      type="button"
-                      onClick={() => handleSelectTemplate(template)}
-                      className={`w-full rounded-2xl border p-5 text-left transition-all ${isActive ? 'border-brand-gold bg-brand-gold/10' : 'border-white/[0.05] bg-white/[0.02] hover:border-brand-gold/30'}`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h5 className="text-lg font-medium text-brand-ivory">{template.name}</h5>
-                          <p className="text-[10px] uppercase tracking-widest text-brand-gold">{template.category || 'General'}</p>
-                        </div>
-                        <span className="text-[10px] uppercase tracking-widest text-brand-accent/35">Prompt</span>
-                      </div>
-                      <p className="mt-3 text-sm font-light text-brand-accent/40">{template.description}</p>
-                    </button>
-                  );
-                })}
-              </div>
-                <div className="space-y-3">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-brand-gold">Plantillas del chat</h4>
-                {availableFileTemplates.map((template) => {
-                  const isActive = selectedFileTemplateId === template.id;
-                  return (
-                    <button
-                      key={template.id}
-                      type="button"
-                      onClick={() => handleSelectFileTemplate(template)}
-                      className={`w-full rounded-2xl border p-5 text-left transition-all ${isActive ? 'border-brand-gold bg-brand-gold/10' : 'border-white/[0.05] bg-white/[0.02] hover:border-brand-gold/30'}`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h4 className="text-lg font-medium text-brand-ivory">{template.name}</h4>
-                          <p className="text-[10px] uppercase tracking-widest text-brand-gold">{template.category || 'General'}</p>
-                        </div>
-                        <span className="text-[10px] uppercase tracking-widest text-brand-accent/35">{template.fileSize ? `${Math.round(template.fileSize / 1024)} KB` : 'Archivo'}</span>
-                      </div>
-                      <p className="mt-3 text-sm font-light text-brand-accent/40">{template.description}</p>
-                      <div className="mt-4 rounded-lg border border-white/[0.05] bg-white/[0.02] p-4 text-xs text-brand-ivory/60">
-                        {template.fileName || 'Archivo sin nombre'}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isTemplatePickerOpen && (
-        <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-xl">
-          <div className="mx-auto flex h-full w-full max-w-3xl items-center justify-center p-4 sm:p-8">
-            <div className="w-full overflow-hidden rounded-3xl border border-white/[0.06] bg-brand-black shadow-2xl">
-              <div className="flex items-center justify-between border-b border-white/[0.05] p-4 sm:p-6">
-                <div>
-                  <h3 className="text-xl font-serif font-medium text-brand-ivory sm:text-2xl">Elegir plantilla</h3>
-                  <p className="mt-1 text-sm font-light text-brand-accent/40">Selecciona una plantilla real para usarla en este chat.</p>
-                </div>
-                <button onClick={() => setIsTemplatePickerOpen(false)} className="text-brand-accent/40 transition-colors hover:text-brand-ivory">
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-              <div className="max-h-[70vh] overflow-y-auto p-4 sm:p-6">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  {availableFileTemplates.length ? availableFileTemplates.map((template) => {
-                    const isActive = selectedFileTemplateId === template.id;
-                    return (
-                      <button
-                        key={template.id}
-                        type="button"
-                        onClick={() => handleSelectFileTemplate(template)}
-                        className={`rounded-2xl border p-5 text-left transition-all ${isActive ? 'border-brand-gold bg-brand-gold/10' : 'border-white/[0.05] bg-white/[0.02] hover:border-brand-gold/30'}`}
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <h4 className="text-lg font-medium text-brand-ivory">{template.name}</h4>
-                            <p className="text-[10px] uppercase tracking-widest text-brand-gold">{template.category || 'General'}</p>
-                          </div>
-                          <span className="text-[10px] uppercase tracking-widest text-brand-accent/35">{isActive ? 'Activa' : 'Elegir'}</span>
-                        </div>
-                        <p className="mt-3 text-sm font-light text-brand-accent/40">{template.description}</p>
-                        <div className="mt-4 rounded-lg border border-white/[0.05] bg-white/[0.02] p-4 text-xs text-brand-ivory/60">
-                          {template.fileName || 'Archivo sin nombre'}
-                        </div>
-                      </button>
-                    );
-                  }) : (
-                    <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.02] p-8 text-center text-sm text-brand-accent/40 md:col-span-2">
-                      No hay plantillas disponibles para este asistente.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
+  </div>
   );
 };
 

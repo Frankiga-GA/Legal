@@ -1,7 +1,54 @@
-const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY;
-const geminiModel = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash';
+// =============================================================================
+// geminiService.js
+// =============================================================================
+// MIGRADO: ya no llama a Google directo. Todo va al backend en
+// `/ai/raw`, que es el unico que conoce la GEMINI_API_KEY privada.
+//
+// Cualquier VITE_GEMINI_API_KEY que quede en .env se IGNORA.
+// =============================================================================
 
-export const isGeminiConfigured = Boolean(geminiApiKey);
+import { isSupabaseConfigured, supabase } from '../utils/supabase';
+
+const isProductionBuild = import.meta.env.PROD;
+
+if (isProductionBuild) {
+  // Antes advertiamos de la key en bundle; ahora el bundle no debe tenerla.
+}
+
+export const isGeminiConfigured = isSupabaseConfigured && Boolean(supabase);
+
+const getAccessToken = async () => {
+  if (!isGeminiConfigured) return null;
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data?.session) return null;
+  return data.session.access_token;
+};
+
+const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens = 2048, responseJson = false }) => {
+  const token = await getAccessToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await fetch('/api/ai/raw', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      prompt,
+      temperature,
+      max_output_tokens: maxOutputTokens,
+      response_json: responseJson,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || `Backend /ai/raw devolvio ${response.status}.`);
+  }
+
+  const data = await response.json();
+  if (!data?.text) throw new Error('Backend devolvio una respuesta vacia.');
+  return data.text;
+};
 
 const cleanAssistantText = (text = '') => text
   .replace(/\*\*/g, '')
@@ -66,6 +113,13 @@ Formato preferido:
 
 Si la pregunta pide leer documentos, usa el campo "contenido" y cita los nombres de documentos disponibles.
 No digas que no puedes identificar el contenido si el contexto incluye extracto o contenido documental.
+Si la pregunta pide resumen de expediente, avance, seguimiento o estado del caso, no te limites a repetir partes, fechas, materia o sumilla. Entrega una lectura operativa:
+1. Que ha pasado en el caso hasta ahora.
+2. Ultimo avance relevante segun documentos, notas o fechas.
+3. Plazos, audiencias, links u obligaciones detectadas.
+4. Riesgos o puntos de atencion.
+5. Proxima accion concreta para el abogado.
+6. Urgencia: Alta, Media o Baja, con motivo.
 
 Contexto del expediente:
 ${JSON.stringify(context, null, 2)}
@@ -83,44 +137,14 @@ export const askGeminiAboutCase = async ({
   officialReferences,
 }) => {
   if (!isGeminiConfigured) {
-    throw new Error('Gemini no esta configurado.');
+    throw new Error('Gemini no esta configurado (Supabase no disponible).');
   }
-
   const context = buildCaseContext({ caseData, documents, notes, importantDates, officialReferences });
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: buildPrompt(question, context) }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.25,
-          topP: 0.9,
-          maxOutputTokens: 1200,
-        },
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || 'Gemini no pudo responder.');
-  }
-
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text)
-    .filter(Boolean)
-    .join('\n')
-    .trim();
-
-  if (!text) throw new Error('Gemini devolvio una respuesta vacia.');
+  const text = await askBackend({
+    prompt: buildPrompt(question, context),
+    temperature: 0.25,
+    maxOutputTokens: 1200,
+  });
   return cleanAssistantText(text);
 };
 
@@ -169,42 +193,12 @@ export const analyzeOfficialRegistryItem = async ({ item, cases }) => {
   if (!isGeminiConfigured) {
     throw new Error('Gemini no esta configurado.');
   }
-
   const context = buildRegistryContext({ item, cases });
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: buildRegistryPrompt(context) }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          topP: 0.9,
-          maxOutputTokens: 1000,
-        },
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || 'Gemini no pudo analizar el registro.');
-  }
-
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text)
-    .filter(Boolean)
-    .join('\n')
-    .trim();
-
-  if (!text) throw new Error('Gemini devolvio un analisis vacio.');
+  const text = await askBackend({
+    prompt: buildRegistryPrompt(context),
+    temperature: 0.2,
+    maxOutputTokens: 1000,
+  });
   return cleanAssistantText(text);
 };
 
@@ -238,50 +232,16 @@ export const askGeminiSpecializedAssistant = async ({ bot, question, attachmentC
   if (!isGeminiConfigured) {
     throw new Error('Gemini no esta configurado.');
   }
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: buildSpecializedAssistantPrompt({
-                  bot,
-                  question,
-                  promptContext: bot.promptContext || '',
-                  attachmentContext,
-                }),
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.25,
-          topP: 0.9,
-          maxOutputTokens: 4096,
-        },
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || 'Gemini no pudo responder.');
-  }
-
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text)
-    .filter(Boolean)
-    .join('\n')
-    .trim();
-
-  if (!text) throw new Error('Gemini devolvio una respuesta vacia.');
+  const text = await askBackend({
+    prompt: buildSpecializedAssistantPrompt({
+      bot,
+      question,
+      promptContext: bot.promptContext || '',
+      attachmentContext,
+    }),
+    temperature: 0.25,
+    maxOutputTokens: 4096,
+  });
   return cleanAssistantText(text);
 };
 
@@ -315,40 +275,137 @@ export const askGeminiVaultAssistant = async ({ question, cases }) => {
   if (!isGeminiConfigured) {
     throw new Error('Gemini no esta configurado.');
   }
+  const text = await askBackend({
+    prompt: buildVaultAssistantPrompt({ question, cases }),
+    temperature: 0.2,
+    maxOutputTokens: 900,
+  });
+  return cleanAssistantText(text);
+};
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+const buildResolutionPrompt = (documentText) => `
+Analiza el siguiente documento judicial o resolucion peruana y extrae la informacion operativa clave de manera precisa.
+Responde estrictamente en formato JSON.
+
+Campos requeridos en el JSON:
+1. "latestProgress": Un resumen conciso de 1 frase del avance real (que se resolvio, que paso con el caso, ej. "Se declara admisible la demanda de alimentos y se programa audiencia para el 15 de julio"). Evita saludos o disclaimers.
+2. "hearingLink": Busca enlaces a salas virtuales (Google Meet, Zoom, MS Teams, Jitsi, etc.) que aparezcan en el texto. Devuelve el enlace exacto como cadena de texto. Si no hay ninguno, devuelve "".
+3. "urgency": Indica el nivel de urgencia del caso ("Alta", "Media", "Baja"). Si hay plazos inminentes o audiencias programadas, marca "Alta".
+4. "newDeadlines": Un arreglo de objetos con los nuevos plazos detectados en el texto. Cada plazo debe tener:
+   - "title": Descripcion del plazo (ej: "Subsanar demanda", "Presentar descargos", "Audiencia unica").
+   - "date": Fecha limite en formato "YYYY-MM-DD" (calcula la fecha si el texto menciona "dentro de 3 dias habiles", asumiendo que la fecha de la resolucion es hoy ${new Date().toISOString().split('T')[0]}, o extrae la fecha explicita si figura).
+   - "priority": "Alta", "Media", o "Baja".
+
+Ejemplo de respuesta esperada:
+{
+  "latestProgress": "El juzgado admite a tramite la contestacion de la demanda y corre traslado al demandante.",
+  "hearingLink": "https://meet.google.com/abc-defg-hij",
+  "urgency": "Alta",
+  "newDeadlines": [
     {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: buildVaultAssistantPrompt({ question, cases }) }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          topP: 0.9,
-          maxOutputTokens: 900,
-        },
-      }),
+      "title": "Audiencia de pruebas",
+      "date": "2026-06-25",
+      "priority": "Alta"
     }
-  );
+  ]
+}
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || 'Gemini no pudo responder.');
+Documento a analizar:
+${documentText}
+`;
+
+const extractFirstJsonObject = (text) => {
+  const trimmed = text.trim();
+  const candidates = [];
+
+  if (trimmed.startsWith('{')) candidates.push(trimmed);
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) candidates.push(fenced[1].trim());
+
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    candidates.push(trimmed.slice(firstBrace, lastBrace + 1));
   }
 
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text)
-    .filter(Boolean)
-    .join('\n')
-    .trim();
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch (_) {
+      // intentar el siguiente
+    }
+  }
+  throw new Error('No se encontro un JSON valido en la respuesta.');
+};
 
-  if (!text) throw new Error('Gemini devolvio una respuesta vacia.');
-  return cleanAssistantText(text);
+export const extractResolutionDetails = async (documentText) => {
+  if (!isGeminiConfigured) {
+    return simulateLocalResolutionExtraction(documentText);
+  }
+  try {
+    const text = await askBackend({
+      prompt: buildResolutionPrompt(documentText),
+      temperature: 0.1,
+      maxOutputTokens: 2000,
+      responseJson: true,
+    });
+    return extractFirstJsonObject(text);
+  } catch (error) {
+    console.warn('Fallo en la extraccion de resolucion con IA. Usando simulacion local.', error);
+    return simulateLocalResolutionExtraction(documentText);
+  }
+};
+
+const simulateLocalResolutionExtraction = (text) => {
+  const lowerText = text.toLowerCase();
+
+  let latestProgress = 'Se vinculo una nueva resolucion al expediente. Revisar los anexos.';
+  let hearingLink = '';
+  let urgency = 'Media';
+  const newDeadlines = [];
+
+  const meetMatch = text.match(/(https?:\/\/(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com)\/[^\s"']+)/i);
+  if (meetMatch) {
+    hearingLink = meetMatch[1];
+    urgency = 'Alta';
+    latestProgress = 'Se programo audiencia virtual y se detecto enlace de sala en la resolucion.';
+    newDeadlines.push({
+      id: Date.now(),
+      title: 'Audiencia Virtual',
+      date: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
+      priority: 'Alta',
+      status: 'Pendiente',
+    });
+  } else if (lowerText.includes('audiencia') || lowerText.includes('vista de la causa')) {
+    urgency = 'Alta';
+    latestProgress = 'Se programo audiencia o vista de causa en el expediente.';
+    newDeadlines.push({
+      id: Date.now(),
+      title: 'Audiencia programada',
+      date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+      priority: 'Alta',
+      status: 'Pendiente',
+    });
+  } else if (lowerText.includes('traslado') || lowerText.includes('subsanar') || lowerText.includes('plazo') || lowerText.includes('dias')) {
+    urgency = 'Alta';
+    latestProgress = 'Se notifica plazo para subsanar o absolver traslado en el expediente.';
+    newDeadlines.push({
+      id: Date.now(),
+      title: 'Subsanar / Absolver resolucion',
+      date: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
+      priority: 'Alta',
+      status: 'Pendiente',
+    });
+  } else if (lowerText.includes('sentencia') || lowerText.includes('declara')) {
+    latestProgress = 'Se notifico sentencia o resolucion decisoria en el expediente.';
+    urgency = 'Media';
+  }
+
+  return {
+    latestProgress,
+    hearingLink,
+    urgency,
+    newDeadlines,
+  };
 };

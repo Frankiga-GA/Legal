@@ -40,6 +40,9 @@ export const mockCases = [
     type: 'Laboral',
     status: 'Activo',
     lastUpdate: '2026-05-24',
+    latestProgress: 'Se programó audiencia de conciliación laboral para el 04 de junio. Pendiente preparar estrategia.',
+    hearingLink: 'https://meet.google.com/abc-defg-hij',
+    urgency: 'Alta',
     summary: 'Demanda por despido arbitrario con reclamo de beneficios sociales y horas extras. La prioridad es reforzar prueba de impedimento de ingreso y preparar audiencia.',
     documents: demoDocumentsByCaseId['EXP-2026-001'],
     notes: buildNotes([
@@ -73,6 +76,9 @@ export const mockCases = [
     type: 'Civil',
     status: 'Activo',
     lastUpdate: '2026-05-23',
+    latestProgress: 'En trámite envío de carta notarial de requerimiento de pago por arrendamiento comercial moroso.',
+    hearingLink: '',
+    urgency: 'Alta',
     summary: 'Incumplimiento de contrato de arrendamiento comercial con tres meses de mora. Se evalua carta notarial, resolucion contractual y eventual desalojo.',
     documents: demoDocumentsByCaseId['EXP-2026-002'],
     notes: buildNotes([
@@ -104,6 +110,9 @@ export const mockCases = [
     type: 'Corporativo',
     status: 'Pendiente',
     lastUpdate: '2026-05-22',
+    latestProgress: 'En revisión el contrato SaaS con el proveedor tecnológico. Falta subsanar cláusula de tratamiento de datos.',
+    hearingLink: '',
+    urgency: 'Media',
     summary: 'Revision de contrato tecnologico con proveedor SaaS. Riesgo principal: tratamiento de datos personales, SLA ambiguo y reporte de incidentes.',
     documents: demoDocumentsByCaseId['EXP-2026-003'],
     notes: buildNotes([
@@ -134,6 +143,9 @@ export const mockCases = [
     type: 'Familia',
     status: 'Activo',
     lastUpdate: '2026-05-21',
+    latestProgress: 'Se admitió demanda de alimentos. Se programó audiencia única para el 20 de junio.',
+    hearingLink: 'https://zoom.us/j/9876543210',
+    urgency: 'Alta',
     summary: 'Proceso de alimentos para menor de edad. Se requiere sustentar gastos mensuales y acreditar capacidad economica del obligado.',
     documents: demoDocumentsByCaseId['EXP-2026-004'],
     notes: buildNotes([
@@ -165,6 +177,9 @@ export const mockCases = [
     type: 'Administrativo',
     status: 'Activo',
     lastUpdate: '2026-05-25',
+    latestProgress: 'Pendiente presentar recurso de reconsideración contra multa municipal antes del 01 de junio.',
+    hearingLink: '',
+    urgency: 'Alta',
     summary: 'Sancion municipal por presunta falta de licencia vigente. Existe renovacion en tramite e inspeccion favorable previa.',
     documents: demoDocumentsByCaseId['EXP-2026-005'],
     notes: buildNotes([

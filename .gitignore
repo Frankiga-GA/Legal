@@ -7,27 +7,66 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+.pnp
+.pnp.js
+
+# Build output
 dist
 dist-ssr
+build
 *.local
+.vite
+
+# Environment files (NEVER commit secrets)
 .env
 .env.*
 !.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
 
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
 .venv/
 venv/
+env/
+.python-version
 
-# Editor directories and files
+# IDE / Editor
 .vscode/*
 !.vscode/extensions.json
-.idea
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+Thumbs.db
+
+# OS
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Test / Coverage
+coverage/
+.nyc_output/
+*.lcov
+junit.xml
+playwright-report/
+test-results/
+
+# Security audit / local state
+.security/
+local-secrets/
+
+# Temporary scratch
+scratch/
+tmp/
+temp/

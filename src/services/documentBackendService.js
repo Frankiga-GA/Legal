@@ -1,3 +1,5 @@
+import { isSupabaseConfigured, supabase } from '../utils/supabase';
+
 const backendUrl = import.meta.env.VITE_DOCUMENT_BACKEND_URL || 'http://127.0.0.1:8000';
 
 const fetchWithTimeout = async (input, init = {}, timeoutMs = 15000) => {
@@ -25,6 +27,30 @@ const handleJsonResponse = async (response, endpoint = '') => {
   return response.json();
 };
 
+// Devuelve el access_token de la sesion actual de Supabase, o null si no hay.
+// Se envia como Authorization: Bearer <token> en cada request al backend.
+const getAccessToken = async () => {
+  if (!isSupabaseConfigured || !supabase) return null;
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.warn('No se pudo obtener la sesion para autorizar el backend.', error);
+      return null;
+    }
+    return data?.session?.access_token || null;
+  } catch (error) {
+    console.warn('Excepcion al leer la sesion de Supabase.', error);
+    return null;
+  }
+};
+
+const authHeaders = async (extra = {}) => {
+  const token = await getAccessToken();
+  const headers = { ...extra };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+};
+
 export const checkDocumentBackendHealth = async () => {
   const response = await fetchWithTimeout(`${backendUrl}/health`, { method: 'GET' }, 15000);
   return handleJsonResponse(response, '/health');
@@ -34,20 +60,31 @@ export const uploadDocumentToBackend = async (file) => {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetchWithTimeout(`${backendUrl}/upload`, {
-    method: 'POST',
-    body: formData,
-  }, 180000);
+  const headers = await authHeaders();
 
-  return handleJsonResponse(response, '/upload');
+  try {
+    const response = await fetchWithTimeout(`${backendUrl}/upload`, {
+      method: 'POST',
+      body: formData,
+      headers,
+    }, 180000);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error uploading document:', error);
+    throw error;
+  }
 };
 
 export const requestDocumentChat = async ({ message, prompt = '', fileName = '', fileType = '', fileText = '' }) => {
+  const headers = await authHeaders({ 'Content-Type': 'application/json' });
+
   const response = await fetchWithTimeout(`${backendUrl}/chat`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({
       message,
       prompt,
@@ -68,9 +105,12 @@ export const generateDocumentWithBackend = async ({ message, prompt = '', file }
     formData.append('file', file);
   }
 
+  const headers = await authHeaders();
+
   const response = await fetchWithTimeout(`${backendUrl}/generate-document`, {
     method: 'POST',
     body: formData,
+    headers,
   }, 300000);
 
   return handleJsonResponse(response, '/generate-document');
@@ -86,11 +126,11 @@ export const generateDocumentFile = async ({
   documentType = 'documento',
   outputFormat = 'docx',
 }) => {
+  const headers = await authHeaders({ 'Content-Type': 'application/json' });
+
   const response = await fetchWithTimeout(`${backendUrl}/generate-file`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({
       message,
       prompt,

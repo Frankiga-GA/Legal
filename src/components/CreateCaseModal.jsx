@@ -100,6 +100,8 @@ const CreateCaseModal = ({ onClose, onSave }) => {
         type: file.mimeType || 'application/octet-stream',
         date: file.modifiedTime ? file.modifiedTime.split('T')[0] : new Date().toISOString().split('T')[0],
         source: 'Drive',
+        driveFileId: file.id,
+        mimeType: file.mimeType || '',
         webViewLink: file.webViewLink || '',
       },
     ]);
@@ -330,37 +332,31 @@ const CreateCaseModal = ({ onClose, onSave }) => {
                     <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-4 text-sm text-brand-accent/45">
                       Cargando archivos de Drive...
                     </div>
-                  ) : selectedDriveFolderId ? (
-                    filteredDriveFiles.length ? (
-                      filteredDriveFiles.map((file) => (
+                  ) : driveItems.length ? (
+                    driveItems.map((file) => (
                         <button
                           key={file.id}
                           type="button"
-                          onClick={() => addDriveFile(file)}
+                          onClick={() => isDriveFolder(file) ? openDriveFolder(file) : addDriveFile(file)}
                           className="flex w-full items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.02] p-4 text-left transition-all hover:border-brand-gold/25 hover:bg-white/[0.04]"
                         >
                           <div className="min-w-0">
                             <div className="truncate text-sm font-medium text-brand-ivory">{file.name}</div>
                             <div className="mt-1 text-[10px] uppercase tracking-widest text-brand-accent/35">
-                              {file.mimeType || 'Archivo'}
+                              {isDriveFolder(file) ? 'Carpeta' : file.mimeType || 'Archivo'}
                               {file.size ? ` • ${Math.round(Number(file.size) / 1024)} KB` : ''}
                             </div>
                           </div>
                           <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-brand-gold/60">
-                            <span>Importar</span>
-                            <ExternalLink className="h-4 w-4" />
+                            <span>{isDriveFolder(file) ? 'Abrir' : 'Importar'}</span>
+                            {isDriveFolder(file) ? <FolderOpen className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
                           </div>
                         </button>
                       ))
-                    ) : (
+                  ) : (
                       <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-4 text-sm text-brand-accent/45">
                         No hay archivos dentro de esta carpeta.
                       </div>
-                    )
-                  ) : (
-                    <div className="rounded-xl border border-dashed border-white/[0.08] bg-white/[0.02] p-4 text-sm text-brand-accent/45">
-                      Elige una carpeta para ver sus documentos y agregarlos al expediente.
-                    </div>
                   )}
                 </div>
               </div>

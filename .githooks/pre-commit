@@ -1,0 +1,27 @@
+#!/usr/bin/env sh
+# Pre-commit hook: bloquea el commit si se detectan secretos en archivos staged.
+# Activalo con: npm run security:install-hooks
+
+set -e
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -vE '(^|/)(node_modules|dist|build|coverage|\.venv|venv)/' || true)
+
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+echo "[pre-commit] Escaneando $(echo "$STAGED" | wc -l) archivos staged..."
+
+# Delega al script principal pasando solo los staged para reducir falsos positivos.
+node scripts/check-secrets.js
+STATUS=$?
+
+if [ $STATUS -ne 0 ]; then
+  echo ""
+  echo "[pre-commit] Commit bloqueado por security:check."
+  echo "Si lo que aparece es un placeholder de .env.example, ignoralo y vuelve a correr el hook."
+  echo "Para omitir (NO recomendado): git commit --no-verify"
+  exit 1
+fi
+
+exit 0

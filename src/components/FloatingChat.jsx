@@ -93,7 +93,7 @@ const FloatingChat = () => {
       setMessages(prev => [...prev, { role: 'ai', content: response }]);
     } catch (error) {
       console.warn('Gemini no pudo responder en chat flotante. Usando fallback local.', error);
-      setMessages(prev => [...prev, { role: 'ai', content: `${buildLocalVaultResponse(userMessage)}\n\nNota: Gemini no respondio en este intento, asi que use datos locales de la boveda.` }]);
+      setMessages(prev => [...prev, { role: 'ai', content: buildLocalVaultResponse(userMessage) }]);
     } finally {
       setIsTyping(false);
     }

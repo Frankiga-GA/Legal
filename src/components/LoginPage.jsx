@@ -212,14 +212,14 @@ const LoginPage = ({ onLogin, onBack }) => {
             alt="Firma legal usando LUSTI"
             className="absolute inset-0 h-full w-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-brand-black via-brand-black/65 to-brand-black/25"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-brand-black/80 via-transparent to-brand-black/25"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/65 to-slate-950/25"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/25"></div>
 
           <div className="relative z-10 flex h-full flex-col justify-between p-12 xl:p-16">
             <div className="flex items-center justify-between">
-              <div className="inline-flex items-center gap-3 rounded-full border border-brand-gold/20 bg-brand-gold/10 px-4 py-2">
-                <Scale className="h-4 w-4 text-brand-gold" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-brand-gold">Legal Intelligence</span>
+              <div className="inline-flex items-center gap-3 rounded-full border border-blue-500/25 bg-blue-500/10 px-4 py-2">
+                <Scale className="h-4 w-4 text-blue-400" />
+                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-blue-400">Legal Intelligence</span>
               </div>
               <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-300">
                 Workspace activo
@@ -230,7 +230,7 @@ const LoginPage = ({ onLogin, onBack }) => {
               <h3 className="text-5xl font-serif font-medium leading-tight text-white">
                 Expedientes, documentos y plazos listos para decidir mejor.
               </h3>
-              <p className="mt-5 max-w-xl text-base font-light leading-7 text-brand-accent/75">
+              <p className="mt-5 max-w-xl text-base font-light leading-7 text-slate-300">
                 La primera impresion debe sentirse como una herramienta que un estudio legal podria usar manana: clara, sobria y orientada a resultados.
               </p>
             </div>

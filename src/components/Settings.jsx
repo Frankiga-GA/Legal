@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Building2, Bot, Users, Plug, Save, RefreshCcw, Unplug } from 'lucide-react';
+import { Building2, Bot, Plug, Save, RefreshCcw, Unplug } from 'lucide-react';
 import {
   clearStoredDriveToken,
   connectGoogleDrive,
@@ -43,7 +43,6 @@ const Settings = () => {
         <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] p-8 md:p-10">
           {activeSection === 'firm' && <FirmProfile />}
           {activeSection === 'ai' && <AIPreferences />}
-          {activeSection === 'users' && <UserManagement />}
           {activeSection === 'integrations' && <Integrations />}
         </div>
       </div>
@@ -54,7 +53,6 @@ const Settings = () => {
 const sections = [
   { id: 'firm', label: 'Perfil de Firma', icon: Building2 },
   { id: 'ai', label: 'Nodos de IA', icon: Bot },
-  { id: 'users', label: 'Equipo', icon: Users },
   { id: 'integrations', label: 'Conexiones', icon: Plug },
 ];
 
@@ -89,51 +87,6 @@ const AIPreferences = () => (
     <button className="flex items-center gap-3 rounded-xl bg-brand-ivory px-8 py-4 font-bold tracking-tight text-brand-black transition-all hover:bg-white">
       <Save className="h-4 w-4" /> Guardar Preferencias
     </button>
-  </div>
-);
-
-const UserManagement = () => (
-  <div className="space-y-10">
-    <h3 className="text-2xl font-serif font-medium text-brand-ivory">Equipo Operativo</h3>
-    <div className="overflow-hidden rounded-lg border border-white/[0.05]">
-      <table className="w-full text-left">
-        <thead className="border-b border-white/[0.05] bg-white/[0.02]">
-          <tr>
-            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-brand-accent/40">Usuario</th>
-            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-brand-accent/40">Nivel de Acceso</th>
-            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-brand-accent/40">Estado</th>
-            <th className="px-6 py-4 text-right text-[10px] font-bold uppercase tracking-widest text-brand-accent/40">Accion</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/[0.03]">
-          {[
-            { name: 'Admin J&N', email: 'admin@jynlegal.com', role: 'Administrador', status: 'Activo' },
-            { name: 'Abogado Juan', email: 'juan@jynlegal.com', role: 'Abogado', status: 'Activo' },
-            { name: 'Asistente Maria', email: 'maria@jynlegal.com', role: 'Asistente', status: 'Activo' },
-          ].map((user, i) => (
-            <tr key={i} className="transition-colors hover:bg-white/[0.01]">
-              <td className="px-6 py-4">
-                <div className="text-sm font-medium text-brand-ivory/80">{user.name}</div>
-                <div className="text-[10px] uppercase tracking-wider text-brand-accent/20">{user.email}</div>
-              </td>
-              <td className="px-6 py-4">
-                <span className="text-[11px] font-medium tracking-tight text-brand-accent/60">{user.role}</span>
-              </td>
-              <td className="px-6 py-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-xs font-light text-brand-accent/60">{user.status}</span>
-                </div>
-              </td>
-              <td className="px-6 py-4 text-right">
-                <button className="text-xs font-semibold uppercase tracking-widest text-brand-gold transition-colors hover:text-brand-ivory">Editar</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-    <button className="rounded-xl bg-brand-ivory px-8 py-4 font-bold tracking-tight text-brand-black transition-all hover:bg-white">+ Invitar Nuevo Integrante</button>
   </div>
 );
 

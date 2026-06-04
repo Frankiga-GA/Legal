@@ -1,8 +1,10 @@
 // src/App.jsx
-import { useEffect, useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
+
 import Sidebar from './components/Sidebar';
 import CaseLibrary from './components/CaseLibrary';
+import CaseWorkspace from './components/CaseWorkspace';
 import ManagerBot from './components/ManagerBot';
 import Dashboard from './components/Dashboard';
 import Settings from './components/Settings';
@@ -15,9 +17,30 @@ import LegalPage from './components/LegalPage';
 import { getCurrentSession, onAuthStateChange, signOut } from './services/authService';
 import { getStoredDriveToken, onDriveTokenChange, onDriveTokenMessage } from './services/googleDriveService';
 
+// Simple Error Boundary to catch render errors
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+  componentDidCatch(error, info) {
+    console.error('ErrorBoundary caught an error', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (<div className="p-8 text-red-600">Se produjo un error inesperado. Recarga la página.</div>);
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   const publicPath = window.location.pathname.replace(/\/+$/, '') || '/';
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('library');
+  const [activeCaseId, setActiveCaseId] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLanding, setIsLanding] = useState(true);
@@ -91,41 +114,51 @@ function App() {
   const handleLogout = async () => {
     await signOut();
     setSession(null);
-    setActiveTab('dashboard');
+    setActiveTab('library');
     setIsLanding(false);
   };
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'case-workspace': return <CaseWorkspace caseId={activeCaseId} onClose={() => setActiveTab('library')} />;
       case 'dashboard': return <Dashboard setActiveTab={setActiveTab} isDriveConnected={isDriveConnected} />;
-      case 'library': return <CaseLibrary setActiveTab={setActiveTab} />;
+      case 'library': return <CaseLibrary setActiveTab={setActiveTab} onOpenCase={(id) => { setActiveCaseId(id); setActiveTab('case-workspace'); }} />;
       case 'monitor': return <LegalMonitor setActiveTab={setActiveTab} />;
       case 'drive': return <DriveVault />;
       case 'ai-chat': return <ManagerBot />;
       case 'elperuano': return <ElPeruano />;
       case 'settings': return <Settings />;
-      default: return <div className="p-8 font-serif italic text-brand-accent">Sección en construcción</div>;
+      default: return <div className="p-8 font-serif italic text-slate-400">Sección en construcción</div>;
     }
   };
 
+  function SafeRender() {
+    try {
+      return renderContent();
+    } catch (e) {
+      console.error('Render error:', e);
+      return <div className="p-8 text-red-500">Error al cargar la sección. Por favor recarga la página.</div>;
+    }
+  }
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    setIsSidebarCollapsed(tab === 'ai-chat');
+    setIsSidebarCollapsed(tab === 'ai-chat' || tab === 'case-workspace');
     setIsMobileMenuOpen(false);
   };
 
   useEffect(() => {
     if (!isDriveConnected && activeTab === 'drive') {
-      setActiveTab('dashboard');
+      setActiveTab('library');
     }
   }, [activeTab, isDriveConnected]);
 
   if (isAuthLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-brand-black text-brand-ivory">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-100">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-8 w-8 rounded-full border border-brand-gold/30 border-t-brand-gold animate-spin"></div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-accent/50">Cargando LUSTI</p>
+          <div className="mx-auto mb-4 h-8 w-8 rounded-full border border-zinc-800 border-t-zinc-900 animate-spin"></div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">Cargando LUSTI</p>
         </div>
       </div>
     );
@@ -148,7 +181,8 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-brand-black text-brand-ivory relative selection:bg-brand-gold/20 overflow-hidden font-sans">
+    <ErrorBoundary>
+    <div className="flex h-screen bg-brand-black text-brand-ivory relative selection:bg-brand-gold/30 overflow-hidden font-sans">
       {/* Noise Overlay */}
       <div className="fixed inset-0 noise-bg pointer-events-none z-50"></div>
       
@@ -156,43 +190,48 @@ function App() {
       <div className="md:hidden absolute top-6 left-6 z-50">
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="rounded-lg border border-white/[0.08] bg-white/[0.04] p-3 text-white"
+          className="rounded-lg border border-white/[0.08] bg-brand-dark p-3 text-brand-ivory shadow-sm"
         >
-          {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {isMobileMenuOpen ? '✖' : '☰'}
         </button>
       </div>
 
       {/* Sidebar Container */}
-      <div className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-500 ease-in-out md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        {/* Mobile Background Overlay */}
-        {isMobileMenuOpen && (
-          <div 
-            className="fixed inset-0 z-[-1] h-screen w-screen bg-black/80" 
-            onClick={() => setIsMobileMenuOpen(false)}
-          ></div>
-        )}
-        <div className="h-full bg-brand-black border-r border-white/[0.05]">
-          <Sidebar
-            activeTab={activeTab}
-            setActiveTab={handleTabChange}
-            onHome={() => setIsLanding(true)}
-            onLogout={handleLogout}
-            userEmail={session.user?.email}
-            collapsed={isSidebarCollapsed}
-            onToggleCollapse={() => setIsSidebarCollapsed((value) => !value)}
-            showDrive={isDriveConnected}
-          />
+      {activeTab !== 'case-workspace' && (
+        <div className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-500 ease-in-out md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          {/* Mobile Background Overlay */}
+          {isMobileMenuOpen && (
+            <div 
+              className="fixed inset-0 z-[-1] h-screen w-screen bg-black/80 backdrop-blur-sm" 
+              onClick={() => setIsMobileMenuOpen(false)}
+            ></div>
+          )}
+          <div className="h-full bg-brand-dark border-r border-white/[0.08]">
+            <Sidebar
+              activeTab={activeTab}
+              setActiveTab={handleTabChange}
+              onHome={() => setIsLanding(true)}
+              onLogout={handleLogout}
+              userEmail={session.user?.email}
+              collapsed={isSidebarCollapsed}
+              onToggleCollapse={() => setIsSidebarCollapsed((value) => !value)}
+              showDrive={isDriveConnected}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <main className="flex-1 overflow-hidden relative z-10 bg-brand-black">
         <div className="h-full w-full pt-16 md:pt-0 overflow-hidden flex flex-col">
           <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {renderContent()}
+            {SafeRender()}
           </div>
         </div>
       </main>
+        {/* Contenedor de toast */}
+        <Toaster />
     </div>
+    </ErrorBoundary>
   );
 }
 
