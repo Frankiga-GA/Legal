@@ -32,18 +32,22 @@ const ElPeruano = () => {
   const [sourceFilter, setSourceFilter] = useState('Todas');
   const [statusMessage, setStatusMessage] = useState('');
   const [feedSource, setFeedSource] = useState('curated-official-links');
+  const [feedQuery, setFeedQuery] = useState('');
   const [lastChecked, setLastChecked] = useState('');
   const [savedItems, setSavedItems] = useState(() => getLocalSavedRegistryItems());
   const [savedItemsSource, setSavedItemsSource] = useState('local');
   const [notificationState] = useState(() => (typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'));
   const [newPublicationCount, setNewPublicationCount] = useState(0);
   const [publicationAlert, setPublicationAlert] = useState('');
+  const [autoAnalyses, setAutoAnalyses] = useState({});
+  const [refreshTick, setRefreshTick] = useState(0);
   const lastPublicationIdsRef = useRef(new Set());
   const hasLoadedPublicationsRef = useRef(false);
 
   const applyRegistryResult = (result) => {
     setItems(result.items);
     setFeedSource(result.source);
+    setFeedQuery(result.query || '');
     setLastChecked(formatCheckedAt(result.checkedAt));
     const nextIds = new Set((result.items || []).map((item) => item.id));
     const previousIds = lastPublicationIdsRef.current;
@@ -59,14 +63,53 @@ const ElPeruano = () => {
       notifyPublicationUpdate(newItems);
     } else if (!hasLoadedPublicationsRef.current) {
       setStatusMessage(result.error
-        ? 'El navegador bloqueo la consulta en vivo. Mostrando fuentes oficiales curadas.'
-        : 'Registros oficiales actualizados desde fuente publica.'
+        ? 'No se pudo consultar El Peruano en vivo. Mostrando fuentes oficiales curadas.'
+        : result.query
+          ? `Resultados en vivo para "${result.query}".`
+          : 'Registros oficiales actualizados desde fuente publica.'
       );
     }
 
     lastPublicationIdsRef.current = nextIds;
     hasLoadedPublicationsRef.current = true;
     setLoading(false);
+  };
+
+  const pickAutoAnalysisTargets = (registryItems, allCases) => {
+    const caseTypes = new Set((allCases || []).map((c) => (c.type || '').toLowerCase()).filter(Boolean));
+    const scored = (registryItems || []).map((item) => {
+      const category = (item.category || '').toLowerCase();
+      const matchesType = Array.from(caseTypes).some((t) => t && category.includes(t));
+      const urgencyScore = item.urgency === 'Alta' ? 2 : item.urgency === 'Media' ? 1 : 0;
+      const matchScore = matchesType ? 2 : 0;
+      return { item, score: urgencyScore + matchScore };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored.filter((s) => s.score > 0).slice(0, 4).map((s) => s.item);
+  };
+
+  const runAutoAnalysis = async (registryItems, allCases) => {
+    if (!isGeminiConfigured || !registryItems || registryItems.length === 0) return;
+    const targets = pickAutoAnalysisTargets(registryItems, allCases);
+    if (targets.length === 0) return;
+
+    setAutoAnalyses((prev) => {
+      const next = { ...prev };
+      targets.forEach((item) => {
+        if (!next[item.id]) next[item.id] = { status: 'analyzing' };
+      });
+      return next;
+    });
+
+    targets.forEach(async (item) => {
+      const related = getRelatedCases(item, allCases);
+      try {
+        const analysis = await analyzeOfficialRegistryItem({ item, cases: allCases });
+        setAutoAnalyses((prev) => ({ ...prev, [item.id]: { status: 'done', analysis, relatedCount: related.length } }));
+      } catch (error) {
+        setAutoAnalyses((prev) => ({ ...prev, [item.id]: { status: 'error', relatedCount: related.length } }));
+      }
+    });
   };
 
   const loadRegistry = async () => {
@@ -89,21 +132,29 @@ const ElPeruano = () => {
       if (result.error) setStatusMessage('Biblioteca normativa cargada localmente. Supabase no respondio.');
     });
 
-    fetchOfficialRegistryItems().then((result) => {
-      if (isMounted) applyRegistryResult(result);
-    });
-
-    const intervalId = window.setInterval(() => {
-      fetchOfficialRegistryItems().then((result) => {
-        if (isMounted) applyRegistryResult(result);
-      });
-    }, 10 * 60 * 1000);
-
     return () => {
       isMounted = false;
-      window.clearInterval(intervalId);
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const handle = window.setTimeout(() => {
+      fetchOfficialRegistryItems(query).then((result) => {
+        if (isMounted) applyRegistryResult(result);
+      });
+    }, 350);
+    return () => {
+      isMounted = false;
+      window.clearTimeout(handle);
+    };
+  }, [query, refreshTick]);
+
+  useEffect(() => {
+    if (!loading && items.length > 0 && cases.length > 0 && isGeminiConfigured) {
+      runAutoAnalysis(items, cases);
+    }
+  }, [loading, items, cases]);
 
   useEffect(() => {
     if (!statusMessage) return;
@@ -213,7 +264,7 @@ const ElPeruano = () => {
           </div>
 
           <button
-            onClick={loadRegistry}
+            onClick={() => setRefreshTick((tick) => tick + 1)}
             disabled={loading}
             className="inline-flex items-center justify-center gap-3 rounded-lg bg-brand-ivory px-5 py-4 text-[11px] font-bold uppercase tracking-[0.16em] text-brand-black transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -289,6 +340,7 @@ const ElPeruano = () => {
                   onSave={() => handleSaveRegistryItem(item)}
                   onLink={linkRegistryToCase}
                   isSaved={savedItems.some((saved) => saved.id === item.id)}
+                  autoAnalysis={autoAnalyses[item.id]}
                 />
               ))
             ) : (
@@ -312,13 +364,18 @@ const ElPeruano = () => {
               </div>
               <div className="space-y-4 text-sm leading-6 text-brand-accent/65">
                 <p>
-                  Cada registro se clasifica por materia y se cruza con tus expedientes para sugerir donde puede haber impacto.
+                  {isGeminiConfigured
+                    ? 'Las normas mas relevantes se analizan solas en segundo plano. El badge "Analizado por IA" aparece cuando termina.'
+                    : 'La IA no esta configurada. Se muestra un analisis local basico para cada norma.'}
                 </p>
                 <div className="rounded-lg border border-white/[0.06] bg-brand-black/30 p-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-gold">Proxima mejora</p>
-                  <p className="mt-2 text-sm text-brand-ivory/80">
-                    LUSTI analizara automaticamente cada norma, generara un resumen legal y avisara que expedientes podrian verse afectados.
-                  </p>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-gold">Como funciona</p>
+                  <ul className="mt-2 space-y-1.5 text-sm text-brand-ivory/80">
+                    <li>· Selecciona 3-4 normas segun urgencia y materia de tus casos.</li>
+                    <li>· Se envia cada titulo a Groq para un resumen legal breve.</li>
+                    <li>· El badge cambia de "Analizando" a "Analizado por IA" al terminar.</li>
+                    <li>· Podes ampliar con "Analizar IA" para analisis profundo.</li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -362,7 +419,7 @@ const ElPeruano = () => {
   );
 };
 
-const RegistryCard = ({ item, cases, onSave, onLink, isSaved }) => {
+const RegistryCard = ({ item, cases, onSave, onLink, isSaved, autoAnalysis }) => {
   const [selectedCaseId, setSelectedCaseId] = useState('');
   const [aiAnalysis, setAiAnalysis] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -386,6 +443,23 @@ const RegistryCard = ({ item, cases, onSave, onLink, isSaved }) => {
     }
   };
 
+  const effectiveAnalysis = aiAnalysis || (autoAnalysis?.status === 'done' ? autoAnalysis.analysis : '');
+  const autoBadge = autoAnalysis?.status === 'analyzing' ? (
+    <span className="inline-flex items-center gap-1 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-brand-gold">
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-gold" />
+      Analizando IA
+    </span>
+  ) : autoAnalysis?.status === 'done' ? (
+    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-300">
+      Analizado por IA
+      {autoAnalysis.relatedCount > 0 ? ` · ${autoAnalysis.relatedCount} caso${autoAnalysis.relatedCount > 1 ? 's' : ''}` : ''}
+    </span>
+  ) : autoAnalysis?.status === 'error' ? (
+    <span className="inline-flex items-center gap-1 rounded-full border border-red-400/20 bg-red-500/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-red-300">
+      Error IA
+    </span>
+  ) : null;
+
   return (
     <article className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-6 transition-colors hover:border-brand-gold/20 hover:bg-white/[0.025]">
       <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -398,6 +472,7 @@ const RegistryCard = ({ item, cases, onSave, onLink, isSaved }) => {
               <Badge>{item.type}</Badge>
               <Badge>{item.category}</Badge>
               <Badge tone={item.urgency === 'Alta' ? 'danger' : 'default'}>{item.urgency}</Badge>
+              {autoBadge}
             </div>
             <h2 className="text-2xl font-serif leading-snug text-brand-ivory">{item.title}</h2>
             <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-accent/40">
@@ -430,14 +505,14 @@ const RegistryCard = ({ item, cases, onSave, onLink, isSaved }) => {
         )}
       </div>
 
-      {aiAnalysis && (
+      {effectiveAnalysis && (
         <div className="mt-5 rounded-lg border border-brand-gold/15 bg-brand-gold/[0.04] p-4">
           <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-gold">
             <Bot className="h-4 w-4" />
-            Analisis IA
+            {aiAnalysis ? 'Analisis IA' : 'Lectura automatica IA'}
           </div>
           <div className="space-y-2 text-sm font-light leading-6 text-brand-ivory/75">
-            {aiAnalysis.split('\n').filter(Boolean).map((line, index) => (
+            {effectiveAnalysis.split('\n').filter(Boolean).map((line, index) => (
               <p key={index}>{line}</p>
             ))}
           </div>

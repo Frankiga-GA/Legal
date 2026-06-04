@@ -122,12 +122,12 @@ function App() {
     switch (activeTab) {
       case 'case-workspace': return <CaseWorkspace caseId={activeCaseId} onClose={() => setActiveTab('library')} />;
       case 'dashboard': return <Dashboard setActiveTab={setActiveTab} isDriveConnected={isDriveConnected} />;
-      case 'library': return <CaseLibrary setActiveTab={setActiveTab} onOpenCase={(id) => { setActiveCaseId(id); setActiveTab('case-workspace'); }} />;
+      case 'library': return <CaseLibrary setActiveTab={setActiveTab} onOpenCase={(id) => { setActiveCaseId(id); setActiveTab('case-workspace'); }} userId={session?.user?.id} />;
       case 'monitor': return <LegalMonitor setActiveTab={setActiveTab} />;
       case 'drive': return <DriveVault />;
       case 'ai-chat': return <ManagerBot />;
       case 'elperuano': return <ElPeruano />;
-      case 'settings': return <Settings />;
+      case 'settings': return <Settings session={session} />;
       default: return <div className="p-8 font-serif italic text-slate-400">Sección en construcción</div>;
     }
   };
@@ -224,7 +224,9 @@ function App() {
       <main className="flex-1 overflow-hidden relative z-10 bg-brand-black">
         <div className="h-full w-full pt-16 md:pt-0 overflow-hidden flex flex-col">
           <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {SafeRender()}
+            <div key={activeTab} className={`h-full ${activeTab === 'case-workspace' ? 'animate-fade-in-up' : 'animate-fade-in'}`}>
+              {SafeRender()}
+            </div>
           </div>
         </div>
       </main>

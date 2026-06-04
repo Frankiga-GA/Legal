@@ -1,5 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Building2, Bot, Plug, Save, RefreshCcw, Unplug } from 'lucide-react';
+// src/components/Settings.jsx
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Building2,
+  Bot,
+  Plug,
+  Save,
+  RefreshCcw,
+  Unplug,
+  CheckCircle2,
+  Database,
+  Bell,
+  AlertTriangle,
+} from 'lucide-react';
 import {
   clearStoredDriveToken,
   connectGoogleDrive,
@@ -9,9 +21,26 @@ import {
   listDriveFiles,
   listDriveFolders,
 } from '../services/googleDriveService';
+import { isSupabaseConfigured, supabase } from '../utils/supabase';
+import {
+  loadAllPreferences,
+  saveAiPreferences,
+  saveFirmProfile,
+  saveNotificationPreferences,
+} from '../services/userPreferencesStore';
 
-const Settings = () => {
+const TONE_OPTIONS = [
+  { value: 'profesional', label: 'Profesional y analitico' },
+  { value: 'directo',     label: 'Sintetico y directo' },
+  { value: 'consultivo',  label: 'Consultivo explicativo' },
+];
+
+const URGENCY_OPTIONS = ['Baja', 'Media', 'Alta'];
+
+const Settings = ({ session }) => {
   const [activeSection, setActiveSection] = useState('firm');
+  const userId = session?.user?.id || null;
+  const userEmail = session?.user?.email || '';
 
   return (
     <div className="min-h-screen bg-brand-black p-8 md:p-12">
@@ -20,7 +49,9 @@ const Settings = () => {
           <h2 className="flex items-center gap-4 text-4xl font-serif font-medium tracking-tight text-brand-ivory">
             Preferencias del Sistema
           </h2>
-          <p className="text-sm font-light tracking-wide text-brand-accent/60">Personaliza los parametros operativos de tu entorno legal digital.</p>
+          <p className="text-sm font-light tracking-wide text-brand-accent/60">
+            Sesion activa: <span className="text-brand-ivory">{userEmail || 'Sin sesion'}</span>
+          </p>
         </header>
 
         <div className="flex flex-wrap gap-3">
@@ -41,9 +72,10 @@ const Settings = () => {
         </div>
 
         <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] p-8 md:p-10">
-          {activeSection === 'firm' && <FirmProfile />}
-          {activeSection === 'ai' && <AIPreferences />}
-          {activeSection === 'integrations' && <Integrations />}
+          {activeSection === 'firm' && <FirmProfile userId={userId} userEmail={userEmail} />}
+          {activeSection === 'ai' && <AIPreferences userId={userId} />}
+          {activeSection === 'notifications' && <NotificationPreferences userId={userId} />}
+          {activeSection === 'integrations' && <Integrations userEmail={userEmail} />}
         </div>
       </div>
     </div>
@@ -52,55 +84,337 @@ const Settings = () => {
 
 const sections = [
   { id: 'firm', label: 'Perfil de Firma', icon: Building2 },
-  { id: 'ai', label: 'Nodos de IA', icon: Bot },
+  { id: 'ai', label: 'Preferencias de IA', icon: Bot },
+  { id: 'notifications', label: 'Notificaciones', icon: Bell },
   { id: 'integrations', label: 'Conexiones', icon: Plug },
 ];
 
-const FirmProfile = () => (
-  <div className="space-y-10">
-    <h3 className="text-2xl font-serif font-medium text-brand-ivory">Informacion de la Firma</h3>
-    <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-      <ReadOnlyField label="Nombre Legal" value="J&N Asesoria Legal y Consultoria S.A.C." />
-      <ReadOnlyField label="RUC" value="20XXXXXXXXX" />
-      <EditableField label="Canal de Comunicacion" value="jynconsultoress@gmail.com" />
-      <EditableField label="Contacto Directo" value="945088014" />
-      <div className="space-y-2 md:col-span-2">
-        <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/40">Sede Principal</label>
-        <input className="w-full rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-4 text-brand-ivory outline-none focus:border-brand-gold/40" defaultValue="Calle Grau 227 - Chincha Alta" />
+// ============================================================================
+// Perfil de Firma
+// ============================================================================
+const FirmProfile = ({ userId, userEmail }) => {
+  const [profile, setProfile] = useState(() => loadAllPreferences(userId).firm);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setProfile(loadAllPreferences(userId).firm);
+  }, [userId]);
+
+  const update = (field, value) => {
+    setProfile((prev) => ({ ...prev, [field]: value }));
+    setSaved(false);
+  };
+
+  const handleSave = () => {
+    saveFirmProfile(userId, profile);
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2500);
+  };
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <h3 className="text-2xl font-serif font-medium text-brand-ivory">Informacion de la Firma</h3>
+        <p className="mt-2 text-sm text-brand-accent/50">
+          Estos datos se usan para identificar al estudio en los escritos y reportes. Se guardan localmente y solo tu los ves.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+        <Field label="Nombre del Estudio" value={profile.firmName} onChange={(v) => update('firmName', v)} placeholder="Estudio Juridico Garcia & Asociados" />
+        <Field label="Abogado a cargo" value={profile.lawyerName} onChange={(v) => update('lawyerName', v)} placeholder="Juan Perez Garcia" />
+        <Field label="N° de Colegiatura (CAL)" value={profile.calNumber} onChange={(v) => update('calNumber', v)} placeholder="CAL 12345" />
+        <Field label="Ciudad" value={profile.city} onChange={(v) => update('city', v)} placeholder="Lima" />
+        <Field label="Direccion" value={profile.address} onChange={(v) => update('address', v)} placeholder="Av. Javier Prado 123, San Isidro" />
+        <Field label="Telefono" value={profile.phone} onChange={(v) => update('phone', v)} placeholder="+51 999 888 777" />
+        <Field label="Email de contacto" value={profile.contactEmail || userEmail} onChange={(v) => update('contactEmail', v)} placeholder="contacto@estudio.com" />
+      </div>
+
+      <div className="flex items-center gap-4">
+        <button
+          onClick={handleSave}
+          className="flex items-center gap-3 rounded-xl bg-brand-ivory px-8 py-4 font-bold tracking-tight text-brand-black transition-all hover:bg-white"
+        >
+          <Save className="h-4 w-4" />
+          Guardar perfil
+        </button>
+        {saved && (
+          <span className="inline-flex items-center gap-2 text-sm text-emerald-400">
+            <CheckCircle2 className="h-4 w-4" />
+            Guardado
+          </span>
+        )}
       </div>
     </div>
-    <button className="flex items-center gap-3 rounded-xl bg-brand-ivory px-8 py-4 font-bold tracking-tight text-brand-black transition-all hover:bg-white">
-      <Save className="h-4 w-4" /> Consolidar Cambios
-    </button>
-  </div>
-);
+  );
+};
 
-const AIPreferences = () => (
-  <div className="space-y-10">
-    <h3 className="text-2xl font-serif font-medium text-brand-ivory">Parametros de Inteligencia</h3>
-    <div className="max-w-2xl space-y-8">
-      <SelectField label="Tono de Interaccion" options={['Profesional y Analitico', 'Sintetico y Directo', 'Consultivo Explicativo']} />
-      <SelectField label="Especializacion de Nodos" options={['Derecho Laboral', 'Derecho Civil', 'Derecho Corporativo']} />
-      <ToggleField label="Indexacion automatica de nuevos activos documentales" defaultChecked />
-      <ToggleField label="Incluir protocolo de descargo en respuestas generativas" defaultChecked />
-    </div>
-    <button className="flex items-center gap-3 rounded-xl bg-brand-ivory px-8 py-4 font-bold tracking-tight text-brand-black transition-all hover:bg-white">
-      <Save className="h-4 w-4" /> Guardar Preferencias
-    </button>
-  </div>
-);
+// ============================================================================
+// Preferencias de IA
+// ============================================================================
+const AIPreferences = ({ userId }) => {
+  const [prefs, setPrefs] = useState(() => loadAllPreferences(userId).ai);
+  const [saved, setSaved] = useState(false);
 
-const Integrations = () => (
-  <div className="space-y-10">
-    <h3 className="text-2xl font-serif font-medium text-brand-ivory">Conexiones de Red</h3>
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-      <IntegrationCard title="Supabase" description="Infraestructura de datos y autenticacion" status="Conectado" />
-      <DriveIntegrationCard />
-      <IntegrationCard title="WhatsApp API" description="Protocolo de notificaciones automatizadas" status="Desconectado" />
-      <IntegrationCard title="RENIEC / SUNAT" description="Validacion de identidades soberanas" status="Proximamente" />
+  useEffect(() => {
+    setPrefs(loadAllPreferences(userId).ai);
+  }, [userId]);
+
+  const update = (field, value) => {
+    setPrefs((prev) => ({ ...prev, [field]: value }));
+    setSaved(false);
+  };
+
+  const handleSave = () => {
+    saveAiPreferences(userId, prefs);
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2500);
+  };
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <h3 className="text-2xl font-serif font-medium text-brand-ivory">Preferencias de Inteligencia Artificial</h3>
+        <p className="mt-2 text-sm text-brand-accent/50">
+          Define como se comporta la IA por defecto en tus expedientes.
+        </p>
+      </div>
+
+      <div className="max-w-2xl space-y-8">
+        <SelectField
+          label="Tono de las respuestas"
+          value={prefs.tone}
+          onChange={(v) => update('tone', v)}
+          options={TONE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        />
+        <SelectField
+          label="Urgencia por defecto al crear un expediente"
+          value={prefs.defaultUrgency}
+          onChange={(v) => update('defaultUrgency', v)}
+          options={URGENCY_OPTIONS.map((o) => ({ value: o, label: o }))}
+        />
+        <ToggleField
+          label="Analisis IA automatico al cargar PDFs"
+          description="La IA extrae resumen, plazos y enlaces de audiencia de cada PDF."
+          checked={prefs.autoIndexDocuments}
+          onChange={(v) => update('autoIndexDocuments', v)}
+        />
+        <ToggleField
+          label="Analisis IA automatico del Radar Normativo"
+          description="Al cargar El Peruano, las 3-4 normas mas relevantes se analizan solas en background."
+          checked={prefs.autoAnalyzeNewNorms}
+          onChange={(v) => update('autoAnalyzeNewNorms', v)}
+        />
+        <ToggleField
+          label="Guardar historial de chat por expediente"
+          description="Las conversaciones con la IA se persisten en Supabase y reaparecen al reabrir el caso."
+          checked={prefs.saveChatHistory}
+          onChange={(v) => update('saveChatHistory', v)}
+        />
+      </div>
+
+      <div className="rounded-lg border border-white/[0.05] bg-black/20 p-5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-gold">Proveedor actual</p>
+        <p className="mt-2 text-sm text-brand-ivory/80">
+          Groq &middot; modelo <span className="font-mono text-brand-gold">llama-3.3-70b-versatile</span>
+        </p>
+        <p className="mt-1 text-xs text-brand-accent/45">
+          El cambio de modelo o proveedor se hace desde variables de entorno del backend (.env).
+        </p>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <button
+          onClick={handleSave}
+          className="flex items-center gap-3 rounded-xl bg-brand-ivory px-8 py-4 font-bold tracking-tight text-brand-black transition-all hover:bg-white"
+        >
+          <Save className="h-4 w-4" />
+          Guardar preferencias
+        </button>
+        {saved && (
+          <span className="inline-flex items-center gap-2 text-sm text-emerald-400">
+            <CheckCircle2 className="h-4 w-4" />
+            Guardado
+          </span>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
+// ============================================================================
+// Notificaciones
+// ============================================================================
+const NotificationPreferences = ({ userId }) => {
+  const [prefs, setPrefs] = useState(() => loadAllPreferences(userId).notifications);
+  const [permission, setPermission] = useState(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
+  );
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setPrefs(loadAllPreferences(userId).notifications);
+  }, [userId]);
+
+  const update = (field, value) => {
+    setPrefs((prev) => ({ ...prev, [field]: value }));
+    setSaved(false);
+  };
+
+  const requestPermission = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    const result = await Notification.requestPermission();
+    setPermission(result);
+    if (result === 'granted') update('browserNotifications', true);
+  };
+
+  const handleSave = () => {
+    saveNotificationPreferences(userId, prefs);
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2500);
+  };
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <h3 className="text-2xl font-serif font-medium text-brand-ivory">Notificaciones</h3>
+        <p className="mt-2 text-sm text-brand-accent/50">
+          Controla como LUSTI te avisa cuando hay algo importante.
+        </p>
+      </div>
+
+      <div className="max-w-2xl space-y-8">
+        {permission === 'unsupported' ? (
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-200/80">
+            <AlertTriangle className="mr-2 inline h-4 w-4" />
+            Tu navegador no soporta notificaciones del sistema.
+          </div>
+        ) : (
+          <div className="rounded-lg border border-white/[0.05] bg-black/20 p-5">
+            <p className="text-sm text-brand-ivory/80">
+              Estado del permiso:{' '}
+              <span className={`font-bold ${permission === 'granted' ? 'text-emerald-400' : 'text-amber-300'}`}>
+                {permission === 'granted' ? 'Concedido' : permission === 'denied' ? 'Bloqueado' : 'Pendiente'}
+              </span>
+            </p>
+            {permission === 'default' && (
+              <button
+                onClick={requestPermission}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg border border-brand-gold/30 bg-brand-gold/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-brand-gold transition-colors hover:bg-brand-gold/15"
+              >
+                Solicitar permiso
+              </button>
+            )}
+          </div>
+        )}
+
+        <ToggleField
+          label="Avisarme cuando el Radar Normativo detecte normas relevantes"
+          description="Usa las notificaciones del navegador si estan activas."
+          checked={prefs.normAlerts}
+          onChange={(v) => update('normAlerts', v)}
+        />
+        <ToggleField
+          label="Avisarme 24h antes de un plazo critico"
+          description="Para expedientes con fechas proximas (HOY, 3 dias, vencidos)."
+          checked={prefs.deadlineAlerts}
+          onChange={(v) => update('deadlineAlerts', v)}
+        />
+      </div>
+
+      <div className="flex items-center gap-4">
+        <button
+          onClick={handleSave}
+          className="flex items-center gap-3 rounded-xl bg-brand-ivory px-8 py-4 font-bold tracking-tight text-brand-black transition-all hover:bg-white"
+        >
+          <Save className="h-4 w-4" />
+          Guardar preferencias
+        </button>
+        {saved && (
+          <span className="inline-flex items-center gap-2 text-sm text-emerald-400">
+            <CheckCircle2 className="h-4 w-4" />
+            Guardado
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// Conexiones (solo Supabase y Google Drive)
+// ============================================================================
+const Integrations = ({ userEmail }) => {
+  return (
+    <div className="space-y-10">
+      <div>
+        <h3 className="text-2xl font-serif font-medium text-brand-ivory">Conexiones</h3>
+        <p className="mt-2 text-sm text-brand-accent/50">
+          Servicios externos vinculados a tu cuenta.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <SupabaseCard userEmail={userEmail} />
+        <DriveIntegrationCard />
+      </div>
+    </div>
+  );
+};
+
+const SupabaseCard = ({ userEmail }) => {
+  const [info, setInfo] = useState({ status: 'checking', detail: '' });
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!isSupabaseConfigured || !supabase) {
+        if (!cancelled) setInfo({ status: 'local', detail: 'Supabase no esta configurado en este entorno.' });
+        return;
+      }
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (cancelled) return;
+        if (error || !data?.user) {
+          setInfo({ status: 'desconectado', detail: error?.message || 'Sin sesion activa.' });
+        } else {
+          setInfo({ status: 'conectado', detail: data.user.email || 'Sesion activa' });
+        }
+      } catch (err) {
+        if (!cancelled) setInfo({ status: 'desconectado', detail: err?.message || 'Error de conexion.' });
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [userEmail]);
+
+  const tone =
+    info.status === 'conectado'
+      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
+      : info.status === 'local'
+        ? 'border-amber-500/20 bg-amber-500/10 text-amber-300'
+        : 'border-red-400/20 bg-red-500/10 text-red-300';
+
+  return (
+    <div className="group rounded-lg border border-white/[0.05] bg-white/[0.01] p-6 transition-colors hover:bg-white/[0.03]">
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h4 className="flex items-center gap-2 text-xl font-serif font-medium text-brand-ivory">
+            <Database className="h-5 w-5 text-brand-gold" />
+            Supabase
+          </h4>
+          <p className="mt-2 text-sm font-light leading-relaxed text-brand-accent/40">
+            Autenticacion, base de datos y sincronizacion de expedientes.
+          </p>
+        </div>
+        <span className={`rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-widest ${tone}`}>
+          {info.status === 'checking' ? 'Verificando' : info.status === 'conectado' ? 'Conectado' : info.status === 'local' ? 'Local' : 'Desconectado'}
+        </span>
+      </div>
+      <p className="text-sm text-brand-accent/60">{info.detail || 'Sondeando sesion...'}</p>
+    </div>
+  );
+};
 
 const DriveIntegrationCard = () => {
   const [token, setToken] = useState(() => getStoredDriveToken());
@@ -111,72 +425,33 @@ const DriveIntegrationCard = () => {
 
   useEffect(() => {
     let cancelled = false;
-
     const run = async () => {
       setLoading(true);
       setError('');
-
       try {
         const nextToken = token || getStoredDriveToken();
         if (!nextToken) {
-          if (!cancelled) {
-            setFolders([]);
-            setFiles([]);
-          }
+          if (!cancelled) { setFolders([]); setFiles([]); }
           return;
         }
-
         const [nextFolders, nextFiles] = await Promise.all([
           listDriveFolders(nextToken),
           listDriveFiles(nextToken),
         ]);
-
         if (!cancelled) {
           setFolders(nextFolders);
           setFiles(nextFiles);
         }
       } catch (driveError) {
-        if (!cancelled) {
-          setError(driveError.message || 'No se pudo leer Drive.');
-        }
+        if (!cancelled) setError(driveError.message || 'No se pudo leer Drive.');
         console.warn(driveError);
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     };
-
     run();
-
-    const unsubscribe = onDriveTokenMessage((nextToken) => {
-      if (cancelled) return;
-      setToken(nextToken);
-    });
-
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, [token]);
-
-  useEffect(() => {
-    const refresh = () => {
-      const nextToken = token || getStoredDriveToken();
-      if (nextToken) {
-        setToken(nextToken);
-      }
-    };
-
-    const intervalId = window.setInterval(refresh, 60000);
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', refresh);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener('focus', refresh);
-      document.removeEventListener('visibilitychange', refresh);
-    };
+    const unsubscribe = onDriveTokenMessage((nextToken) => { if (!cancelled) setToken(nextToken); });
+    return () => { cancelled = true; unsubscribe(); };
   }, [token]);
 
   const connect = async () => {
@@ -208,7 +483,9 @@ const DriveIntegrationCard = () => {
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h4 className="text-xl font-serif font-medium text-brand-ivory">Google Drive</h4>
-          <p className="mt-2 text-sm font-light leading-relaxed text-brand-accent/40">Boveda de activos documentales externa</p>
+          <p className="mt-2 text-sm font-light leading-relaxed text-brand-accent/40">
+            Boveda de activos documentales externa
+          </p>
         </div>
         <span className={`rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-widest ${
           token ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' : 'border-white/10 bg-white/5 text-brand-accent/40'
@@ -248,9 +525,6 @@ const DriveIntegrationCard = () => {
         <DriveList title="Carpetas" items={folders} />
         <DriveList title="Archivos" items={files} />
       </div>
-      <p className="mt-4 text-[10px] uppercase tracking-widest text-brand-accent/35">
-        Se sincroniza automaticamente cada 60 segundos y al volver a enfocar la ventana.
-      </p>
     </div>
   );
 };
@@ -282,58 +556,53 @@ const DriveList = ({ title, items }) => (
   </div>
 );
 
-const IntegrationCard = ({ title, description, status }) => (
-  <div className="group rounded-lg border border-white/[0.05] bg-white/[0.01] p-6 transition-colors hover:bg-white/[0.03]">
-    <div className="mb-6 flex items-start justify-between">
-      <h4 className="text-xl font-serif font-medium text-brand-ivory">{title}</h4>
-      <span
-        className={`rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-widest ${
-          status === 'Conectado'
-            ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
-            : status === 'Desconectado'
-              ? 'border-white/10 bg-white/5 text-brand-accent/40'
-              : 'border-brand-gold/20 bg-brand-gold/10 text-brand-gold'
-        }`}
-      >
-        {status}
-      </span>
-    </div>
-    <p className="mb-8 text-sm font-light leading-relaxed text-brand-accent/40">{description}</p>
-    <button className="text-xs font-bold uppercase tracking-widest text-brand-gold transition-colors hover:text-brand-ivory">
-      {status === 'Conectado' ? 'Terminar Conexion' : 'Inicializar Enlace'}
-    </button>
+// ============================================================================
+// Helpers
+// ============================================================================
+const Field = ({ label, value, onChange, placeholder }) => (
+  <div className="space-y-2">
+    <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/40">{label}</label>
+    <input
+      type="text"
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-4 text-brand-ivory outline-none placeholder:text-brand-accent/25 focus:border-brand-gold/40"
+    />
   </div>
 );
 
-const ReadOnlyField = ({ label, value }) => (
+const SelectField = ({ label, value, onChange, options }) => (
   <div className="space-y-2">
     <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/40">{label}</label>
-    <input className="w-full rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-4 text-brand-ivory outline-none" value={value} readOnly />
-  </div>
-);
-
-const EditableField = ({ label, value }) => (
-  <div className="space-y-2">
-    <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/40">{label}</label>
-    <input className="w-full rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-4 text-brand-ivory outline-none focus:border-brand-gold/40" defaultValue={value} />
-  </div>
-);
-
-const SelectField = ({ label, options }) => (
-  <div className="space-y-2">
-    <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/40">{label}</label>
-    <select className="w-full appearance-none rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-4 text-brand-ivory outline-none focus:border-brand-gold/40">
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full appearance-none rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-4 text-brand-ivory outline-none focus:border-brand-gold/40"
+    >
       {options.map((option) => (
-        <option key={option} className="bg-brand-dark">{option}</option>
+        <option key={option.value} value={option.value} className="bg-brand-dark">
+          {option.label}
+        </option>
       ))}
     </select>
   </div>
 );
 
-const ToggleField = ({ label, defaultChecked }) => (
-  <label className="flex cursor-pointer items-center gap-4">
-    <input type="checkbox" defaultChecked={defaultChecked} className="h-5 w-5 rounded border-white/[0.1] bg-white/[0.02] text-brand-gold focus:ring-brand-gold" />
-    <span className="text-sm font-light text-brand-accent/60 transition-colors hover:text-brand-ivory">{label}</span>
+const ToggleField = ({ label, description, checked, onChange }) => (
+  <label className="flex cursor-pointer items-start gap-4">
+    <input
+      type="checkbox"
+      checked={!!checked}
+      onChange={(e) => onChange(e.target.checked)}
+      className="mt-1 h-5 w-5 rounded border-white/[0.1] bg-white/[0.02] text-brand-gold focus:ring-brand-gold"
+    />
+    <span className="flex-1">
+      <span className="block text-sm font-light text-brand-ivory transition-colors">{label}</span>
+      {description && (
+        <span className="mt-1 block text-xs text-brand-accent/45">{description}</span>
+      )}
+    </span>
   </label>
 );
 

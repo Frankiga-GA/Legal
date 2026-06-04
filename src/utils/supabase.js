@@ -47,4 +47,11 @@ if (placeholderDetected) {
 
 export const isSupabaseConfigured = Boolean(supabase);
 
+export const getSupabaseSession = async () => {
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) return null;
+  return data?.session || null;
+};
+
 export { supabase };

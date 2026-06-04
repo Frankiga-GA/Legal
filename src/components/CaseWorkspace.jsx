@@ -14,14 +14,17 @@ import {
   User,
   ExternalLink,
   ChevronRight,
-  Globe
+  Globe,
+  Video,
+  Pencil
 } from 'lucide-react';
 // src/components/CaseWorkspace.jsx
 import toast, { Toaster } from 'react-hot-toast';
 
 import { askGeminiAboutCase, isGeminiConfigured, extractResolutionDetails } from '../services/geminiService';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
-import { getCases, updateCaseAsync } from '../services/caseStore';
+import { getCases, updateCaseAsync, deleteCaseAsync } from '../services/caseStore';
+import { loadCaseChats, saveCaseChat, clearCaseChats } from '../services/chatHistoryStore';
 
 const CaseWorkspace = ({ caseId, onClose }) => {
   const [caseData, setCaseData] = useState(null);
@@ -38,6 +41,10 @@ const CaseWorkspace = ({ caseId, onClose }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [aiMessages, setAiMessages] = useState([]);
 
+  // Audiencia (link de la audiencia virtual)
+  const [editingHearing, setEditingHearing] = useState(false);
+  const [hearingInput, setHearingInput] = useState('');
+
   useEffect(() => {
     const allCases = getCases();
     const data = allCases.find(c => c.id === caseId);
@@ -47,10 +54,19 @@ const CaseWorkspace = ({ caseId, onClose }) => {
         setAiMessages([
           {
             role: 'ai',
-            content: `Hola. Estoy analizando el expediente ${data.id}. Puedo resumir los documentos, redactar escritos, buscar fechas o aclararte el impacto de las normas. ¿Qué necesitas?`,
+            content: `¡Hola! Soy tu asistente para el caso ${data.id}. Ya tengo el expediente a la vista. Contame en qué te ayudo: resúmenes, plazos críticos, redacción de escritos, análisis de riesgos o lo que se te ocurra.`,
           },
         ]);
       }
+      loadCaseChats(caseId).then(({ messages, error }) => {
+        if (error) {
+          console.warn('No se pudo cargar el historial de chat.', error.message);
+          return;
+        }
+        if (messages && messages.length > 0) {
+          setAiMessages(messages);
+        }
+      });
     }
   }, [caseId]);
 
@@ -158,6 +174,38 @@ const CaseWorkspace = ({ caseId, onClose }) => {
     handleUpdate({ documents: documents.filter((doc) => doc.id !== docId) });
   };
 
+  const handleDeleteDate = (dateId) => {
+    if (!window.confirm("¿Eliminar este plazo?")) return;
+    handleUpdate({ importantDates: importantDates.filter((d) => d.id !== dateId) });
+  };
+
+  // Marca o desmarca un plazo como completado (cambia el status)
+  const handleToggleDateStatus = (item) => {
+    const newStatus = item.status === 'Completado' ? 'Pendiente' : 'Completado';
+    handleUpdate({
+      importantDates: importantDates.map((d) => d.id === item.id ? { ...d, status: newStatus } : d),
+    });
+  };
+
+  const handleDeleteNote = (noteId) => {
+    if (!window.confirm("¿Eliminar esta nota?")) return;
+    handleUpdate({ notes: notes.filter((n) => n.id !== noteId) });
+  };
+
+  const handleDeleteCase = async () => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar el expediente ${caseData.id} de ${caseData.clientName}? Esta acción borrará permanentemente todos sus documentos, fechas, notas y resúmenes.`)) {
+      return;
+    }
+    try {
+      const allCases = getCases();
+      await deleteCaseAsync(allCases, caseData.id);
+      onClose();
+    } catch (error) {
+      console.error('Error al eliminar expediente:', error);
+      window.alert(`Error al eliminar: ${error?.message || 'desconocido'}`);
+    }
+  };
+
   const handleAddNote = (e) => {
     e.preventDefault();
     if (!noteText.trim()) return;
@@ -189,6 +237,9 @@ const CaseWorkspace = ({ caseId, onClose }) => {
     if (!question.trim() || isAiThinking) return;
 
     setAiMessages(prev => [...prev, { role: 'user', content: question }]);
+    saveCaseChat(caseData.id, 'user', question).catch((err) =>
+      console.warn('No se pudo guardar el mensaje en Supabase.', err?.message)
+    );
     setIsAiThinking(true);
 
     try {
@@ -201,10 +252,32 @@ const CaseWorkspace = ({ caseId, onClose }) => {
         officialReferences,
       });
       setAiMessages(prev => [...prev, { role: 'ai', content: response }]);
+      saveCaseChat(caseData.id, 'ai', response).catch((err) =>
+        console.warn('No se pudo guardar el mensaje en Supabase.', err?.message)
+      );
     } catch (error) {
-      setAiMessages(prev => [...prev, { role: 'ai', content: 'Hubo un error de conexión con la IA. Inténtalo de nuevo.' }]);
+      const errorMsg = 'Hubo un error de conexión con la IA. Inténtalo de nuevo.';
+      setAiMessages(prev => [...prev, { role: 'ai', content: errorMsg }]);
+      saveCaseChat(caseData.id, 'ai', errorMsg).catch(() => {});
     }
     setIsAiThinking(false);
+  };
+
+  const handleClearChat = async () => {
+    if (!window.confirm('¿Borrar todo el historial de conversación de este expediente?')) return;
+    setAiMessages([
+      {
+        role: 'ai',
+        content: `¡Hola! Soy tu asistente para el caso ${caseData.id}. Ya tengo el expediente a la vista. Contame en qué te ayudo: resúmenes, plazos críticos, redacción de escritos, análisis de riesgos o lo que se te ocurra.`,
+      },
+    ]);
+    const { error } = await clearCaseChats(caseData.id);
+    if (error) {
+      console.warn('No se pudo borrar el historial en Supabase.', error.message);
+      toast.error('No se pudo borrar el historial en Supabase.');
+    } else {
+      toast.success('Historial borrado.');
+    }
   };
 
   const handleAskAi = async (e) => {
@@ -221,7 +294,19 @@ const CaseWorkspace = ({ caseId, onClose }) => {
     { id: 'dates', label: 'Fechas', icon: Calendar },
     { id: 'notes', label: 'Notas', icon: MessageSquare },
     { id: 'official', label: 'Normas', icon: Gavel },
+    { id: 'hearing', label: 'Audiencia', icon: Video },
   ];
+
+  const handleSaveHearing = (e) => {
+    e?.preventDefault();
+    handleUpdate({ hearingLink: hearingInput.trim() });
+    setEditingHearing(false);
+  };
+
+  const handleStartEditHearing = () => {
+    setHearingInput(caseData.hearingLink || '');
+    setEditingHearing(true);
+  };
 
   return (
     <div className="flex h-full flex-col md:flex-row overflow-hidden bg-brand-black text-brand-ivory">
@@ -252,9 +337,18 @@ const CaseWorkspace = ({ caseId, onClose }) => {
             </div>
           </div>
           
-          <div className="hidden sm:flex gap-3 text-xs text-brand-accent font-medium">
-            <div className="flex flex-col items-center"><span className="text-lg font-bold text-brand-ivory">{documents.length}</span> Docs</div>
-            <div className="flex flex-col items-center"><span className="text-lg font-bold text-brand-ivory">{importantDates.length}</span> Plazos</div>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex gap-3 text-xs text-brand-accent font-medium">
+              <div className="flex flex-col items-center"><span className="text-lg font-bold text-brand-ivory">{documents.length}</span> Docs</div>
+              <div className="flex flex-col items-center"><span className="text-lg font-bold text-brand-ivory">{importantDates.length}</span> Plazos</div>
+            </div>
+            <button
+              onClick={handleDeleteCase}
+              className="rounded-lg border border-white/[0.08] p-2 text-brand-accent hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+              title="Eliminar expediente completo"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
@@ -374,7 +468,7 @@ const CaseWorkspace = ({ caseId, onClose }) => {
                       onChange={(e) => setDeadlineForm(prev => ({ ...prev, date: e.target.value }))}
                       className="w-full rounded-lg border border-white/[0.08] bg-brand-dark px-4 py-2.5 text-sm outline-none focus:border-brand-gold/50 focus:ring-2 focus:ring-zinc-100"
                     />
-                    <button type="submit" className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-brand-gold px-4 py-2.5 text-xs font-bold text-brand-ivory transition-colors hover:opacity-90 shadow-sm">
+                    <button type="submit" className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-brand-gold px-4 py-2.5 text-xs font-bold text-brand-black transition-colors hover:bg-white shadow-sm">
                       <Plus className="h-4 w-4" />
                       Guardar plazo
                     </button>
@@ -384,22 +478,69 @@ const CaseWorkspace = ({ caseId, onClose }) => {
 
               <div className="space-y-3">
                 {importantDates.length > 0 ? (
-                  importantDates.map((item, idx) => (
-                    <div key={item.id || idx} className="flex items-center justify-between rounded-lg border border-white/[0.08] bg-brand-dark p-4 shadow-sm">
-                      <div>
-                        <p className="text-sm font-bold text-brand-ivory">{item.title}</p>
-                        <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-brand-ivory">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {item.date}
-                        </p>
-                      </div>
-                      <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                        item.priority === 'Alta' ? 'bg-red-100 text-red-700' : 'bg-white/[0.05] text-brand-ivory'
-                      }`}>
-                        {item.priority}
-                      </span>
-                    </div>
-                  ))
+                  [...importantDates]
+                    .sort((a, b) => {
+                      // Pendientes primero, completados al final
+                      const aDone = a.status === 'Completado' ? 1 : 0;
+                      const bDone = b.status === 'Completado' ? 1 : 0;
+                      if (aDone !== bDone) return aDone - bDone;
+                      return 0;
+                    })
+                    .map((item, idx) => {
+                      const isDone = item.status === 'Completado';
+                      return (
+                        <div
+                          key={item.id || idx}
+                          className={`group flex items-center justify-between rounded-lg border p-4 shadow-sm transition-all ${
+                            isDone
+                              ? 'border-emerald-500/20 bg-emerald-500/[0.04] opacity-60 hover:opacity-80'
+                              : 'border-white/[0.08] bg-brand-dark hover:border-white/[0.12]'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            <button
+                              onClick={() => handleToggleDateStatus(item)}
+                              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                                isDone
+                                  ? 'border-emerald-500 bg-emerald-500 text-brand-black'
+                                  : 'border-brand-accent/40 hover:border-emerald-500 hover:bg-emerald-500/10'
+                              }`}
+                              title={isDone ? 'Reabrir plazo' : 'Marcar como completado'}
+                            >
+                              {isDone && <CheckCircle2 className="h-3.5 w-3.5" />}
+                            </button>
+                            <div className="min-w-0 flex-1">
+                              <p className={`text-sm font-bold ${isDone ? 'text-brand-accent line-through' : 'text-brand-ivory'}`}>
+                                {item.title}
+                              </p>
+                              <p className={`mt-1 flex items-center gap-1.5 text-xs font-semibold ${isDone ? 'text-brand-accent line-through' : 'text-brand-ivory'}`}>
+                                <Calendar className="h-3.5 w-3.5" />
+                                {item.date}
+                                {isDone && <span className="ml-1.5 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300 no-underline">✓ COMPLETADO</span>}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                              isDone
+                                ? 'bg-emerald-500/15 text-emerald-300'
+                                : item.priority === 'Alta'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-white/[0.05] text-brand-ivory'
+                            }`}>
+                              {isDone ? 'Hecho' : item.priority}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteDate(item.id)}
+                              className="rounded p-2 text-brand-accent opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+                              title="Eliminar plazo"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
                 ) : (
                   <div className="py-12 text-center text-brand-accent"><Calendar className="mx-auto mb-3 h-8 w-8" /><p className="text-sm">Sin vencimientos.</p></div>
                 )}
@@ -416,16 +557,23 @@ const CaseWorkspace = ({ caseId, onClose }) => {
                   placeholder="Anota acuerdos, llamadas o recordatorios del caso..."
                   className="h-24 w-full resize-none rounded-lg border border-white/[0.08] bg-brand-dark px-4 py-3 text-sm outline-none focus:border-brand-gold/50 focus:ring-2 focus:ring-zinc-100"
                 />
-                <button type="submit" className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-brand-gold px-4 py-2.5 text-xs font-bold text-brand-ivory transition-colors hover:opacity-90 shadow-sm">
+                <button type="submit" className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-brand-gold px-4 py-2.5 text-xs font-bold text-brand-black transition-colors hover:bg-white shadow-sm">
                   <Plus className="h-4 w-4" />
                   Agregar Nota
                 </button>
               </form>
               <div className="space-y-3">
                 {notes.map((note, idx) => (
-                  <div key={idx} className="rounded-lg border border-white/[0.08] bg-brand-dark p-4 shadow-sm">
+                  <div key={note.id || idx} className="group relative rounded-lg border border-white/[0.08] bg-brand-dark p-4 pr-12 shadow-sm hover:border-white/[0.12]">
                     <p className="text-sm text-brand-ivory">{note.text}</p>
                     <p className="mt-2 text-[10px] font-bold text-brand-accent">{note.date} • {note.author}</p>
+                    <button
+                      onClick={() => handleDeleteNote(note.id)}
+                      className="absolute right-3 top-3 rounded p-1.5 text-brand-accent opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+                      title="Eliminar nota"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -434,6 +582,86 @@ const CaseWorkspace = ({ caseId, onClose }) => {
           
           {activeTab === 'official' && (
             <div className="py-12 text-center text-brand-accent"><Gavel className="mx-auto mb-3 h-8 w-8" /><p className="text-sm">Sin normas vinculadas.</p></div>
+          )}
+
+          {activeTab === 'hearing' && (
+            <section className="space-y-5">
+              <div>
+                <h4 className="text-lg font-bold text-brand-ivory">Audiencia virtual</h4>
+                <p className="mt-1 text-xs text-brand-accent">El link se completa automáticamente al subir resoluciones. También podés pegarlo a mano.</p>
+              </div>
+
+              {caseData.hearingLink && !editingHearing ? (
+                <div className="rounded-xl border border-brand-gold/20 bg-brand-gold/[0.04] p-6 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-gold/15">
+                      <Video className="h-6 w-6 text-brand-gold" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-brand-ivory">Listo para conectarte</p>
+                      <p className="mt-1 break-all text-xs text-brand-accent">{caseData.hearingLink}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={caseData.hearingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg bg-brand-gold px-5 py-2.5 text-xs font-bold text-brand-black transition-colors hover:bg-white shadow-sm"
+                    >
+                      <Globe className="h-4 w-4" />
+                      Ingresar a la audiencia
+                    </a>
+                    <button
+                      onClick={handleStartEditHearing}
+                      className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-brand-dark px-4 py-2.5 text-xs font-bold text-brand-accent transition-colors hover:bg-white/[0.04]"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Cambiar link
+                    </button>
+                    <button
+                      onClick={() => handleUpdate({ hearingLink: '' })}
+                      className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-brand-dark px-4 py-2.5 text-xs font-bold text-brand-accent transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Quitar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleSaveHearing} className="rounded-xl border border-white/[0.08] bg-brand-black p-5 space-y-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-brand-accent/70">Link de la audiencia</p>
+                  <input
+                    type="url"
+                    value={hearingInput}
+                    onChange={(e) => setHearingInput(e.target.value)}
+                    placeholder="https://meet.google.com/xxx-yyyy-zzz o https://zoom.us/j/123456789"
+                    className="w-full rounded-lg border border-white/[0.08] bg-brand-dark px-4 py-3 text-sm outline-none focus:border-brand-gold/50 focus:ring-2 focus:ring-zinc-100"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={!hearingInput.trim()} className="inline-flex items-center gap-2 rounded-lg bg-brand-gold px-5 py-2.5 text-xs font-bold text-brand-black transition-colors hover:bg-white shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                      <Plus className="h-4 w-4" />
+                      Guardar link
+                    </button>
+                    {editingHearing && caseData.hearingLink && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingHearing(false)}
+                        className="rounded-lg border border-white/[0.08] bg-brand-dark px-4 py-2.5 text-xs font-bold text-brand-accent hover:bg-white/[0.04]"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
+                </form>
+              )}
+
+              <div className="rounded-lg border border-dashed border-white/[0.06] bg-white/[0.01] p-4 text-[11px] text-brand-accent/70">
+                <p className="font-semibold text-brand-accent">💡 Tip</p>
+                <p className="mt-1 leading-relaxed">Acepta links de Google Meet, Zoom, Microsoft Teams, Whereby o cualquier sala virtual. Si subís una resolución que mencione la audiencia, la IA detecta el link automáticamente.</p>
+              </div>
+            </section>
           )}
         </div>
       </div>
@@ -444,10 +672,17 @@ const CaseWorkspace = ({ caseId, onClose }) => {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-brand-ivory">
             <Bot className="h-5 w-5" />
           </div>
-          <div>
+          <div className="flex-1">
             <h3 className="text-sm font-bold text-brand-ivory">Asistente Legal del Caso</h3>
             <p className="text-[10px] uppercase tracking-wider text-brand-accent font-semibold">Contexto: {caseData.id}</p>
           </div>
+          <button
+            onClick={handleClearChat}
+            title="Borrar historial de conversación"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] text-brand-accent/60 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">

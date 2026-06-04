@@ -20,6 +20,7 @@ const toAppCase = (row) => ({
   lastUpdate: row.last_update,
   latestProgress: row.latest_progress || '',
   hearingLink: row.hearing_link || '',
+  counterparty: row.counterparty || '',
   urgency: row.urgency || 'Media',
   documents: Array.isArray(row.documents) ? row.documents : [],
   notes: Array.isArray(row.notes) ? row.notes : [],
@@ -37,6 +38,7 @@ const toDbCase = (caseData) => ({
   last_update: caseData.lastUpdate || new Date().toISOString().split('T')[0],
   latest_progress: caseData.latestProgress || '',
   hearing_link: caseData.hearingLink || '',
+  counterparty: caseData.counterparty || '',
   urgency: caseData.urgency || 'Media',
   documents: caseData.documents || [],
   notes: caseData.notes || [],
@@ -76,7 +78,7 @@ export const upsertSupabaseCase = async (caseData) => {
 
   const { error } = await supabase
     .from(TABLE_NAME)
-    .upsert(payload, { onConflict: 'id' });
+    .upsert(payload, { onConflict: 'id,user_id' });
 
   return { error, skipped: false };
 };

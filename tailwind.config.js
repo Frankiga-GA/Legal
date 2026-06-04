@@ -22,7 +22,22 @@ export default {
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-      }
+      },
+      animation: {
+        'fade-in-up': 'fadeInUp 500ms cubic-bezier(0.16, 1, 0.3, 1) both',
+        'fade-in': 'fadeIn 500ms ease-out both',
+        'fade-in-slow': 'fadeIn 700ms ease-out both',
+      },
+      keyframes: {
+        fadeInUp: {
+          '0%': { opacity: '0', transform: 'translateY(12px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+      },
     },
   },
   plugins: [],

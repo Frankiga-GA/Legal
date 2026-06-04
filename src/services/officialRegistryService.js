@@ -1,6 +1,7 @@
 import { mockOfficialRegistryItems } from '../data/mockOfficialRegistry';
+import { getSupabaseSession } from '../utils/supabase';
 
-const EL_PERUANO_SEARCH_URL = 'https://www.elperuano.pe/portal/buscador';
+const BACKEND_EL_PERUANO_URL = '/api/elperuano/search';
 
 const normalizeText = (value = '') => value.toString().trim().replace(/\s+/g, ' ');
 
@@ -66,27 +67,44 @@ const parseElPeruanoSearch = (html) => {
   });
 };
 
-export const fetchOfficialRegistryItems = async () => {
+export const fetchOfficialRegistryItems = async (query = '') => {
   try {
-    const response = await fetch(EL_PERUANO_SEARCH_URL, { mode: 'cors' });
-    if (!response.ok) throw new Error('El Peruano no respondio correctamente.');
+    const session = await getSupabaseSession();
+    const accessToken = session?.access_token;
+    if (!accessToken) throw new Error('Sesion expirada. Inicia sesion para consultar El Peruano.');
 
-    const html = await response.text();
-    const liveItems = parseElPeruanoSearch(html);
+    const params = new URLSearchParams();
+    const trimmed = (query || '').trim();
+    if (trimmed) params.set('q', trimmed);
+    params.set('pageSize', '10');
+    const url = `${BACKEND_EL_PERUANO_URL}?${params.toString()}`;
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      throw new Error(detail?.detail || 'El Peruano no respondio correctamente.');
+    }
+
+    const payload = await response.json();
+    const liveItems = Array.isArray(payload?.items) ? payload.items : [];
 
     if (liveItems.length === 0) throw new Error('No se encontraron resultados parseables.');
 
     return {
       items: liveItems,
-      source: 'live',
+      source: payload?.source || 'live',
+      query: payload?.query || trimmed,
       error: null,
-      checkedAt: new Date().toISOString(),
+      checkedAt: payload?.checkedAt || new Date().toISOString(),
     };
   } catch (error) {
     return {
       items: mockOfficialRegistryItems,
       source: 'curated-official-links',
       error,
+      query,
       checkedAt: new Date().toISOString(),
     };
   }

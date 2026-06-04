@@ -7,6 +7,18 @@ const DEMO_CASE_IDS = new Set(mockCases.map((caseItem) => caseItem.id));
 
 const cloneCases = (cases) => JSON.parse(JSON.stringify(cases));
 
+const generateCaseId = (cases) => {
+  const year = new Date().getFullYear();
+  const prefix = `EXP-${year}-`;
+  const maxNum = (Array.isArray(cases) ? cases : []).reduce((max, caseItem) => {
+    const match = /^EXP-\d{4}-(\d+)$/.exec(caseItem?.id || '');
+    if (!match) return max;
+    const num = parseInt(match[1], 10);
+    return Number.isFinite(num) && num > max ? num : max;
+  }, 0);
+  return `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
+};
+
 const mergeDemoDocuments = (caseData) => {
   const documents = Array.isArray(caseData.documents) ? caseData.documents : [];
   const demoDocuments = demoDocumentsByCaseId[caseData.id] || [];
@@ -20,6 +32,7 @@ const normalizeCase = (caseData) => ({
   ...caseData,
   latestProgress: caseData.latestProgress || 'Sin avance registrado.',
   hearingLink: caseData.hearingLink || '',
+  counterparty: caseData.counterparty || '',
   urgency: caseData.urgency || 'Media',
   documents: mergeDemoDocuments(caseData),
   notes: Array.isArray(caseData.notes) ? caseData.notes : [],
@@ -108,13 +121,15 @@ export const saveCases = (cases) => {
 };
 
 export const addCase = (cases, newCase) => {
-  const nextCases = [normalizeCase(newCase), ...cases];
+  const withId = newCase.id ? newCase : { ...newCase, id: generateCaseId(cases) };
+  const nextCases = [normalizeCase(withId), ...cases];
   saveCases(nextCases);
   return nextCases;
 };
 
 export const addCaseAsync = async (cases, newCase) => {
-  const normalizedCase = normalizeCase(newCase);
+  const withId = newCase.id ? newCase : { ...newCase, id: generateCaseId(cases) };
+  const normalizedCase = normalizeCase(withId);
   const nextCases = [normalizedCase, ...cases];
   saveCases(nextCases);
   const { error } = await upsertSupabaseCase(normalizedCase);

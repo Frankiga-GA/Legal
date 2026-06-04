@@ -4,6 +4,7 @@ import io
 import os
 import re
 import unicodedata
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -483,6 +484,160 @@ def health() -> dict[str, str]:
         "groq_model": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
         "auth_required": "yes" if os.getenv("SUPABASE_JWT_SECRET") else "no",
         "version": app.version,
+    }
+
+
+# =============================================================================
+# Proxy a El Peruano (evita CORS en el navegador)
+# =============================================================================
+# El frontend no puede hacer fetch directo a elperuano.pe porque el sitio no
+# envia Access-Control-Allow-Origin. Pasamos por aca, el backend no tiene
+# esa restriccion.
+EL_PERUANO_SEARCH_URL = "https://www.elperuano.pe/portal/buscador"
+EL_PERUANO_API_URL = "https://www.elperuano.pe/portal/_SearchNews"
+EL_PERUANO_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+)
+
+
+def _normalize_text(value: str) -> str:
+    return re.sub(r"\s+", " ", (value or "").strip())
+
+
+def _infer_category(text: str) -> str:
+    n = text.lower()
+    if "trabajo" in n or "laboral" in n or "sunafil" in n:
+        return "Laboral"
+    if "sunat" in n or "tribut" in n:
+        return "Tributario"
+    if "indecopi" in n or "consumidor" in n:
+        return "Consumidor"
+    if "contratacion" in n or "osce" in n:
+        return "Contrataciones"
+    if "empresa" in n or "societ" in n:
+        return "Corporativo"
+    if "penal" in n or "delito" in n:
+        return "Penal"
+    if "civil" in n or "propiedad" in n:
+        return "Civil"
+    return "General"
+
+
+def _infer_type(title: str) -> str:
+    n = title.lower()
+    if "decreto supremo" in n:
+        return "Decreto Supremo"
+    if "decreto legislativo" in n:
+        return "Decreto Legislativo"
+    if "resolucion" in n or "resolución" in n:
+        return "Resolucion"
+    if "ley " in n:
+        return "Ley"
+    if "sentencia" in n or "casacion" in n or "casación" in n:
+        return "Jurisprudencia"
+    return "Norma Legal"
+
+
+def _build_impact(category: str) -> str:
+    label = "el estudio" if category == "General" else f"la practica {category.lower()}"
+    return f"Revisar posible impacto en {label} y validar si corresponde vincularla a expedientes activos."
+
+
+def _parse_elperuano_dotnet_date(value: str | None) -> str:
+    """Convierte /Date(1773982800000)/ a YYYY-MM-DD."""
+    if not value:
+        return datetime.utcnow().date().isoformat()
+    match = re.search(r"/Date\((-?\d+)(?:[+-]\d+)?\)/", value)
+    if not match:
+        return datetime.utcnow().date().isoformat()
+    try:
+        ts_ms = int(match.group(1))
+        return datetime.utcfromtimestamp(ts_ms / 1000).date().isoformat()
+    except Exception:
+        return datetime.utcnow().date().isoformat()
+
+
+def _map_seccion_to_category(seccion: str, title: str) -> str:
+    text = f"{seccion or ''} {title or ''}".lower()
+    if "derecho" in text or "legal" in text:
+        # Si no hay pista adicional, devolvemos General para no inventar materia
+        return _infer_category(title)
+    return _infer_category(text)
+
+
+@app.get("/elperuano/search")
+async def elperuano_search(
+    q: str = "",
+    pageSize: int = 10,
+    _: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    """Proxy que consulta el buscador publico de El Peruano desde el servidor.
+
+    Acepta `?q=termino` para hacer una busqueda real (el endpoint oficial es
+    /portal/_SearchNews?claves=...). Si `q` viene vacio, devuelve los registros
+    mas recientes de la portada.
+    """
+    query = (q or "").strip()
+    page_size = max(1, min(int(pageSize or 10), 25))
+
+    headers = {
+        "User-Agent": EL_PERUANO_USER_AGENT,
+        "Accept": "application/json, text/plain, */*",
+        "Referer": EL_PERUANO_SEARCH_URL,
+    }
+    params = {"pageIndex": "1", "pageSize": str(page_size), "claves": query}
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=headers) as client:
+            response = await client.get(EL_PERUANO_API_URL, params=params)
+            response.raise_for_status()
+            payload = response.json()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"No se pudo consultar El Peruano: {exc}") from exc
+
+    if not isinstance(payload, list):
+        return {
+            "items": [],
+            "source": "empty",
+            "checkedAt": datetime.utcnow().isoformat() + "Z",
+            "query": query,
+            "error": None,
+        }
+
+    items: list[dict[str, Any]] = []
+    for index, raw in enumerate(payload):
+        title = _normalize_text(str(raw.get("vchTitulo") or ""))
+        if not title or len(title) < 8:
+            continue
+        url_path = str(raw.get("URLFriendLy") or "").lstrip("./").lstrip("/")
+        full_url = f"https://www.elperuano.pe/{url_path}" if url_path else "#"
+        seccion = _normalize_text(str(raw.get("Seccion") or ""))
+        date = _parse_elperuano_dotnet_date(raw.get("dtmFecha"))
+        description = _normalize_text(str(raw.get("vchDescripcion") or ""))
+        category = _map_seccion_to_category(seccion, title)
+        items.append({
+            "id": f"elperuano-{query or 'recientes'}-{index}-{date}",
+            "title": title,
+            "date": date,
+            "type": _infer_type(title),
+            "source": "El Peruano",
+            "entity": seccion or "Diario Oficial El Peruano",
+            "summary": description or "Resultado obtenido desde el buscador publico de El Peruano. Abre la fuente para revisar el texto completo.",
+            "impact": _build_impact(category),
+            "url": full_url,
+            "category": category,
+            "urgency": "Alta" if index < 2 else "Media",
+            "scrapedAt": f"Busqueda: {query}" if query else "Consulta en vivo",
+            "official": True,
+        })
+
+    return {
+        "items": items,
+        "source": "live" if items else "empty",
+        "checkedAt": datetime.utcnow().isoformat() + "Z",
+        "query": query,
+        "error": None,
     }
 
 

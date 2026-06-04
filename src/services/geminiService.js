@@ -339,13 +339,22 @@ const extractFirstJsonObject = (text) => {
   throw new Error('No se encontro un JSON valido en la respuesta.');
 };
 
+const MAX_RESOLUTION_CHARS = 18000;
+
+const truncateForAi = (text = '') => {
+  if (!text || text.length <= MAX_RESOLUTION_CHARS) return text;
+  const head = text.slice(0, MAX_RESOLUTION_CHARS);
+  return `${head}\n\n[... texto truncado para analisis ...]`;
+};
+
 export const extractResolutionDetails = async (documentText) => {
   if (!isGeminiConfigured) {
     return simulateLocalResolutionExtraction(documentText);
   }
+  const trimmedText = truncateForAi(documentText);
   try {
     const text = await askBackend({
-      prompt: buildResolutionPrompt(documentText),
+      prompt: buildResolutionPrompt(trimmedText),
       temperature: 0.1,
       maxOutputTokens: 2000,
       responseJson: true,
