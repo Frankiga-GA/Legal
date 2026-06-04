@@ -5,14 +5,13 @@ import {
   Bot,
   CheckCircle2,
   FileText,
-  Globe,
   Lock,
   Mail,
   Scale,
   ShieldCheck,
   UserPlus,
 } from 'lucide-react';
-import { signInWithEmail, signInWithGoogle, signUpWithEmail } from '../services/authService';
+import { signInWithEmail, signUpWithEmail } from '../services/authService';
 
 const LoginPage = ({ onLogin, onBack }) => {
   const [mode, setMode] = useState('login');
@@ -65,21 +64,6 @@ const LoginPage = ({ onLogin, onBack }) => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setError('');
-    setNotice('');
-    setIsSubmitting(true);
-
-    try {
-      await signInWithGoogle();
-      setNotice('Abriendo Google para continuar con el acceso.');
-    } catch (authError) {
-      setError(getFriendlyAuthError(authError.message));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div className="min-h-screen overflow-hidden bg-brand-black font-sans text-brand-ivory">
       <div className="grid min-h-screen lg:grid-cols-[0.92fr_1.08fr]">
@@ -121,22 +105,6 @@ const LoginPage = ({ onLogin, onBack }) => {
               <ModeButton active={mode === 'register'} onClick={() => switchMode('register', setMode, setError, setNotice)}>
                 Crear cuenta
               </ModeButton>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={isSubmitting}
-              className="mb-6 flex w-full items-center justify-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] py-4 font-bold tracking-tight text-brand-ivory transition-all hover:border-brand-gold/30 hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Globe className="h-5 w-5 text-brand-gold" />
-              Continuar con Google
-            </button>
-
-            <div className="mb-6 flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/[0.08]"></div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-brand-accent/35">o con correo</span>
-              <div className="h-px flex-1 bg-white/[0.08]"></div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
