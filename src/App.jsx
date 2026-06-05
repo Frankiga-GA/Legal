@@ -132,23 +132,25 @@ function App() {
         } catch {
           /* noop */
         }
-        if (channel) {
-          channel.postMessage({ type: 'AUTH_COMPLETE', tabId });
+        if (channelRef.current) {
+          channelRef.current.postMessage({ type: 'AUTH_COMPLETE', tabId });
         }
       } else {
         // Pestana secundaria: detecta si el SIGNED_IN lo disparo esta
         // misma pestana (login con password) o si vino por sync desde
         // otra pestana (magic link abierto en una ventana nueva).
         let selfTriggered = false;
+        let dismissed = false;
         try {
           selfTriggered = window.sessionStorage.getItem('lusti_self_auth') === '1';
           if (selfTriggered) {
             window.sessionStorage.removeItem('lusti_self_auth');
           }
+          dismissed = window.sessionStorage.getItem('lusti_overlay_dismissed') === '1';
         } catch {
           /* noop */
         }
-        if (!selfTriggered) {
+        if (!selfTriggered && !dismissed) {
           setShowAlreadyLoggedIn(true);
         }
       }
