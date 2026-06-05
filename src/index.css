@@ -159,6 +159,7 @@
  * Override de colores de texto hardcodeados (text-slate-X, text-sky-X,
  * text-amber-X) en modo claro. En modo oscuro conservan su tono claro.
  * ============================================================================ */
+.theme-light .text-white { color: var(--text-on-light-5); }
 .theme-light .text-slate-50 { color: var(--text-on-light-5); }
 .theme-light .text-slate-100 { color: var(--text-on-light-5); }
 .theme-light .text-slate-200 { color: var(--text-on-light-4); }

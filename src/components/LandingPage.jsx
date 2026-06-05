@@ -85,7 +85,7 @@ const LandingPage = ({ onGetStarted }) => {
         <div className="relative z-10 mx-auto flex min-h-[92vh] max-w-7xl flex-col px-6 py-7">
           <nav className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="rounded-lg bg-brand-gold p-3 text-white">
+              <div className="rounded-lg bg-brand-gold p-3 text-brand-black">
                 <Scale className="h-5 w-5" />
               </div>
               <div>
@@ -120,7 +120,7 @@ const LandingPage = ({ onGetStarted }) => {
               <div className="flex flex-col gap-4 sm:flex-row">
                 <button
                   onClick={onGetStarted}
-                  className="group inline-flex items-center justify-center gap-3 rounded-lg bg-brand-gold px-8 py-4 font-bold text-white transition-colors hover:bg-blue-600"
+                  className="group inline-flex items-center justify-center gap-3 rounded-lg bg-brand-gold px-8 py-4 font-bold text-brand-black transition-colors hover:bg-brand-ivory"
                 >
                   Ver demo privada
                   <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />

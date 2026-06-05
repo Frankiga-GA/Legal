@@ -730,7 +730,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
                   msg.role === 'user' ? 'flex-row-reverse' : ''
                 }`}
               >
-                <div className={`mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${msg.role === 'ai' ? 'bg-brand-gold text-white shadow-none' : 'border border-white/[0.08] bg-brand-dark text-brand-accent shadow-none'}`}>
+                <div className={`mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${msg.role === 'ai' ? 'bg-brand-gold text-brand-black shadow-none' : 'border border-white/[0.08] bg-brand-dark text-brand-accent shadow-none'}`}>
                   {msg.role === 'ai' ? (
                     <Bot className="h-5 w-5" />
                   ) : msg.role === 'file' ? (
@@ -765,7 +765,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
 
             {isTyping && (
               <div className="flex gap-4 sm:gap-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-gold text-white shadow-none">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-gold text-brand-black shadow-none">
                   <Bot className="h-5 w-5" />
                 </div>
                 <div className="flex items-center gap-2 opacity-60">
@@ -829,7 +829,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
 
               <button
                 onClick={handleSend}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg bg-brand-gold text-white transition-colors hover:bg-brand-gold/80 disabled:opacity-50 disabled:bg-slate-300 disabled:text-brand-accent"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg bg-brand-gold text-brand-black transition-colors hover:bg-brand-ivory disabled:opacity-50 disabled:bg-slate-300 disabled:text-brand-accent"
                 disabled={!input.trim() || isTyping}
               >
                 <Send className="h-5 w-5" />
@@ -872,7 +872,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
                       type="button"
                       onClick={() => handleGenerateFile('pdf')}
                       disabled={Boolean(fileGenerationStatus?.startsWith('Generando'))}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-brand-gold px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 shadow-none disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-brand-gold px-3 py-1.5 text-xs font-bold text-brand-black transition-colors hover:bg-brand-ivory shadow-none disabled:opacity-50"
                     >
                       <Download className="h-4 w-4" />
                       PDF
