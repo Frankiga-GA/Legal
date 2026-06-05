@@ -15,6 +15,7 @@ import ElPeruano from './components/ElPeruano';
 import LegalMonitor from './components/LegalMonitor';
 import DriveVault from './components/DriveVault';
 import DeadlineCalculator from './components/DeadlineCalculator';
+import CalendarView from './components/CalendarView';
 import LegalPage from './components/LegalPage';
 import { getCurrentSession, onAuthStateChange, signOut } from './services/authService';
 import { getStoredDriveToken, onDriveTokenChange, onDriveTokenMessage } from './services/googleDriveService';
@@ -168,6 +169,11 @@ function App() {
       case 'global-chat': return <GlobalChat onBack={() => setActiveTab('ai-chat')} />;
       case 'elperuano': return <ElPeruano />;
       case 'deadlines': return <DeadlineCalculator />;
+      case 'calendar': return (
+        <CalendarView
+          onOpenCase={(id) => { setActiveCaseId(id); setActiveTab('case-workspace'); }}
+        />
+      );
       case 'settings': return <Settings session={session} />;
       default: return <div className="p-8 font-serif italic text-slate-400">Sección en construcción</div>;
     }
