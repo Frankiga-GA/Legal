@@ -46,6 +46,35 @@ app = FastAPI(title="LUSTI Document Backend", version="0.2.0")
 
 
 # =============================================================================
+# Strip del prefijo `/api`
+# =============================================================================
+# En produccion (Vercel) Vercel invoca esta serverless function con la ruta
+# ORIGINAL del request (ej. `/api/upload`). En local, el proxy de Vite ya
+# recorta el prefijo antes de llegar aca. Para que el mismo backend funcione
+# en ambos entornos sin duplicar rutas, este middleware recorta `/api/...`
+# -> `/...` en el scope ASGI antes de que FastAPI haga el matching.
+# =============================================================================
+from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+from starlette.requests import Request  # noqa: E402
+
+
+class StripApiPrefixMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.scope.get("path", "")
+        if path.startswith("/api/"):
+            new_path = "/" + path[len("/api/"):]
+            request.scope["path"] = new_path
+            request.scope["raw_path"] = new_path.encode("latin-1")
+        elif path == "/api":
+            request.scope["path"] = "/"
+            request.scope["raw_path"] = b"/"
+        return await call_next(request)
+
+
+app.add_middleware(StripApiPrefixMiddleware)
+
+
+# =============================================================================
 # CORS estricto
 # =============================================================================
 # Origenes leidos desde `ALLOWED_ORIGINS` (CSV) en backend/.env.
