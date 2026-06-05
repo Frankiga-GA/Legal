@@ -54,17 +54,17 @@ const AiMessage = ({ content, author = 'ai' }) => {
 
   return (
     <div>
-      <div className="text-sm text-slate-100">{renderInlineText(visible)}</div>
+      <div className="text-sm text-brand-ivory">{renderInlineText(visible)}</div>
 
       {isLong && (
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-sky-300 hover:text-sky-200"
+          className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-sky-300"
         >
           {expanded ? (
             <>
-              <ChevronUp className="h-3 w-3" /> Ver menos
+              <ChevronDown className="h-3 w-3" /> Ver menos
             </>
           ) : (
             <>
@@ -76,8 +76,8 @@ const AiMessage = ({ content, author = 'ai' }) => {
 
       {citations.length > 0 && (
         <div className="mt-3 border-t border-white/10 pt-3">
-          <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-            <Sparkles className="h-3 w-3 text-amber-300" />
+          <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-brand-accent">
+            <Sparkles className="h-3 w-3 text-amber-500" />
             Citas en esta respuesta
           </p>
           <div className="flex flex-wrap gap-1.5">
