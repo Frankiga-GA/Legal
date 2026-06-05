@@ -1,98 +1,17 @@
+// =============================================================================
+// src/services/personalizationStore.js
+// =============================================================================
+// Asistentes personalizados y prompts guardados, persistidos en Supabase.
+// Cada usuario solo ve sus propios registros (RLS en el server).
+// =============================================================================
+
+import { isSupabaseConfigured, supabase } from '../utils/supabase';
 import { getCurrentSession } from './authService';
 
-const ASSISTANTS_KEY = (userId) => `lusti-assistants-${userId || 'anonymous'}`;
-const PROMPTS_KEY = (userId) => `lusti-saved-prompts-${userId || 'anonymous'}`;
+const ASSISTANTS_TABLE = 'personal_assistants';
+const PROMPTS_TABLE = 'personal_prompts';
 
-const readJson = (key, fallback) => {
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : fallback;
-  } catch {
-    return fallback;
-  }
-};
-
-const writeJson = (key, value) => {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.warn('[personalization] No se pudo guardar en localStorage.', error);
-  }
-};
-
-const generateId = (prefix) => {
-  const random = Math.random().toString(36).slice(2, 10);
-  return `${prefix}_${Date.now()}_${random}`;
-};
-
-const resolveUserId = async () => {
-  try {
-    const session = await getCurrentSession();
-    return session?.user?.id || 'anonymous';
-  } catch {
-    return 'anonymous';
-  }
-};
-
-const sortByCreatedAtDesc = (list) =>
-  [...list].sort((a, b) => {
-    const at = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const bt = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return bt - at;
-  });
-
-// =============================================================================
-// Asistentes personalizados
-// =============================================================================
-
-export const listAssistants = async () => {
-  const userId = await resolveUserId();
-  return sortByCreatedAtDesc(readJson(ASSISTANTS_KEY(userId), []));
-};
-
-export const createAssistant = async ({ name, description = '', systemPrompt = '', specialty = '' }) => {
-  const cleanName = String(name || '').trim();
-  if (!cleanName) throw new Error('El asistente necesita un nombre.');
-  const userId = await resolveUserId();
-  const list = readJson(ASSISTANTS_KEY(userId), []);
-  const next = {
-    id: generateId('ast'),
-    name: cleanName,
-    description: String(description || '').trim(),
-    systemPrompt: String(systemPrompt || '').trim(),
-    specialty: String(specialty || '').trim(),
-    createdAt: new Date().toISOString(),
-  };
-  const updated = [next, ...list];
-  writeJson(ASSISTANTS_KEY(userId), updated);
-  return next;
-};
-
-export const updateAssistant = async (id, patch) => {
-  const userId = await resolveUserId();
-  const list = readJson(ASSISTANTS_KEY(userId), []);
-  const updated = list.map((item) => (item.id === id ? { ...item, ...patch, id: item.id } : item));
-  writeJson(ASSISTANTS_KEY(userId), updated);
-  return updated.find((item) => item.id === id) || null;
-};
-
-export const deleteAssistant = async (id) => {
-  const userId = await resolveUserId();
-  const list = readJson(ASSISTANTS_KEY(userId), []);
-  const updated = list.filter((item) => item.id !== id);
-  writeJson(ASSISTANTS_KEY(userId), updated);
-  return updated;
-};
-
-// =============================================================================
-// Prompts guardados
-// =============================================================================
-
-export const PROMPT_CATEGORIES = [
+const PROMPT_CATEGORIES = [
   'Analisis',
   'Redaccion',
   'Resumen',
@@ -100,9 +19,137 @@ export const PROMPT_CATEGORIES = [
   'Consulta general',
 ];
 
+const resolveUserId = async () => {
+  try {
+    const session = await getCurrentSession();
+    return session?.user?.id || null;
+  } catch {
+    return null;
+  }
+};
+
+const ensureAuth = async () => {
+  const userId = await resolveUserId();
+  if (!isSupabaseConfigured || !supabase || !userId) {
+    throw new Error('Necesitas iniciar sesion para gestionar asistentes o prompts.');
+  }
+  return userId;
+};
+
+const fromAssistantRow = (row) => ({
+  id: row.id,
+  name: row.name,
+  description: row.description || '',
+  systemPrompt: row.system_prompt || '',
+  specialty: row.specialty || '',
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const fromPromptRow = (row) => ({
+  id: row.id,
+  name: row.name,
+  content: row.content || '',
+  category: row.category || 'Consulta general',
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+// =============================================================================
+// Asistentes personalizados
+// =============================================================================
+
+export const listAssistants = async () => {
+  const userId = await resolveUserId();
+  if (!isSupabaseConfigured || !supabase || !userId) return [];
+
+  const { data, error } = await supabase
+    .from(ASSISTANTS_TABLE)
+    .select('id, name, description, system_prompt, specialty, created_at, updated_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.warn('[personalization] No se pudieron cargar los asistentes.', error.message);
+    return [];
+  }
+  return (data || []).map(fromAssistantRow);
+};
+
+export const createAssistant = async ({ name, description = '', systemPrompt = '', specialty = '' }) => {
+  const cleanName = String(name || '').trim();
+  if (!cleanName) throw new Error('El asistente necesita un nombre.');
+  const userId = await ensureAuth();
+
+  const { data, error } = await supabase
+    .from(ASSISTANTS_TABLE)
+    .insert({
+      user_id: userId,
+      name: cleanName,
+      description: String(description || '').trim(),
+      system_prompt: String(systemPrompt || '').trim(),
+      specialty: String(specialty || '').trim(),
+    })
+    .select('id, name, description, system_prompt, specialty, created_at, updated_at')
+    .single();
+
+  if (error) throw new Error(`No se pudo guardar el asistente: ${error.message}`);
+  return fromAssistantRow(data);
+};
+
+export const updateAssistant = async (id, patch) => {
+  const userId = await ensureAuth();
+  const update = { updated_at: new Date().toISOString() };
+  if (patch.name !== undefined) update.name = String(patch.name).trim();
+  if (patch.description !== undefined) update.description = String(patch.description).trim();
+  if (patch.systemPrompt !== undefined) update.system_prompt = String(patch.systemPrompt).trim();
+  if (patch.specialty !== undefined) update.specialty = String(patch.specialty).trim();
+
+  const { data, error } = await supabase
+    .from(ASSISTANTS_TABLE)
+    .update(update)
+    .eq('id', id)
+    .eq('user_id', userId)
+    .select('id, name, description, system_prompt, specialty, created_at, updated_at')
+    .single();
+
+  if (error) throw new Error(`No se pudo actualizar el asistente: ${error.message}`);
+  return fromAssistantRow(data);
+};
+
+export const deleteAssistant = async (id) => {
+  const userId = await ensureAuth();
+  const { error } = await supabase
+    .from(ASSISTANTS_TABLE)
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  if (error) throw new Error(`No se pudo eliminar el asistente: ${error.message}`);
+  return true;
+};
+
+// =============================================================================
+// Prompts guardados
+// =============================================================================
+
+export { PROMPT_CATEGORIES };
+
 export const listSavedPrompts = async () => {
   const userId = await resolveUserId();
-  return sortByCreatedAtDesc(readJson(PROMPTS_KEY(userId), []));
+  if (!isSupabaseConfigured || !supabase || !userId) return [];
+
+  const { data, error } = await supabase
+    .from(PROMPTS_TABLE)
+    .select('id, name, content, category, created_at, updated_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.warn('[personalization] No se pudieron cargar los prompts.', error.message);
+    return [];
+  }
+  return (data || []).map(fromPromptRow);
 };
 
 export const createSavedPrompt = async ({ name, content, category = 'Consulta general' }) => {
@@ -110,34 +157,56 @@ export const createSavedPrompt = async ({ name, content, category = 'Consulta ge
   const cleanContent = String(content || '').trim();
   if (!cleanName) throw new Error('El prompt necesita un nombre.');
   if (!cleanContent) throw new Error('El contenido del prompt no puede estar vacio.');
-  const userId = await resolveUserId();
-  const list = readJson(PROMPTS_KEY(userId), []);
-  const next = {
-    id: generateId('prm'),
-    name: cleanName,
-    content: cleanContent,
-    category: PROMPT_CATEGORIES.includes(category) ? category : 'Consulta general',
-    createdAt: new Date().toISOString(),
-  };
-  const updated = [next, ...list];
-  writeJson(PROMPTS_KEY(userId), updated);
-  return next;
+  const userId = await ensureAuth();
+
+  const safeCategory = PROMPT_CATEGORIES.includes(category) ? category : 'Consulta general';
+
+  const { data, error } = await supabase
+    .from(PROMPTS_TABLE)
+    .insert({
+      user_id: userId,
+      name: cleanName,
+      content: cleanContent,
+      category: safeCategory,
+    })
+    .select('id, name, content, category, created_at, updated_at')
+    .single();
+
+  if (error) throw new Error(`No se pudo guardar el prompt: ${error.message}`);
+  return fromPromptRow(data);
 };
 
 export const updateSavedPrompt = async (id, patch) => {
-  const userId = await resolveUserId();
-  const list = readJson(PROMPTS_KEY(userId), []);
-  const updated = list.map((item) => (item.id === id ? { ...item, ...patch, id: item.id } : item));
-  writeJson(PROMPTS_KEY(userId), updated);
-  return updated.find((item) => item.id === id) || null;
+  const userId = await ensureAuth();
+  const update = { updated_at: new Date().toISOString() };
+  if (patch.name !== undefined) update.name = String(patch.name).trim();
+  if (patch.content !== undefined) update.content = String(patch.content).trim();
+  if (patch.category !== undefined) {
+    update.category = PROMPT_CATEGORIES.includes(patch.category) ? patch.category : 'Consulta general';
+  }
+
+  const { data, error } = await supabase
+    .from(PROMPTS_TABLE)
+    .update(update)
+    .eq('id', id)
+    .eq('user_id', userId)
+    .select('id, name, content, category, created_at, updated_at')
+    .single();
+
+  if (error) throw new Error(`No se pudo actualizar el prompt: ${error.message}`);
+  return fromPromptRow(data);
 };
 
 export const deleteSavedPrompt = async (id) => {
-  const userId = await resolveUserId();
-  const list = readJson(PROMPTS_KEY(userId), []);
-  const updated = list.filter((item) => item.id !== id);
-  writeJson(PROMPTS_KEY(userId), updated);
-  return updated;
+  const userId = await ensureAuth();
+  const { error } = await supabase
+    .from(PROMPTS_TABLE)
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  if (error) throw new Error(`No se pudo eliminar el prompt: ${error.message}`);
+  return true;
 };
 
 export const copyPromptToClipboard = async (id) => {
