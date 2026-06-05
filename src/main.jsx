@@ -3,6 +3,16 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
+// Aplica el tema antes del primer render para evitar el "flash" de fondo.
+try {
+  const stored = window.localStorage.getItem('lusti-theme')
+  if (stored === 'light') {
+    document.documentElement.classList.add('theme-light')
+  }
+} catch {
+  /* noop */
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />

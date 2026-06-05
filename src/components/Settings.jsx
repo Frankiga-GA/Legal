@@ -11,6 +11,8 @@ import {
   Database,
   Bell,
   AlertTriangle,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import {
   clearStoredDriveToken,
@@ -22,6 +24,7 @@ import {
   listDriveFolders,
 } from '../services/googleDriveService';
 import { isSupabaseConfigured, supabase } from '../utils/supabase';
+import { useTheme } from '../hooks/useTheme';
 import {
   loadAllPreferences,
   saveAiPreferences,
@@ -173,6 +176,17 @@ const AIPreferences = ({ userId }) => {
 
   return (
     <div className="space-y-10">
+      <div>
+        <h3 className="text-2xl font-serif font-medium text-brand-ivory">Apariencia</h3>
+        <p className="mt-2 text-sm text-brand-accent/50">
+          Cambia entre el tema oscuro (por defecto) o claro para reducir el cansancio visual.
+        </p>
+      </div>
+
+      <div className="max-w-2xl">
+        <AppearanceCard />
+      </div>
+
       <div>
         <h3 className="text-2xl font-serif font-medium text-brand-ivory">Preferencias de Inteligencia Artificial</h3>
         <p className="mt-2 text-sm text-brand-accent/50">
@@ -604,5 +618,49 @@ const ToggleField = ({ label, description, checked, onChange }) => (
     </span>
   </label>
 );
+
+const AppearanceCard = () => {
+  const { theme, setTheme } = useTheme();
+  const options = [
+    { value: 'dark', label: 'Oscuro', icon: Moon, hint: 'Fondo negro, ideal para uso prolongado.' },
+    { value: 'light', label: 'Claro', icon: Sun, hint: 'Fondo blanco, menor cansancio en ambientes iluminados.' },
+  ];
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-accent">
+        Tema del sistema
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        {options.map((opt) => {
+          const Icon = opt.icon;
+          const isActive = theme === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setTheme(opt.value)}
+              className={`flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-colors ${
+                isActive
+                  ? 'border-brand-gold/60 bg-brand-gold/10'
+                  : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.16] hover:bg-white/[0.04]'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Icon className={`h-4 w-4 ${isActive ? 'text-brand-gold' : 'text-brand-ivory'}`} />
+                <span className="text-sm font-semibold text-brand-ivory">{opt.label}</span>
+                {isActive && (
+                  <span className="rounded-full bg-brand-gold/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-brand-gold">
+                    Activo
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] leading-relaxed text-brand-accent/60">{opt.hint}</p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 export default Settings;

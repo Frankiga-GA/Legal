@@ -11,6 +11,7 @@ import {
   Scale,
   Settings,
 } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 
 const Sidebar = ({ activeTab, setActiveTab, onHome, onLogout, userEmail, collapsed = false, onToggleCollapse, showDrive = false }) => {
   const primaryItems = [
@@ -75,6 +76,9 @@ const Sidebar = ({ activeTab, setActiveTab, onHome, onLogout, userEmail, collaps
       </nav>
 
       <div className="mt-auto space-y-3 border-t border-white/[0.08] pt-6">
+        <div className={`flex ${collapsed ? 'justify-center' : 'justify-end'}`}>
+          <ThemeToggle size="sm" />
+        </div>
         <div className="rounded-lg border border-white/[0.08] bg-brand-black p-4">
           <div className="mb-1 flex items-center gap-3">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>

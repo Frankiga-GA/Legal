@@ -4,6 +4,70 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================================
+ * Variables de tema. Default (root) = oscuro. .theme-light = claro.
+ * El color dorado/dorado-acento se conserva igual en ambos.
+ * ============================================================================ */
+:root {
+  --brand-black: #09090b;
+  --brand-dark: #18181b;
+  --brand-gray: #27272a;
+  --brand-accent: #a1a1aa;
+  --brand-gold: #e4e4e7;
+  --brand-ivory: #f4f4f5;
+
+  /* overlays con opacidad (white en dark, black en light) */
+  --surface-overlay-1: rgba(255, 255, 255, 0.02);
+  --surface-overlay-2: rgba(255, 255, 255, 0.04);
+  --surface-overlay-3: rgba(255, 255, 255, 0.05);
+  --surface-overlay-4: rgba(255, 255, 255, 0.06);
+  --surface-overlay-5: rgba(255, 255, 255, 0.08);
+  --surface-overlay-6: rgba(255, 255, 255, 0.10);
+  --surface-overlay-7: rgba(255, 255, 255, 0.12);
+  --surface-overlay-8: rgba(255, 255, 255, 0.15);
+
+  --text-on-light-1: rgba(0, 0, 0, 0.4);
+  --text-on-light-2: rgba(0, 0, 0, 0.5);
+  --text-on-light-3: rgba(0, 0, 0, 0.6);
+  --text-on-light-4: rgba(0, 0, 0, 0.7);
+  --text-on-light-5: rgba(0, 0, 0, 0.85);
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(161, 161, 170, 0.3);
+  --scrollbar-thumb-hover: rgba(161, 161, 170, 0.5);
+
+  color-scheme: dark;
+}
+
+.theme-light {
+  --brand-black: #fafafa;
+  --brand-dark: #ffffff;
+  --brand-gray: #e4e4e7;
+  --brand-accent: #52525b;
+  --brand-gold: #18181b;
+  --brand-ivory: #09090b;
+
+  --surface-overlay-1: rgba(0, 0, 0, 0.015);
+  --surface-overlay-2: rgba(0, 0, 0, 0.03);
+  --surface-overlay-3: rgba(0, 0, 0, 0.04);
+  --surface-overlay-4: rgba(0, 0, 0, 0.05);
+  --surface-overlay-5: rgba(0, 0, 0, 0.07);
+  --surface-overlay-6: rgba(0, 0, 0, 0.09);
+  --surface-overlay-7: rgba(0, 0, 0, 0.12);
+  --surface-overlay-8: rgba(0, 0, 0, 0.15);
+
+  --text-on-light-1: rgba(0, 0, 0, 0.4);
+  --text-on-light-2: rgba(0, 0, 0, 0.5);
+  --text-on-light-3: rgba(0, 0, 0, 0.6);
+  --text-on-light-4: rgba(0, 0, 0, 0.7);
+  --text-on-light-5: rgba(0, 0, 0, 0.85);
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
+
+  color-scheme: light;
+}
+
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;
@@ -27,11 +91,68 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-brand-accent/30 rounded-full;
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-brand-accent/50;
+    background: var(--scrollbar-thumb-hover);
   }
+}
+
+/* ============================================================================
+ * Traductor para clases hardcodeadas `bg-white/[op]` y similares.
+ * En modo oscuro se mantiene el blanco con opacidad; en modo claro se
+ * invierte a negro con opacidad para mantener la legibilidad.
+ * ============================================================================ */
+.theme-light .bg-white\/\[0\.01\] { background-color: var(--surface-overlay-1); }
+.theme-light .bg-white\/\[0\.02\] { background-color: var(--surface-overlay-1); }
+.theme-light .bg-white\/\[0\.03\] { background-color: var(--surface-overlay-2); }
+.theme-light .bg-white\/\[0\.04\] { background-color: var(--surface-overlay-2); }
+.theme-light .bg-white\/\[0\.05\] { background-color: var(--surface-overlay-3); }
+.theme-light .bg-white\/\[0\.06\] { background-color: var(--surface-overlay-4); }
+.theme-light .bg-white\/\[0\.07\] { background-color: var(--surface-overlay-4); }
+.theme-light .bg-white\/\[0\.08\] { background-color: var(--surface-overlay-5); }
+.theme-light .bg-white\/\[0\.10\] { background-color: var(--surface-overlay-6); }
+.theme-light .bg-white\/\[0\.12\] { background-color: var(--surface-overlay-7); }
+.theme-light .bg-white\/\[0\.15\] { background-color: var(--surface-overlay-8); }
+.theme-light .bg-white\/\[0\.20\] { background-color: var(--surface-overlay-8); }
+
+.theme-light .border-white\/\[0\.04\] { border-color: var(--surface-overlay-2); }
+.theme-light .border-white\/\[0\.05\] { border-color: var(--surface-overlay-3); }
+.theme-light .border-white\/\[0\.06\] { border-color: var(--surface-overlay-4); }
+.theme-light .border-white\/\[0\.08\] { border-color: var(--surface-overlay-5); }
+.theme-light .border-white\/\[0\.10\] { border-color: var(--surface-overlay-6); }
+.theme-light .border-white\/\[0\.12\] { border-color: var(--surface-overlay-7); }
+.theme-light .border-white\/\[0\.15\] { border-color: var(--surface-overlay-8); }
+.theme-light .border-white\/\[0\.20\] { border-color: var(--surface-overlay-8); }
+
+.theme-light .text-white\/40 { color: var(--text-on-light-1); }
+.theme-light .text-white\/50 { color: var(--text-on-light-1); }
+.theme-light .text-white\/60 { color: var(--text-on-light-2); }
+.theme-light .text-white\/70 { color: var(--text-on-light-3); }
+.theme-light .text-white\/80 { color: var(--text-on-light-4); }
+.theme-light .text-white\/85 { color: var(--text-on-light-4); }
+.theme-light .text-white\/90 { color: var(--text-on-light-5); }
+
+/* Hover y placeholder de inputs */
+.theme-light input::placeholder,
+.theme-light textarea::placeholder {
+  color: var(--text-on-light-2);
+}
+.theme-light .hover\:bg-white\/\[0\.04\]:hover { background-color: var(--surface-overlay-2); }
+.theme-light .hover\:bg-white\/\[0\.05\]:hover { background-color: var(--surface-overlay-3); }
+.theme-light .hover\:bg-white\/\[0\.06\]:hover { background-color: var(--surface-overlay-4); }
+.theme-light .hover\:bg-white\/\[0\.08\]:hover { background-color: var(--surface-overlay-5); }
+.theme-light .hover\:bg-white\/\[0\.10\]:hover { background-color: var(--surface-overlay-6); }
+.theme-light .hover\:bg-white\/\[0\.12\]:hover { background-color: var(--surface-overlay-7); }
+.theme-light .hover\:bg-white\/\[0\.15\]:hover { background-color: var(--surface-overlay-8); }
+.theme-light .hover\:bg-white\/\[0\.20\]:hover { background-color: var(--surface-overlay-8); }
+.theme-light .hover\:border-white\/\[0\.12\]:hover { border-color: var(--surface-overlay-5); }
+
+/* Glass card reversion: en light es sombra suave sobre blanco */
+.theme-light .glass-card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  background-color: #ffffff;
 }
 
 @layer components {
