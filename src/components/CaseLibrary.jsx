@@ -456,14 +456,6 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId }) => {
             }}
             options={SORT_OPTIONS.map(o => o.label)}
           />
-          <button
-            type="button"
-            onClick={handleResetCases}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] px-5 py-4 text-sm font-semibold text-brand-accent hover:bg-white/[0.05] hover:text-brand-ivory transition-colors"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Cargar ejemplos
-          </button>
         </div>
 
         <div className="px-2 text-xs font-medium text-brand-accent">
