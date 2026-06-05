@@ -11,11 +11,13 @@
       "config": { "maxDuration": 60 }
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
-    },
+      "src": "/api/(.*)",
+      "dest": "/api/index.py"
+    }
+  ],
+  "rewrites": [
     {
       "source": "/((?!google.*\\.html).*)",
       "destination": "/index.html"
