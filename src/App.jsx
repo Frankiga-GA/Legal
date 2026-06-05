@@ -16,8 +16,9 @@ import LegalMonitor from './components/LegalMonitor';
 import DriveVault from './components/DriveVault';
 import DeadlineCalculator from './components/DeadlineCalculator';
 import CalendarView from './components/CalendarView';
+import OnboardingTour from './components/OnboardingTour';
 import LegalPage from './components/LegalPage';
-import { getCurrentSession, onAuthStateChange, signOut } from './services/authService';
+import { getCurrentSession, onAuthStateChange, signOut, hasCompletedOnboarding } from './services/authService';
 import { getStoredDriveToken, onDriveTokenChange, onDriveTokenMessage } from './services/googleDriveService';
 import { setPendingAiInput, setActiveAssistant } from './services/aiBridge';
 import { getCases } from './services/caseStore';
@@ -52,6 +53,7 @@ function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLanding, setIsLanding] = useState(true);
   const [session, setSession] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isDriveConnected, setIsDriveConnected] = useState(() => Boolean(getStoredDriveToken()?.access_token));
 
@@ -141,6 +143,9 @@ function App() {
   const handleLogin = (nextSession) => {
     setSession(nextSession);
     setIsLanding(false);
+    if (nextSession?.user?.id && !hasCompletedOnboarding(nextSession.user.id)) {
+      setShowOnboarding(true);
+    }
   };
 
   const handleLogout = async () => {
@@ -279,6 +284,17 @@ function App() {
       </main>
         {/* Contenedor de toast */}
         <Toaster />
+
+      {showOnboarding && session?.user?.id && (
+        <OnboardingTour
+          userId={session.user.id}
+          onComplete={() => setShowOnboarding(false)}
+          onNavigate={(tab) => {
+            setActiveTab(tab);
+            setShowOnboarding(false);
+          }}
+        />
+      )}
     </div>
     </ErrorBoundary>
   );
