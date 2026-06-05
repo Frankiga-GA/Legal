@@ -11,8 +11,11 @@ import {
   ArrowLeft,
   Bot,
   Edit3,
+  FileText,
+  Loader2,
   MessageSquare,
   Mic,
+  Paperclip,
   Plus,
   Search,
   Send,
@@ -31,8 +34,10 @@ import {
   saveGlobalChat,
   clearGlobalChats,
 } from '../services/chatHistoryStore';
+import { uploadDocumentToBackend } from '../services/documentBackendService';
 
 const HISTORY_LIMIT = 10;
+const ACCEPTED_TYPES = '.pdf,.docx,.doc,.txt,.md,.rtf';
 
 const QUICK_ACTIONS = [
   {
@@ -56,6 +61,8 @@ const GlobalChat = ({ onBack }) => {
   const [isThinking, setIsThinking] = useState(false);
   const [error, setError] = useState('');
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [attachedFile, setAttachedFile] = useState(null); // { name, text, status }
+  const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   // Lee asistente activo + prompt pendiente al montar
@@ -113,6 +120,13 @@ const GlobalChat = ({ onBack }) => {
     setIsThinking(true);
     setError('');
 
+    // Capturamos el archivo adjunto (si lo hay) y lo limpiamos del estado
+    // para que no quede "pegado" entre mensajes.
+    const fileContext = attachedFile && attachedFile.status === 'ready'
+      ? { fileName: attachedFile.name, fileText: attachedFile.text }
+      : null;
+    setAttachedFile(null);
+
     // Persistir el mensaje del usuario (fire-and-forget)
     saveGlobalChat(activeAssistant?.id || null, 'user', question).catch((err) => {
       console.warn('No se pudo guardar el mensaje en Supabase.', err?.message);
@@ -128,6 +142,8 @@ const GlobalChat = ({ onBack }) => {
         maxOutputTokens: 1500,
         systemPrompt,
         history,
+        fileName: fileContext?.fileName || null,
+        fileText: fileContext?.fileText || null,
       });
       setMessages((prev) => [...prev, { role: 'ai', content: text }]);
       saveGlobalChat(activeAssistant?.id || null, 'ai', text).catch((err) => {
@@ -142,6 +158,33 @@ const GlobalChat = ({ onBack }) => {
     } finally {
       setIsThinking(false);
     }
+  };
+
+  const handleAttachClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (event) => {
+    const file = event.target.files?.[0];
+    // Reseteamos el input para poder seleccionar el mismo archivo dos veces seguidas
+    event.target.value = '';
+    if (!file) return;
+    setAttachedFile({ name: file.name, text: '', status: 'uploading' });
+    try {
+      const response = await uploadDocumentToBackend(file);
+      const text = String(response?.extracted_text || '').trim();
+      setAttachedFile({
+        name: file.name,
+        text,
+        status: text ? 'ready' : 'empty',
+      });
+    } catch (err) {
+      setAttachedFile({ name: file.name, text: '', status: 'error', error: err?.message });
+    }
+  };
+
+  const handleRemoveAttachment = () => {
+    setAttachedFile(null);
   };
 
   const handleClear = async () => {
@@ -216,6 +259,11 @@ const GlobalChat = ({ onBack }) => {
           isThinking={isThinking}
           onQuickAction={handleQuickAction}
           error={error}
+          attachedFile={attachedFile}
+          onAttachClick={handleAttachClick}
+          onRemoveAttachment={handleRemoveAttachment}
+          onFileSelected={handleFileSelected}
+          fileInputRef={fileInputRef}
         />
       ) : (
         <>
@@ -235,6 +283,11 @@ const GlobalChat = ({ onBack }) => {
             onClear={handleClear}
             isThinking={isThinking}
             error={error}
+            attachedFile={attachedFile}
+            onAttachClick={handleAttachClick}
+            onRemoveAttachment={handleRemoveAttachment}
+            onFileSelected={handleFileSelected}
+            fileInputRef={fileInputRef}
           />
         </>
       )}
@@ -242,7 +295,19 @@ const GlobalChat = ({ onBack }) => {
   );
 };
 
-const EmptyState = ({ input, setInput, onSend, isThinking, onQuickAction, error }) => {
+const EmptyState = ({
+  input,
+  setInput,
+  onSend,
+  isThinking,
+  onQuickAction,
+  error,
+  attachedFile,
+  onAttachClick,
+  onRemoveAttachment,
+  onFileSelected,
+  fileInputRef,
+}) => {
   const textareaRef = useRef(null);
 
   useEffect(() => {
@@ -260,6 +325,10 @@ const EmptyState = ({ input, setInput, onSend, isThinking, onQuickAction, error 
           onSubmit={onSend}
           className="rounded-2xl border border-white/[0.08] bg-brand-dark/80 px-4 py-3 shadow-xl backdrop-blur-sm"
         >
+          <AttachmentChip
+            attachedFile={attachedFile}
+            onRemove={onRemoveAttachment}
+          />
           <textarea
             ref={textareaRef}
             value={input}
@@ -275,10 +344,18 @@ const EmptyState = ({ input, setInput, onSend, isThinking, onQuickAction, error 
             className="w-full resize-none bg-transparent px-1 py-2 text-base text-brand-ivory outline-none placeholder:text-brand-accent/40"
           />
           <div className="mt-2 flex items-center justify-between">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_TYPES}
+              onChange={onFileSelected}
+              className="hidden"
+            />
             <button
               type="button"
+              onClick={onAttachClick}
               className="flex h-9 w-9 items-center justify-center rounded-full text-brand-accent transition-colors hover:bg-white/[0.05] hover:text-brand-ivory"
-              aria-label="Adjuntar"
+              aria-label="Adjuntar archivo"
             >
               <Plus className="h-5 w-5" />
             </button>
@@ -329,7 +406,19 @@ const EmptyState = ({ input, setInput, onSend, isThinking, onQuickAction, error 
   );
 };
 
-const ChatFooter = ({ input, setInput, onSend, onClear, isThinking, error }) => (
+const ChatFooter = ({
+  input,
+  setInput,
+  onSend,
+  onClear,
+  isThinking,
+  error,
+  attachedFile,
+  onAttachClick,
+  onRemoveAttachment,
+  onFileSelected,
+  fileInputRef,
+}) => (
   <footer className="shrink-0 border-t border-white/[0.05] bg-brand-dark px-5 py-4">
     <div className="mx-auto max-w-3xl">
       {!isGeminiConfigured ? (
@@ -346,6 +435,10 @@ const ChatFooter = ({ input, setInput, onSend, onClear, isThinking, error }) => 
         onSubmit={onSend}
         className="rounded-2xl border border-white/[0.08] bg-brand-dark/80 px-3 py-2"
       >
+        <AttachmentChip
+          attachedFile={attachedFile}
+          onRemove={onRemoveAttachment}
+        />
         <textarea
           value={input}
           onChange={(event) => setInput(event.target.value)}
@@ -360,10 +453,18 @@ const ChatFooter = ({ input, setInput, onSend, onClear, isThinking, error }) => 
           className="w-full resize-none bg-transparent px-1 py-1.5 text-sm text-brand-ivory outline-none placeholder:text-brand-accent/40"
         />
         <div className="mt-1 flex items-center justify-between">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_TYPES}
+            onChange={onFileSelected}
+            className="hidden"
+          />
           <button
             type="button"
+            onClick={onAttachClick}
             className="flex h-8 w-8 items-center justify-center rounded-full text-brand-accent transition-colors hover:bg-white/[0.05] hover:text-brand-ivory"
-            aria-label="Adjuntar"
+            aria-label="Adjuntar archivo"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -397,6 +498,42 @@ const ChatFooter = ({ input, setInput, onSend, onClear, isThinking, error }) => 
     </div>
   </footer>
 );
+
+const AttachmentChip = ({ attachedFile, onRemove }) => {
+  if (!attachedFile) return null;
+
+  let label = attachedFile.name;
+  let tone = 'border-white/[0.1] bg-white/[0.04] text-brand-ivory';
+  let icon = <Paperclip className="h-3.5 w-3.5 text-brand-accent" />;
+  if (attachedFile.status === 'uploading') {
+    label = `Subiendo ${attachedFile.name}...`;
+    tone = 'border-brand-gold/30 bg-brand-gold/10 text-brand-gold';
+    icon = <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-gold" />;
+  } else if (attachedFile.status === 'error') {
+    label = `${attachedFile.name} (no se pudo leer)`;
+    tone = 'border-red-500/30 bg-red-500/10 text-red-300';
+    icon = <FileText className="h-3.5 w-3.5 text-red-300" />;
+  } else if (attachedFile.status === 'empty') {
+    label = `${attachedFile.name} (sin texto legible)`;
+    tone = 'border-amber-500/30 bg-amber-500/10 text-amber-300';
+    icon = <FileText className="h-3.5 w-3.5 text-amber-300" />;
+  }
+
+  return (
+    <div className={`mb-2 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${tone}`}>
+      {icon}
+      <span className="max-w-[260px] truncate">{label}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="rounded-full p-0.5 transition-colors hover:bg-white/10"
+        aria-label="Quitar archivo"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  );
+};
 
 const MessageBubble = ({ role, content }) => {
   const isUser = role === 'user';

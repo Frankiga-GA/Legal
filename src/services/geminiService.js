@@ -24,7 +24,7 @@ const getAccessToken = async () => {
   return data.session.access_token;
 };
 
-export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens = 2048, responseJson = false, systemPrompt = null, history = null }) => {
+export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens = 2048, responseJson = false, systemPrompt = null, history = null, fileName = null, fileText = null }) => {
   const token = await getAccessToken();
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -39,6 +39,8 @@ export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens =
       response_json: responseJson,
       system_prompt: systemPrompt,
       history,
+      file_name: fileName,
+      file_text: fileText,
     }),
   });
 

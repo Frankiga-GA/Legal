@@ -139,6 +139,8 @@ class RawAskRequest(BaseModel):
     response_json: bool = False
     system_prompt: str | None = None
     history: list[dict[str, str]] | None = None
+    file_name: str | None = None
+    file_text: str | None = None
 
 
 class RawAskResponse(BaseModel):
@@ -268,12 +270,17 @@ async def _ask_gemini(
     response_json: bool = False,
     system_prompt: str | None = None,
     history: list[dict[str, str]] | None = None,
+    file_name: str | None = None,
+    file_text: str | None = None,
 ) -> str:
     """Llama a Groq (OpenAI-compatible) usando GROQ_API_KEY.
 
     Si se pasa `history`, se construye la conversacion como
     [system, ...history..., user(prompt_text)]. Esto le da a la IA
     memoria de los mensajes previos del chat.
+
+    Si se pasa `file_name` y `file_text`, el contenido del archivo se
+    adjunta al prompt del usuario como contexto de solo lectura.
     """
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
@@ -281,6 +288,21 @@ async def _ask_gemini(
 
     model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
     url = "https://api.groq.com/openai/v1/chat/completions"
+
+    # Si hay archivo adjunto, lo agregamos como contexto antes de la pregunta.
+    # Truncamos para no pasar el limite de tokens del modelo.
+    if file_text and file_text.strip():
+        max_file_chars = 18000
+        truncated = file_text.strip()
+        if len(truncated) > max_file_chars:
+            truncated = truncated[:max_file_chars] + "\n\n[...texto truncado por limite de contexto...]"
+        file_block = (
+            f"Archivo adjunto: {file_name or 'documento'}\n"
+            f"--- INICIO DEL ARCHIVO ---\n"
+            f"{truncated}\n"
+            f"--- FIN DEL ARCHIVO ---\n\n"
+        )
+        prompt_text = file_block + prompt_text
 
     messages: list[dict[str, str]] = []
     if system_prompt and system_prompt.strip():
@@ -736,6 +758,8 @@ async def ai_raw(
             response_json=payload.response_json,
             system_prompt=payload.system_prompt,
             history=payload.history,
+            file_name=payload.file_name,
+            file_text=payload.file_text,
         )
     except Exception as error:
         raise HTTPException(status_code=502, detail=f"No se pudo llamar a Gemini: {error}") from error
