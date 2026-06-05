@@ -1,5 +1,6 @@
 // src/components/Sidebar.jsx
 import {
+  Clock,
   FileText,
   FileSearch,
   HardDrive,
@@ -22,6 +23,7 @@ const Sidebar = ({ activeTab, setActiveTab, onHome, onLogout, userEmail, collaps
   const secondaryItems = [
     { id: 'monitor', label: 'Seguimiento', icon: FileSearch },
     { id: 'elperuano', label: 'Normas', icon: Newspaper },
+    { id: 'deadlines', label: 'Plazos', icon: Clock },
     { id: 'settings', label: 'Configuracion', icon: Settings },
   ];
 
