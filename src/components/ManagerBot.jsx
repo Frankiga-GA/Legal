@@ -197,7 +197,7 @@ const CustomSelect = ({ value, onChange, options, placeholder = 'Seleccionar...'
   );
 };
 
-const ManagerBot = () => {
+const ManagerBot = ({ onUseInChat }) => {
   const [activeTab, setActiveTab] = useState('assistants');
   const [assistants, setAssistants] = useState([]);
   const [prompts, setPrompts] = useState([]);
@@ -409,6 +409,16 @@ const ManagerBot = () => {
             }}
             onDelete={handleDeleteAssistant}
             onCreate={() => setIsCreatingAssistant(true)}
+            onUse={async (item) => {
+              if (typeof onUseInChat !== 'function') {
+                flash('error', 'No se puede abrir un chat desde esta vista.');
+                return;
+              }
+              const ok = await onUseInChat({
+                assistant: { id: item.id, name: item.name, systemPrompt: item.systemPrompt },
+              });
+              if (ok) flash('ok', `Asistente "${item.name}" activado en el chat.`);
+            }}
           />
         ) : (
           <PromptsList
@@ -420,6 +430,14 @@ const ManagerBot = () => {
             onDelete={handleDeletePrompt}
             onCopy={handleCopyPrompt}
             onCreate={() => setIsCreatingPrompt(true)}
+            onUse={async (item) => {
+              if (typeof onUseInChat !== 'function') {
+                flash('error', 'No se puede abrir un chat desde esta vista.');
+                return;
+              }
+              const ok = await onUseInChat({ pendingInput: item.content });
+              if (ok) flash('ok', `Prompt "${item.name}" cargado en el chat.`);
+            }}
           />
         )}
       </div>
@@ -451,7 +469,7 @@ const ManagerBot = () => {
   );
 };
 
-const AssistantsList = ({ items, onEdit, onDelete, onCreate }) => {
+const AssistantsList = ({ items, onEdit, onDelete, onCreate, onUse }) => {
   if (!items.length) {
     return (
       <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] p-12 text-center">
@@ -508,6 +526,16 @@ const AssistantsList = ({ items, onEdit, onDelete, onCreate }) => {
             </details>
           ) : null}
           <div className="mt-4 flex items-center justify-end gap-2 border-t border-white/[0.05] pt-3">
+            {onUse ? (
+              <button
+                type="button"
+                onClick={() => onUse(item)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-brand-gold/30 bg-brand-gold/10 px-2.5 py-1.5 text-xs font-semibold text-brand-gold transition-colors hover:bg-brand-gold/20"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Usar
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => onEdit(item)}
@@ -531,7 +559,7 @@ const AssistantsList = ({ items, onEdit, onDelete, onCreate }) => {
   );
 };
 
-const PromptsList = ({ items, onEdit, onDelete, onCopy, onCreate }) => {
+const PromptsList = ({ items, onEdit, onDelete, onCopy, onCreate, onUse }) => {
   if (!items.length) {
     return (
       <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] p-12 text-center">
@@ -569,6 +597,16 @@ const PromptsList = ({ items, onEdit, onDelete, onCopy, onCreate }) => {
             {item.content}
           </p>
           <div className="mt-4 flex items-center justify-end gap-2 border-t border-white/[0.05] pt-3">
+            {onUse ? (
+              <button
+                type="button"
+                onClick={() => onUse(item)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-brand-gold/30 bg-brand-gold/10 px-2.5 py-1.5 text-xs font-semibold text-brand-gold transition-colors hover:bg-brand-gold/20"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Usar
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => onCopy(item.id)}

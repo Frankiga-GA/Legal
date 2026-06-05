@@ -137,6 +137,7 @@ class RawAskRequest(BaseModel):
     temperature: float = Field(0.25, ge=0.0, le=2.0)
     max_output_tokens: int = Field(2048, ge=64, le=8192)
     response_json: bool = False
+    system_prompt: str | None = None
 
 
 class RawAskResponse(BaseModel):
@@ -264,6 +265,7 @@ async def _ask_gemini(
     temperature: float = 0.25,
     max_output_tokens: int = 4096,
     response_json: bool = False,
+    system_prompt: str | None = None,
 ) -> str:
     """Llama a Groq (OpenAI-compatible) usando GROQ_API_KEY."""
     api_key = os.getenv("GROQ_API_KEY")
@@ -273,9 +275,14 @@ async def _ask_gemini(
     model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
     url = "https://api.groq.com/openai/v1/chat/completions"
 
+    messages: list[dict[str, str]] = []
+    if system_prompt and system_prompt.strip():
+        messages.append({"role": "system", "content": system_prompt.strip()})
+    messages.append({"role": "user", "content": prompt_text})
+
     payload: dict[str, Any] = {
         "model": model,
-        "messages": [{"role": "user", "content": prompt_text}],
+        "messages": messages,
         "temperature": temperature,
         "max_tokens": max_output_tokens,
         "top_p": 0.9,
@@ -709,6 +716,7 @@ async def ai_raw(
             temperature=payload.temperature,
             max_output_tokens=payload.max_output_tokens,
             response_json=payload.response_json,
+            system_prompt=payload.system_prompt,
         )
     except Exception as error:
         raise HTTPException(status_code=502, detail=f"No se pudo llamar a Gemini: {error}") from error

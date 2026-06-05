@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar';
 import CaseLibrary from './components/CaseLibrary';
 import CaseWorkspace from './components/CaseWorkspace';
 import ManagerBot from './components/ManagerBot';
+import GlobalChat from './components/GlobalChat';
 import Dashboard from './components/Dashboard';
 import Settings from './components/Settings';
 import LoginPage from './components/LoginPage';
@@ -16,6 +17,7 @@ import DriveVault from './components/DriveVault';
 import LegalPage from './components/LegalPage';
 import { getCurrentSession, onAuthStateChange, signOut } from './services/authService';
 import { getStoredDriveToken, onDriveTokenChange, onDriveTokenMessage } from './services/googleDriveService';
+import { setPendingAiInput, setActiveAssistant } from './services/aiBridge';
 
 // Simple Error Boundary to catch render errors
 class ErrorBoundary extends React.Component {
@@ -118,6 +120,14 @@ function App() {
     setIsLanding(false);
   };
 
+  const openGlobalChat = async ({ pendingInput = null, assistant = null } = {}) => {
+    if (pendingInput) setPendingAiInput(pendingInput);
+    if (assistant) setActiveAssistant(assistant);
+    setActiveTab('global-chat');
+    setIsSidebarCollapsed(true);
+    return true;
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'case-workspace': return <CaseWorkspace caseId={activeCaseId} onClose={() => setActiveTab('library')} />;
@@ -125,7 +135,8 @@ function App() {
       case 'library': return <CaseLibrary setActiveTab={setActiveTab} onOpenCase={(id) => { setActiveCaseId(id); setActiveTab('case-workspace'); }} userId={session?.user?.id} />;
       case 'monitor': return <LegalMonitor setActiveTab={setActiveTab} />;
       case 'drive': return <DriveVault />;
-      case 'ai-chat': return <ManagerBot />;
+      case 'ai-chat': return <ManagerBot onUseInChat={openGlobalChat} />;
+      case 'global-chat': return <GlobalChat onBack={() => setActiveTab('ai-chat')} />;
       case 'elperuano': return <ElPeruano />;
       case 'settings': return <Settings session={session} />;
       default: return <div className="p-8 font-serif italic text-slate-400">Sección en construcción</div>;
@@ -143,7 +154,7 @@ function App() {
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    setIsSidebarCollapsed(tab === 'ai-chat' || tab === 'case-workspace');
+    setIsSidebarCollapsed(tab === 'ai-chat' || tab === 'case-workspace' || tab === 'global-chat');
     setIsMobileMenuOpen(false);
   };
 
