@@ -138,6 +138,7 @@ class RawAskRequest(BaseModel):
     max_output_tokens: int = Field(2048, ge=64, le=8192)
     response_json: bool = False
     system_prompt: str | None = None
+    history: list[dict[str, str]] | None = None
 
 
 class RawAskResponse(BaseModel):
@@ -266,8 +267,14 @@ async def _ask_gemini(
     max_output_tokens: int = 4096,
     response_json: bool = False,
     system_prompt: str | None = None,
+    history: list[dict[str, str]] | None = None,
 ) -> str:
-    """Llama a Groq (OpenAI-compatible) usando GROQ_API_KEY."""
+    """Llama a Groq (OpenAI-compatible) usando GROQ_API_KEY.
+
+    Si se pasa `history`, se construye la conversacion como
+    [system, ...history..., user(prompt_text)]. Esto le da a la IA
+    memoria de los mensajes previos del chat.
+    """
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError("GROQ_API_KEY no esta configurada en el backend.")
@@ -278,6 +285,17 @@ async def _ask_gemini(
     messages: list[dict[str, str]] = []
     if system_prompt and system_prompt.strip():
         messages.append({"role": "system", "content": system_prompt.strip()})
+
+    if history:
+        # Solo aceptamos roles validos; descartamos entradas mal formadas
+        for entry in history:
+            role = entry.get("role") if isinstance(entry, dict) else None
+            content = entry.get("content") if isinstance(entry, dict) else None
+            if role in ("user", "ai", "assistant", "system") and content:
+                # Groq espera "assistant", no "ai"
+                normalized = "assistant" if role == "ai" else role
+                messages.append({"role": normalized, "content": str(content)})
+
     messages.append({"role": "user", "content": prompt_text})
 
     payload: dict[str, Any] = {
@@ -717,6 +735,7 @@ async def ai_raw(
             max_output_tokens=payload.max_output_tokens,
             response_json=payload.response_json,
             system_prompt=payload.system_prompt,
+            history=payload.history,
         )
     except Exception as error:
         raise HTTPException(status_code=502, detail=f"No se pudo llamar a Gemini: {error}") from error

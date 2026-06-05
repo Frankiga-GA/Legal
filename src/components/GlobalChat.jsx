@@ -2,56 +2,37 @@
 // =============================================================================
 // src/components/GlobalChat.jsx
 // =============================================================================
-// Chat IA standalone, NO atado a un expediente.
-//
-// Caso de uso: el usuario activo un asistente o cargo un prompt guardado
-// desde "Asistentes y Plantillas" y quiere conversar con la IA sin abrir
-// un caso. El asistente activo se mantiene durante la sesion y se aplica
-// como system prompt a cada llamada.
+// Chat IA standalone, NO atado a un expediente. Historial persistido en
+// Supabase (tabla global_chats) para sincronizar entre dispositivos.
 // =============================================================================
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Bot, Compass, Edit3, MessageSquare, Mic, Plus, Search, Send, Sparkles, Trash2, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Bot,
+  Edit3,
+  MessageSquare,
+  Mic,
+  Plus,
+  Search,
+  Send,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react';
 import {
   consumePendingAiInput,
   getActiveAssistant,
   clearActiveAssistant,
 } from '../services/aiBridge';
 import { isGeminiConfigured, askBackend } from '../services/geminiService';
+import {
+  loadGlobalChats,
+  saveGlobalChat,
+  clearGlobalChats,
+} from '../services/chatHistoryStore';
 
-const HISTORY_KEY = (userId) => `lusti-global-chat-${userId || 'anonymous'}`;
-const ASSISTANT_HISTORY_KEY = (userId, assistantId) =>
-  `lusti-global-chat-${userId || 'anonymous'}-${assistantId || 'default'}`;
-
-const getUserId = async () => {
-  try {
-    const { getCurrentSession } = await import('../services/authService');
-    const session = await getCurrentSession();
-    return session?.user?.id || 'anonymous';
-  } catch {
-    return 'anonymous';
-  }
-};
-
-const readHistory = (key) => {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-};
-
-const writeHistory = (key, value) => {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* localStorage puede estar lleno; lo ignoramos para no romper el chat */
-  }
-};
+const HISTORY_LIMIT = 10;
 
 const QUICK_ACTIONS = [
   {
@@ -74,10 +55,10 @@ const GlobalChat = ({ onBack }) => {
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [error, setError] = useState('');
-  const [userId, setUserId] = useState('anonymous');
   const [hasInteracted, setHasInteracted] = useState(false);
   const messagesEndRef = useRef(null);
 
+  // Lee asistente activo + prompt pendiente al montar
   useEffect(() => {
     const assistant = getActiveAssistant();
     if (assistant) setActiveAssistant(assistant);
@@ -88,17 +69,18 @@ const GlobalChat = ({ onBack }) => {
     }
   }, []);
 
+  // Carga historial desde Supabase cuando cambia el asistente activo
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const uid = await getUserId();
+      const { messages: stored, error: loadError } = await loadGlobalChats(
+        activeAssistant?.id || null
+      );
       if (cancelled) return;
-      setUserId(uid);
-      const key = activeAssistant
-        ? ASSISTANT_HISTORY_KEY(uid, activeAssistant.id)
-        : HISTORY_KEY(uid);
-      const stored = readHistory(key);
-      if (stored && Array.isArray(stored) && stored.length) {
+      if (loadError) {
+        console.warn('No se pudo cargar el historial del chat global.', loadError.message);
+      }
+      if (stored && stored.length) {
         setMessages(stored);
         setHasInteracted(true);
       } else {
@@ -106,6 +88,7 @@ const GlobalChat = ({ onBack }) => {
           ? `Hola, soy ${activeAssistant.name}. Preguntame lo que necesites.`
           : null;
         setMessages(greeting ? [{ role: 'ai', content: greeting }] : []);
+        setHasInteracted(false);
       }
     })();
     return () => {
@@ -113,14 +96,7 @@ const GlobalChat = ({ onBack }) => {
     };
   }, [activeAssistant]);
 
-  useEffect(() => {
-    if (!messages.length) return;
-    const key = activeAssistant
-      ? ASSISTANT_HISTORY_KEY(userId, activeAssistant.id)
-      : HISTORY_KEY(userId);
-    writeHistory(key, messages);
-  }, [messages, userId, activeAssistant]);
-
+  // Auto-scroll al final cuando cambian los mensajes
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -129,38 +105,51 @@ const GlobalChat = ({ onBack }) => {
     event?.preventDefault();
     const question = input.trim();
     if (!question || isThinking) return;
+
     setHasInteracted(true);
-    setMessages((prev) => [...prev, { role: 'user', content: question }]);
+    const userMessage = { role: 'user', content: question };
+    setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsThinking(true);
     setError('');
 
+    // Persistir el mensaje del usuario (fire-and-forget)
+    saveGlobalChat(activeAssistant?.id || null, 'user', question).catch((err) => {
+      console.warn('No se pudo guardar el mensaje en Supabase.', err?.message);
+    });
+
     try {
       const systemPrompt = activeAssistant?.systemPrompt || null;
-      const promptText = systemPrompt
-        ? `${question}\n\n(Contexto: el usuario esta hablando con el asistente "${activeAssistant.name}").`
-        : question;
+      // Tomamos los ultimos N mensajes previos para que la IA recuerde
+      const history = messages.slice(-HISTORY_LIMIT);
       const text = await askBackend({
-        prompt: promptText,
+        prompt: question,
         temperature: 0.4,
         maxOutputTokens: 1500,
         systemPrompt,
+        history,
       });
       setMessages((prev) => [...prev, { role: 'ai', content: text }]);
+      saveGlobalChat(activeAssistant?.id || null, 'ai', text).catch((err) => {
+        console.warn('No se pudo guardar la respuesta en Supabase.', err?.message);
+      });
     } catch (err) {
       const msg = err?.message || 'Error desconocido al llamar a la IA.';
       setError(msg);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'ai', content: `Hubo un error: ${msg}` },
-      ]);
+      const errorBubble = { role: 'ai', content: `Hubo un error: ${msg}` };
+      setMessages((prev) => [...prev, errorBubble]);
+      saveGlobalChat(activeAssistant?.id || null, 'ai', errorBubble.content).catch(() => {});
     } finally {
       setIsThinking(false);
     }
   };
 
-  const handleClear = () => {
+  const handleClear = async () => {
     if (!window.confirm('Borrar el historial de este chat?')) return;
+    const { error: clearError } = await clearGlobalChats(activeAssistant?.id || null);
+    if (clearError) {
+      console.warn('No se pudo borrar el historial en Supabase.', clearError.message);
+    }
     const greeting = activeAssistant
       ? `Hola, soy ${activeAssistant.name}. Preguntame lo que necesites.`
       : null;
@@ -246,7 +235,6 @@ const GlobalChat = ({ onBack }) => {
             onClear={handleClear}
             isThinking={isThinking}
             error={error}
-            compact
           />
         </>
       )}
@@ -341,8 +329,8 @@ const EmptyState = ({ input, setInput, onSend, isThinking, onQuickAction, error 
   );
 };
 
-const ChatFooter = ({ input, setInput, onSend, onClear, isThinking, error, compact }) => (
-  <footer className={`shrink-0 border-t border-white/[0.05] bg-brand-dark ${compact ? 'px-5 py-4' : 'px-5 py-5'}`}>
+const ChatFooter = ({ input, setInput, onSend, onClear, isThinking, error }) => (
+  <footer className="shrink-0 border-t border-white/[0.05] bg-brand-dark px-5 py-4">
     <div className="mx-auto max-w-3xl">
       {!isGeminiConfigured ? (
         <p className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">

@@ -24,7 +24,7 @@ const getAccessToken = async () => {
   return data.session.access_token;
 };
 
-export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens = 2048, responseJson = false, systemPrompt = null }) => {
+export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens = 2048, responseJson = false, systemPrompt = null, history = null }) => {
   const token = await getAccessToken();
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -38,6 +38,7 @@ export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens =
       max_output_tokens: maxOutputTokens,
       response_json: responseJson,
       system_prompt: systemPrompt,
+      history,
     }),
   });
 
@@ -137,6 +138,7 @@ export const askGeminiAboutCase = async ({
   importantDates,
   officialReferences,
   systemPrompt = null,
+  history = null,
 }) => {
   if (!isGeminiConfigured) {
     throw new Error('Gemini no esta configurado (Supabase no disponible).');
@@ -147,6 +149,7 @@ export const askGeminiAboutCase = async ({
     temperature: 0.25,
     maxOutputTokens: 1200,
     systemPrompt,
+    history,
   });
   return cleanAssistantText(text);
 };

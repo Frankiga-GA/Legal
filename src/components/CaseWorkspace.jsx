@@ -236,13 +236,17 @@ const CaseWorkspace = ({ caseId, onClose }) => {
   const submitAiQuestion = async (question) => {
     if (!question.trim() || isAiThinking) return;
 
-    setAiMessages(prev => [...prev, { role: 'user', content: question }]);
+    const userMessage = { role: 'user', content: question };
+    setAiMessages(prev => [...prev, userMessage]);
     saveCaseChat(caseData.id, 'user', question).catch((err) =>
       console.warn('No se pudo guardar el mensaje en Supabase.', err?.message)
     );
     setIsAiThinking(true);
 
     try {
+      // Pasamos los ultimos 10 mensajes (sin contar el actual) para que la IA
+      // tenga contexto de la conversacion. El backend los recibe como historial.
+      const history = aiMessages.slice(-10);
       const response = await askGeminiAboutCase({
         question,
         caseData,
@@ -250,6 +254,7 @@ const CaseWorkspace = ({ caseId, onClose }) => {
         notes,
         importantDates,
         officialReferences,
+        history,
       });
       setAiMessages(prev => [...prev, { role: 'ai', content: response }]);
       saveCaseChat(caseData.id, 'ai', response).catch((err) =>
