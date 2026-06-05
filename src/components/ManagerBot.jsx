@@ -1,7 +1,9 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bot,
+  Check,
+  ChevronDown,
   ClipboardCopy,
   Edit3,
   FileText,
@@ -93,6 +95,107 @@ const inputClass =
   'w-full rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-sm text-brand-ivory outline-none transition-colors placeholder:text-brand-accent/30 focus:border-brand-gold/40';
 
 const textareaClass = `${inputClass} resize-y min-h-[110px] font-light leading-relaxed`;
+
+const CustomSelect = ({ value, onChange, options, placeholder = 'Seleccionar...' }) => {
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(-1);
+  const containerRef = useRef(null);
+  const buttonRef = useRef(null);
+
+  const current = options.find((opt) => opt.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    const handleKey = (event) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        buttonRef.current?.focus();
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setHighlighted((prev) => (prev + 1) % options.length);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setHighlighted((prev) => (prev <= 0 ? options.length - 1 : prev - 1));
+      } else if (event.key === 'Enter' && highlighted >= 0) {
+        event.preventDefault();
+        onChange(options[highlighted].value);
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [open, options, highlighted, onChange]);
+
+  useEffect(() => {
+    if (open) {
+      const idx = options.findIndex((opt) => opt.value === value);
+      setHighlighted(idx >= 0 ? idx : 0);
+    }
+  }, [open, options, value]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className={`flex w-full items-center justify-between gap-3 rounded-xl border bg-white/[0.02] px-4 py-3 text-left text-sm transition-colors ${
+          open
+            ? 'border-brand-gold/40 text-brand-ivory'
+            : 'border-white/[0.08] text-brand-ivory hover:border-white/[0.15]'
+        }`}
+      >
+        <span className={current ? 'text-brand-ivory' : 'text-brand-accent/40'}>
+          {current ? current.label : placeholder}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-brand-accent/60 transition-transform ${open ? 'rotate-180 text-brand-gold' : ''}`}
+        />
+      </button>
+      {open ? (
+        <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl border border-white/[0.08] bg-brand-dark shadow-2xl shadow-black/40">
+          <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
+            {options.map((opt, index) => {
+              const isSelected = opt.value === value;
+              const isHighlighted = index === highlighted;
+              return (
+                <li key={opt.value} role="option" aria-selected={isSelected}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(opt.value);
+                      setOpen(false);
+                    }}
+                    onMouseEnter={() => setHighlighted(index)}
+                    className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                      isHighlighted
+                        ? 'bg-brand-gold/10 text-brand-ivory'
+                        : 'text-brand-accent hover:bg-white/[0.04] hover:text-brand-ivory'
+                    }`}
+                  >
+                    <span className="font-light">{opt.label}</span>
+                    {isSelected ? <Check className="h-4 w-4 text-brand-gold" /> : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 const ManagerBot = () => {
   const [activeTab, setActiveTab] = useState('assistants');
@@ -532,17 +635,11 @@ const AssistantForm = ({ initial, editingId, onClose, onSave }) => {
           />
         </FormField>
         <FormField label="Materia (opcional)">
-          <select
+          <CustomSelect
             value={form.specialty}
-            onChange={(event) => update('specialty', event.target.value)}
-            className={inputClass}
-          >
-            {SPECIALTY_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => update('specialty', value)}
+            options={SPECIALTY_OPTIONS.map((option) => ({ value: option, label: option }))}
+          />
         </FormField>
         <FormField label="Descripcion breve" hint="Una linea que explique cuando usar este asistente.">
           <input
@@ -622,17 +719,11 @@ const PromptForm = ({ initial, editingId, onClose, onSave }) => {
           />
         </FormField>
         <FormField label="Categoria">
-          <select
+          <CustomSelect
             value={form.category}
-            onChange={(event) => update('category', event.target.value)}
-            className={inputClass}
-          >
-            {PROMPT_CATEGORIES.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => update('category', value)}
+            options={PROMPT_CATEGORIES.map((option) => ({ value: option, label: option }))}
+          />
         </FormField>
         <FormField label="Contenido del prompt" hint="Lo que se va a pegar en el chat al usar este prompt.">
           <textarea
