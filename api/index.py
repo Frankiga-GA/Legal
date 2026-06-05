@@ -24,13 +24,36 @@ from main import app  # noqa: E402
 from mangum import Mangum  # noqa: E402
 
 
-class LustiMangum(Mangum):
-    """Wrapper que muestra la ruta entrante para depurar el routing en Vercel."""
+def _strip_api_prefix(event):
+    """Vercel entrega la ruta con el prefijo `/api/...` (ej. /api/upload).
+    FastAPI tiene las rutas registradas SIN ese prefijo (ej. /upload),
+    igual que en local, donde el proxy de Vite ya lo recorta. Esta funcion
+    reescribe el evento para que el resto del pipeline (Mangum -> FastAPI)
+    vea la ruta limpia. Si en el futuro Vercel recorta el prefijo solo,
+    esta funcion no hace daño (no encuentra `/api/` y deja el path igual).
+    """
+    api_prefix = "/api/"
+    for key in ("rawPath", "path"):
+        value = event.get(key)
+        if isinstance(value, str) and value.startswith(api_prefix):
+            new_value = "/" + value[len(api_prefix):]
+            event[key] = new_value
+            logger.info("vercel-entry: rewrote %s %s -> %s", key, value, new_value)
+    # Tambien reescribir requestContext.http.path si esta presente
+    rc = event.get("requestContext") or {}
+    http = rc.get("http") if isinstance(rc, dict) else None
+    if isinstance(http, dict):
+        path = http.get("path")
+        if isinstance(path, str) and path.startswith(api_prefix):
+            new_path = "/" + path[len(api_prefix):]
+            http["path"] = new_path
+            logger.info("vercel-entry: rewrote requestContext.http.path %s -> %s", path, new_path)
+    return event
 
+
+class LustiMangum(Mangum):
     def __call__(self, event, context):
-        path = event.get("rawPath") or event.get("path") or ""
-        method = event.get("requestContext", {}).get("http", {}).get("method") or event.get("httpMethod") or ""
-        logger.info("vercel-entry: %s %s", method, path)
+        event = _strip_api_prefix(event)
         return super().__call__(event, context)
 
 
