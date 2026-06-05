@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 
 import Sidebar from './components/Sidebar';
@@ -57,20 +57,38 @@ function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isDriveConnected, setIsDriveConnected] = useState(() => Boolean(getStoredDriveToken()?.access_token));
   const [showAlreadyLoggedIn, setShowAlreadyLoggedIn] = useState(false);
+  const [showTakeOverMessage, setShowTakeOverMessage] = useState(false);
+  const [closeFailed, setCloseFailed] = useState(false);
+
+  const tabId = useRef(`tab_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`).current;
+  const channelRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
-    let channel = null;
-    const tabId = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     // Sincroniza el inicio de sesion entre pestanas para evitar que el
     // magic link deje dos sesiones abiertas a la vez.
     if (typeof BroadcastChannel !== 'undefined') {
-      channel = new BroadcastChannel('lusti_auth_sync');
+      const channel = new BroadcastChannel('lusti_auth_sync');
+      channelRef.current = channel;
       channel.onmessage = (event) => {
         if (!isMounted) return;
         if (event.data?.type === 'AUTH_COMPLETE' && event.data.tabId !== tabId) {
-          setShowAlreadyLoggedIn(true);
+          // Si el usuario ya confirmo que quiere usar esta ventana,
+          // no le volvamos a mostrar el overlay.
+          let dismissed = false;
+          try {
+            dismissed = window.sessionStorage.getItem('lusti_overlay_dismissed') === '1';
+          } catch {
+            /* noop */
+          }
+          if (!dismissed) {
+            setShowAlreadyLoggedIn(true);
+          }
+        }
+        if (event.data?.type === 'TAKE_OVER' && event.data.fromTabId !== tabId) {
+          // Otra pestana tomo el control. Esta pestana debe cerrarse.
+          setShowTakeOverMessage(true);
         }
       };
     }
@@ -139,7 +157,10 @@ function App() {
     return () => {
       isMounted = false;
       subscription.unsubscribe();
-      if (channel) channel.close();
+      if (channelRef.current) {
+        channelRef.current.close();
+        channelRef.current = null;
+      }
     };
   }, []);
 
@@ -401,14 +422,35 @@ function App() {
             <p className="text-sm text-slate-400 mb-6 leading-relaxed">
               LUSTI se abrio en otra ventana cuando hiciste clic en el enlace magico. Para evitar duplicados, te recomendamos cerrar esta pestana y volver a la original.
             </p>
+            {closeFailed && (
+              <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] text-amber-300">
+                No pude cerrar la pestana automaticamente. Usa la <span className="font-semibold">X</span> del navegador para cerrarla.
+              </p>
+            )}
             <div className="flex flex-col gap-2">
               <button
                 type="button"
                 onClick={() => {
+                  try {
+                    window.sessionStorage.setItem('lusti_closing', '1');
+                  } catch {
+                    /* noop */
+                  }
                   window.close();
-                  // Si el navegador no permite cerrarla (pestana abierta manualmente),
-                  // el usuario vera un mensaje de respaldo.
-                  setTimeout(() => setShowAlreadyLoggedIn(false), 300);
+                  // Si window.close() no funciona, el navegador no permite
+                  // cerrar pestanas abiertas manualmente. Detectamos el caso
+                  // y avisamos al usuario.
+                  setTimeout(() => {
+                    try {
+                      const stillHere = window.sessionStorage.getItem('lusti_closing') === '1';
+                      if (stillHere) {
+                        window.sessionStorage.removeItem('lusti_closing');
+                        setCloseFailed(true);
+                      }
+                    } catch {
+                      /* noop */
+                    }
+                  }, 300);
                 }}
                 className="w-full rounded-lg bg-brand-gold px-4 py-3 text-sm font-semibold text-brand-black hover:bg-brand-gold/90 transition-colors"
               >
@@ -417,8 +459,18 @@ function App() {
               <button
                 type="button"
                 onClick={() => {
+                  // Marca esta ventana como la principal y avisa a las
+                  // demas para que se cierren. Asi no vuelve a aparecer
+                  // el overlay aunque Supabase sincronice el estado.
+                  try {
+                    window.sessionStorage.setItem('lusti_overlay_dismissed', '1');
+                  } catch {
+                    /* noop */
+                  }
+                  if (channelRef.current) {
+                    channelRef.current.postMessage({ type: 'TAKE_OVER', fromTabId: tabId });
+                  }
                   setShowAlreadyLoggedIn(false);
-                  window.location.reload();
                 }}
                 className="w-full rounded-lg border border-white/[0.08] bg-transparent px-4 py-3 text-sm font-medium text-brand-ivory hover:bg-white/[0.04] transition-colors"
               >
@@ -427,6 +479,27 @@ function App() {
             </div>
             <p className="mt-5 text-[10px] uppercase tracking-[0.2em] text-slate-500">
               Sesion activa en otra pestana
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showTakeOverMessage && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+          <div className="relative w-full max-w-md rounded-2xl border border-white/[0.08] bg-brand-dark p-8 shadow-2xl text-center">
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/30">
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <h2 className="font-serif text-2xl text-brand-ivory mb-2">Cierra esta ventana</h2>
+            <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+              Abriste LUSTI en otra ventana. Para evitar duplicados, por favor cierra esta pestana con la <span className="font-semibold text-brand-ivory">X</span> del navegador.
+            </p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+              Otra ventana tomo el control
             </p>
           </div>
         </div>
