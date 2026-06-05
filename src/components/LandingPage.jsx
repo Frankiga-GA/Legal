@@ -1,3 +1,16 @@
+// =============================================================================
+// src/components/LandingPage.jsx
+// =============================================================================
+// Pagina publica de LUSTI. Integra:
+//   - Scroll fade-in (AnimatedSection)
+//   - Blobs de gradiente flotando (FloatingBlobs)
+//   - Spotlight que sigue al cursor (Spotlight)
+//   - Contador animado en metrics (AnimatedNumber)
+//   - Marquee de fuentes legales (Marquee)
+//   - Product preview animado (AnimatedProductPreview)
+//   - Sticky CTA flotante (StickyCTA)
+// =============================================================================
+
 import {
   ArrowRight,
   Bell,
@@ -11,6 +24,25 @@ import {
   SearchCheck,
   Shield,
 } from 'lucide-react';
+import AnimatedSection from './AnimatedSection';
+import AnimatedNumber from './AnimatedNumber';
+import AnimatedProductPreview from './AnimatedProductPreview';
+import FloatingBlobs from './FloatingBlobs';
+import Marquee from './Marquee';
+import Spotlight from './Spotlight';
+import StickyCTA from './StickyCTA';
+
+const LEGAL_SOURCES = [
+  'El Peruano',
+  'Tribunal Constitucional',
+  'Poder Judicial',
+  'SUNARP',
+  'SUNAT',
+  'Casaciones',
+  'Sanciones SOL',
+  'Diario Oficial',
+  'Casilla Electronica',
+];
 
 const LandingPage = ({ onGetStarted }) => {
   const modules = [
@@ -73,168 +105,212 @@ const LandingPage = ({ onGetStarted }) => {
       <div className="fixed inset-0 grid-pattern opacity-10 pointer-events-none"></div>
       <div className="fixed inset-0 noise-bg pointer-events-none z-50"></div>
 
-      <section className="relative min-h-[92vh] overflow-hidden bg-slate-950">
-        <img
-          src="/Legal1.jpeg"
-          alt="Estudio juridico"
-          className="absolute inset-0 h-full w-full object-cover opacity-20"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-slate-900/40"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/20"></div>
-
+      {/* HERO */}
+      <Spotlight className="relative min-h-[92vh] overflow-hidden">
+        <FloatingBlobs />
         <div className="relative z-10 mx-auto flex min-h-[92vh] max-w-7xl flex-col px-6 py-7">
-          <nav className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="rounded-lg bg-brand-gold p-3 text-brand-black">
-                <Scale className="h-5 w-5" />
+          <AnimatedSection direction="down">
+            <nav className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="rounded-lg bg-brand-gold p-3 text-brand-black shadow-[0_0_20px_rgba(228,228,231,0.15)]">
+                  <Scale className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-serif text-xl font-bold tracking-tight text-white">LUSTI</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-blue-400">Legal Intelligence</p>
+                </div>
               </div>
-              <div>
-                <p className="font-serif text-xl font-bold tracking-tight text-white">LUSTI</p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-blue-400">Legal Intelligence</p>
-              </div>
-            </div>
-            <button
-              onClick={onGetStarted}
-              className="hidden rounded-lg border border-white/20 bg-white/5 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-white/80 transition-colors hover:bg-white/10 hover:text-white sm:inline-flex"
-            >
-              Acceder
-            </button>
-          </nav>
+              <button
+                onClick={onGetStarted}
+                className="hidden rounded-lg border border-white/20 bg-white/5 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-white/80 transition-all hover:border-white/30 hover:bg-white/10 hover:text-white sm:inline-flex"
+              >
+                Acceder
+              </button>
+            </nav>
+          </AnimatedSection>
 
           <div className="grid flex-1 items-center gap-12 py-12 lg:grid-cols-[0.95fr_1.05fr]">
             <div className="max-w-4xl space-y-8">
-              <div className="inline-flex max-w-full items-center gap-3 rounded-full border border-blue-500/25 bg-blue-500/10 px-4 py-2">
-                <span className="h-2 w-2 shrink-0 rounded-full bg-blue-400"></span>
-                <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-blue-400">Legal workspace con IA documental</span>
-              </div>
+              <AnimatedSection delay={100}>
+                <div className="inline-flex max-w-full items-center gap-3 rounded-full border border-blue-500/25 bg-blue-500/10 px-4 py-2">
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60"></span>
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-400"></span>
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-blue-400">Legal workspace con IA documental</span>
+                </div>
+              </AnimatedSection>
 
-              <div className="space-y-5">
-                <h1 className="max-w-5xl text-5xl font-serif font-medium leading-[1.05] tracking-tight text-white md:text-7xl">
-                  Convierte expedientes dispersos en una operacion legal inteligente.
-                </h1>
-                <p className="max-w-2xl text-lg font-light leading-8 text-slate-300 md:text-xl">
-                  LUSTI organiza casos, documentos, vencimientos y asistentes IA para que una firma trabaje con mas control, menos busqueda manual y respuestas mejor sustentadas.
-                </p>
-              </div>
+              <AnimatedSection delay={200}>
+                <div className="space-y-5">
+                  <h1 className="max-w-5xl text-5xl font-serif font-medium leading-[1.05] tracking-tight text-white md:text-7xl">
+                    Convierte expedientes dispersos en una operacion legal inteligente.
+                  </h1>
+                  <p className="max-w-2xl text-lg font-light leading-8 text-slate-300 md:text-xl">
+                    LUSTI organiza casos, documentos, vencimientos y asistentes IA para que una firma trabaje con mas control, menos busqueda manual y respuestas mejor sustentadas.
+                  </p>
+                </div>
+              </AnimatedSection>
 
-              <div className="flex flex-col gap-4 sm:flex-row">
-                <button
-                  onClick={onGetStarted}
-                  className="group inline-flex items-center justify-center gap-3 rounded-lg bg-brand-gold px-8 py-4 font-bold text-brand-black transition-colors hover:bg-brand-ivory"
-                >
-                  Ver demo privada
-                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-                </button>
-                <a
-                  href="#modulos"
-                  className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-8 py-4 font-bold text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-                >
-                  Explorar valor
-                </a>
-              </div>
+              <AnimatedSection delay={300}>
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  <button
+                    onClick={onGetStarted}
+                    className="group inline-flex items-center justify-center gap-3 rounded-lg bg-brand-gold px-8 py-4 font-bold text-brand-black shadow-[0_0_30px_rgba(228,228,231,0.12)] transition-all hover:scale-[1.02] hover:bg-brand-ivory"
+                  >
+                    Ver demo privada
+                    <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                  </button>
+                  <a
+                    href="#modulos"
+                    className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-8 py-4 font-bold text-white/80 transition-all hover:scale-[1.02] hover:bg-white/10 hover:text-white"
+                  >
+                    Explorar valor
+                  </a>
+                </div>
+              </AnimatedSection>
 
-              <div className="grid max-w-2xl grid-cols-3 gap-3 pt-2">
-                <TrustMetric value="3" label="flujos clave" />
-                <TrustMetric value="IA" label="por expediente" />
-                <TrustMetric value="360" label="vista legal" />
-              </div>
+              <AnimatedSection delay={400}>
+                <div className="grid max-w-2xl grid-cols-3 gap-3 pt-2">
+                  <TrustMetric value="3" label="flujos clave" />
+                  <TrustMetric value="IA" label="por expediente" />
+                  <TrustMetric value="360" label="vista legal" />
+                </div>
+              </AnimatedSection>
             </div>
 
-            <ProductPreview />
+            <AnimatedSection delay={350} direction="left" className="hidden lg:block">
+              <AnimatedProductPreview />
+            </AnimatedSection>
           </div>
         </div>
-      </section>
+      </Spotlight>
 
+      {/* MARQUEE DE FUENTES */}
+      <AnimatedSection>
+        <div className="relative z-10 border-y border-white/[0.06] bg-white/[0.01] py-6">
+          <Marquee items={LEGAL_SOURCES} speed={42} />
+        </div>
+      </AnimatedSection>
+
+      {/* PAIN POINTS */}
       <section className="relative z-10 mx-auto grid max-w-7xl gap-8 px-6 py-20 lg:grid-cols-[0.85fr_1.15fr]">
-        <div>
-          <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.28em] text-brand-gold">Por que importa</p>
-          <h2 className="text-4xl font-serif font-medium leading-tight text-brand-ivory md:text-5xl">
-            La firma pierde velocidad cuando la informacion legal no esta conectada.
-          </h2>
-        </div>
-        <div className="grid gap-3">
-          {painPoints.map((point) => (
-            <div key={point} className="flex items-start gap-4 rounded-lg border border-white/[0.06] bg-white/[0.015] p-5">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-brand-gold" />
-              <p className="text-sm leading-6 text-brand-accent/70">{point}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section id="modulos" className="relative z-10 mx-auto max-w-7xl px-6 py-16">
-        <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <AnimatedSection>
           <div>
-            <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.28em] text-brand-gold">La propuesta</p>
-            <h2 className="max-w-3xl text-4xl font-serif font-medium leading-tight text-brand-ivory md:text-5xl">
-              Un sistema que se vende por claridad, no por cantidad de botones.
+            <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.28em] text-brand-gold">Por que importa</p>
+            <h2 className="text-4xl font-serif font-medium leading-tight text-brand-ivory md:text-5xl">
+              La firma pierde velocidad cuando la informacion legal no esta conectada.
             </h2>
           </div>
-          <p className="max-w-md text-sm font-light leading-6 text-brand-accent/60">
-            La experiencia principal se centra en expediente, documento e IA. Todo lo demas acompana esa ruta.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {modules.map((module) => (
-            <ModuleCard key={module.title} {...module} />
+        </AnimatedSection>
+        <div className="grid gap-3">
+          {painPoints.map((point, idx) => (
+            <AnimatedSection key={point} delay={idx * 80}>
+              <div className="group flex items-start gap-4 rounded-lg border border-white/[0.06] bg-white/[0.015] p-5 transition-all hover:-translate-y-0.5 hover:border-brand-gold/20 hover:bg-white/[0.025]">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-brand-gold transition-transform group-hover:scale-110" />
+                <p className="text-sm leading-6 text-brand-accent/70">{point}</p>
+              </div>
+            </AnimatedSection>
           ))}
         </div>
       </section>
 
-      <section className="relative z-10 mx-auto max-w-7xl px-6 py-12">
-        <div className="grid gap-4 md:grid-cols-3">
-          {proofPoints.map((item) => (
-            <TrustBlock key={item.title} {...item} />
-          ))}
-        </div>
-      </section>
-
-      <section className="relative z-10 mx-auto max-w-7xl px-6 py-20">
-        <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-6 md:p-10">
+      {/* MODULOS */}
+      <section id="modulos" className="relative z-10 mx-auto max-w-7xl px-6 py-16">
+        <AnimatedSection>
           <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.28em] text-brand-gold">Como funciona</p>
-              <h2 className="text-4xl font-serif font-medium text-brand-ivory">Del expediente al analisis en minutos.</h2>
+              <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.28em] text-brand-gold">La propuesta</p>
+              <h2 className="max-w-3xl text-4xl font-serif font-medium leading-tight text-brand-ivory md:text-5xl">
+                Un sistema que se vende por claridad, no por cantidad de botones.
+              </h2>
             </div>
-            <button
-              onClick={onGetStarted}
-              className="inline-flex items-center justify-center gap-3 rounded-lg bg-brand-gold px-6 py-3 text-sm font-bold text-brand-black transition-colors hover:bg-brand-ivory"
-            >
-              Iniciar demo <ArrowRight className="h-4 w-4" />
-            </button>
+            <p className="max-w-md text-sm font-light leading-6 text-brand-accent/60">
+              La experiencia principal se centra en expediente, documento e IA. Todo lo demas acompana esa ruta.
+            </p>
           </div>
-          <div className="grid gap-4 md:grid-cols-4">
-            {workflow.map((item) => (
-              <WorkflowStep key={item.step} {...item} />
-            ))}
-          </div>
+        </AnimatedSection>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {modules.map((module, idx) => (
+            <AnimatedSection key={module.title} delay={idx * 100}>
+              <ModuleCard {...module} />
+            </AnimatedSection>
+          ))}
         </div>
       </section>
 
+      {/* PROOF POINTS */}
+      <section className="relative z-10 mx-auto max-w-7xl px-6 py-12">
+        <div className="grid gap-4 md:grid-cols-3">
+          {proofPoints.map((item, idx) => (
+            <AnimatedSection key={item.title} delay={idx * 100}>
+              <TrustBlock {...item} />
+            </AnimatedSection>
+          ))}
+        </div>
+      </section>
+
+      {/* WORKFLOW */}
+      <section className="relative z-10 mx-auto max-w-7xl px-6 py-20">
+        <AnimatedSection>
+          <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-6 md:p-10">
+            <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.28em] text-brand-gold">Como funciona</p>
+                <h2 className="text-4xl font-serif font-medium text-brand-ivory">Del expediente al analisis en minutos.</h2>
+              </div>
+              <button
+                onClick={onGetStarted}
+                className="inline-flex items-center justify-center gap-3 rounded-lg bg-brand-gold px-6 py-3 text-sm font-bold text-brand-black transition-all hover:scale-[1.03] hover:bg-brand-ivory"
+              >
+                Iniciar demo <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid gap-4 md:grid-cols-4">
+              {workflow.map((item, idx) => (
+                <AnimatedSection key={item.step} delay={idx * 80}>
+                  <WorkflowStep {...item} />
+                </AnimatedSection>
+              ))}
+            </div>
+          </div>
+        </AnimatedSection>
+      </section>
+
+      {/* TRUST BLOCKS */}
       <section className="relative z-10 border-y border-white/[0.06] bg-white/[0.01] py-20">
         <div className="mx-auto grid max-w-7xl gap-6 px-6 md:grid-cols-3">
-          <TrustBlock icon={Shield} title="Privacidad por diseno" text="Los datos del expediente se tratan como informacion sensible desde el primer flujo." />
-          <TrustBlock icon={LockKeyhole} title="Control del estudio" text="Cada caso concentra documentos, notas y fechas para reducir dispersion operativa." />
-          <TrustBlock icon={FileText} title="Trazabilidad del caso" text="La boveda ayuda a revisar que existe, que falta y cual es el siguiente paso." />
+          <AnimatedSection>
+            <TrustBlock icon={Shield} title="Privacidad por diseno" text="Los datos del expediente se tratan como informacion sensible desde el primer flujo." />
+          </AnimatedSection>
+          <AnimatedSection delay={100}>
+            <TrustBlock icon={LockKeyhole} title="Control del estudio" text="Cada caso concentra documentos, notas y fechas para reducir dispersion operativa." />
+          </AnimatedSection>
+          <AnimatedSection delay={200}>
+            <TrustBlock icon={FileText} title="Trazabilidad del caso" text="La boveda ayuda a revisar que existe, que falta y cual es el siguiente paso." />
+          </AnimatedSection>
         </div>
       </section>
 
+      {/* CIERRE */}
       <section className="relative z-10 mx-auto max-w-5xl px-6 py-28 text-center">
-        <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.28em] text-brand-gold">Siguiente paso</p>
-        <h2 className="text-4xl font-serif font-medium leading-tight text-brand-ivory md:text-6xl">
-          Muestra LUSTI como una plataforma seria desde el primer clic.
-        </h2>
-        <p className="mx-auto mt-6 max-w-2xl text-base font-light leading-7 text-brand-accent/65">
-          Entra a la plataforma, abre un expediente demo, carga un documento y deja que la IA muestre valor concreto.
-        </p>
-        <button
-          onClick={onGetStarted}
-          className="mt-10 inline-flex items-center justify-center gap-3 rounded-lg bg-brand-ivory px-8 py-4 font-bold text-brand-black transition-colors hover:bg-white"
-        >
-          Entrar a la plataforma
-          <ArrowRight className="h-5 w-5" />
-        </button>
+        <AnimatedSection>
+          <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.28em] text-brand-gold">Siguiente paso</p>
+          <h2 className="text-4xl font-serif font-medium leading-tight text-brand-ivory md:text-6xl">
+            Muestra LUSTI como una plataforma seria desde el primer clic.
+          </h2>
+          <p className="mx-auto mt-6 max-w-2xl text-base font-light leading-7 text-brand-accent/65">
+            Entra a la plataforma, abre un expediente demo, carga un documento y deja que la IA muestre valor concreto.
+          </p>
+          <button
+            onClick={onGetStarted}
+            className="mt-10 inline-flex items-center justify-center gap-3 rounded-lg bg-brand-ivory px-8 py-4 font-bold text-brand-black shadow-[0_0_30px_rgba(228,228,231,0.15)] transition-all hover:scale-[1.03] hover:bg-white"
+          >
+            Entrar a la plataforma
+            <ArrowRight className="h-5 w-5" />
+          </button>
+        </AnimatedSection>
       </section>
 
       <footer className="relative z-10 border-t border-white/[0.06] px-6 py-10">
@@ -245,74 +321,25 @@ const LandingPage = ({ onGetStarted }) => {
           </p>
         </div>
       </footer>
+
+      <StickyCTA onClick={onGetStarted} />
     </div>
   );
 };
 
 const TrustMetric = ({ value, label }) => (
-  <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4">
-    <p className="text-2xl font-serif text-blue-400">{value}</p>
-    <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{label}</p>
-  </div>
-);
-
-const ProductPreview = () => (
-  <div className="relative mt-4 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/80 p-4 sm:p-5">
-    <div className="absolute inset-x-0 top-0 h-px bg-slate-800"></div>
-    <div className="mb-5 flex items-center justify-between gap-4 border-b border-slate-800 pb-4">
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-400">Panel operativo</p>
-        <h3 className="mt-2 font-serif text-2xl text-white">Caso laboral urgente</h3>
-      </div>
-      <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-300">Activo</span>
-    </div>
-    <div className="grid grid-cols-3 gap-3">
-      <MiniStat value="12" label="docs" />
-      <MiniStat value="03" label="plazos" />
-      <MiniStat value="08" label="notas" />
-    </div>
-    <div className="mt-5 space-y-3">
-      {[
-        ['IA del expediente', 'Resumen ejecutivo, riesgos y siguientes acciones listos.'],
-        ['Proximo vencimiento', 'Audiencia de conciliacion: requiere preparacion.'],
-        ['Documento reciente', 'Contrato y anexos vinculados al analisis.'],
-      ].map(([title, text]) => (
-        <div key={title} className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-400">{title}</p>
-          <p className="mt-2 text-sm text-slate-300">{text}</p>
-        </div>
-      ))}
-    </div>
-    <div className="mt-5 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/60">
-      <div className="flex w-max animate-live-feed gap-3 px-4 py-3">
-        {[
-          'Nuevo documento indexado',
-          'Alerta de vencimiento detectada',
-          'IA genero resumen del caso',
-          'Nota interna agregada',
-          'Expediente actualizado',
-          'Nuevo documento indexado',
-          'Alerta de vencimiento detectada',
-        ].map((item, index) => (
-          <span key={`${item}-${index}`} className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-            {item}
-          </span>
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
-const MiniStat = ({ value, label }) => (
-  <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
-    <p className="text-2xl font-serif text-white">{value}</p>
+  <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 transition-colors hover:border-brand-gold/20">
+    <p className="text-2xl font-serif text-blue-400">
+      <AnimatedNumber value={value} duration={1200} />
+    </p>
     <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{label}</p>
   </div>
 );
 
 const ModuleCard = ({ icon: Icon, title, description }) => (
-  <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-6 transition-colors hover:border-brand-gold/30">
-    <div className="mb-8 inline-flex rounded-lg bg-brand-gold/10 p-3 text-brand-gold">
+  <div className="group relative h-full overflow-hidden rounded-lg border border-white/[0.06] bg-white/[0.015] p-6 transition-all hover:-translate-y-1 hover:border-brand-gold/30 hover:bg-white/[0.025]">
+    <div className="absolute inset-0 -z-10 opacity-0 transition-opacity duration-500 group-hover:opacity-100" style={{ background: 'radial-gradient(400px circle at 50% 0%, rgba(228,228,231,0.06), transparent 60%)' }} />
+    <div className="mb-8 inline-flex rounded-lg bg-brand-gold/10 p-3 text-brand-gold transition-transform group-hover:scale-110">
       <Icon className="h-6 w-6" />
     </div>
     <h3 className="font-serif text-2xl text-brand-ivory">{title}</h3>
@@ -321,16 +348,16 @@ const ModuleCard = ({ icon: Icon, title, description }) => (
 );
 
 const WorkflowStep = ({ step, title, text }) => (
-  <div className="rounded-lg border border-white/[0.06] bg-brand-black/30 p-5">
-    <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-brand-gold">{step}</p>
+  <div className="group h-full rounded-lg border border-white/[0.06] bg-brand-black/30 p-5 transition-all hover:-translate-y-1 hover:border-brand-gold/30">
+    <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-brand-gold transition-transform group-hover:scale-110 inline-block">{step}</p>
     <h3 className="mt-6 font-serif text-xl text-brand-ivory">{title}</h3>
     <p className="mt-3 text-sm font-light leading-6 text-brand-accent/60">{text}</p>
   </div>
 );
 
 const TrustBlock = ({ icon: Icon, title, text }) => (
-  <div className="rounded-lg border border-white/[0.06] bg-brand-black/30 p-6">
-    <Icon className="mb-6 h-6 w-6 text-brand-gold" />
+  <div className="group h-full rounded-lg border border-white/[0.06] bg-brand-black/30 p-6 transition-all hover:-translate-y-1 hover:border-brand-gold/30">
+    <Icon className="mb-6 h-6 w-6 text-brand-gold transition-transform group-hover:scale-110" />
     <h3 className="font-serif text-2xl text-brand-ivory">{title}</h3>
     <p className="mt-4 text-sm font-light leading-6 text-brand-accent/60">{text}</p>
   </div>
