@@ -257,21 +257,18 @@ const NotificationPreferences = ({ userId }) => {
   }, [userId]);
 
   const update = (field, value) => {
-    setPrefs((prev) => ({ ...prev, [field]: value }));
+    const next = { ...prefs, [field]: value };
+    setPrefs(next);
     setSaved(false);
+    saveNotificationPreferences(userId, next);
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2000);
   };
 
   const requestPermission = async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
     const result = await Notification.requestPermission();
     setPermission(result);
-    if (result === 'granted') update('browserNotifications', true);
-  };
-
-  const handleSave = () => {
-    saveNotificationPreferences(userId, prefs);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2500);
   };
 
   return (
@@ -305,38 +302,40 @@ const NotificationPreferences = ({ userId }) => {
                 Solicitar permiso
               </button>
             )}
+            {permission === 'denied' && (
+              <p className="mt-2 text-xs text-brand-accent/60">
+                Para reactivar las notificaciones, desbloquealas desde la configuracion de tu navegador.
+              </p>
+            )}
           </div>
         )}
 
         <ToggleField
-          label="Avisarme cuando el Radar Normativo detecte normas relevantes"
-          description="Usa las notificaciones del navegador si estan activas."
-          checked={prefs.normAlerts}
-          onChange={(v) => update('normAlerts', v)}
-        />
-        <ToggleField
           label="Avisarme 24h antes de un plazo critico"
-          description="Para expedientes con fechas proximas (HOY, 3 dias, vencidos)."
+          description="Para expedientes con fechas pendientes. Las notificaciones salen cuando abris la app o volves a la pestaña."
           checked={prefs.deadlineAlerts}
           onChange={(v) => update('deadlineAlerts', v)}
         />
+
+        <div className="rounded-lg border border-dashed border-white/[0.08] bg-white/[0.01] p-4">
+          <div className="flex items-start gap-3">
+            <Bell className="mt-0.5 h-4 w-4 text-brand-accent" />
+            <div>
+              <p className="text-sm font-medium text-brand-ivory/80">Radar Normativo</p>
+              <p className="mt-1 text-xs text-brand-accent/60">
+                Proximamente: avisos automaticos cuando aparezcan normas relevantes para tus expedientes.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <button
-          onClick={handleSave}
-          className="flex items-center gap-3 rounded-xl bg-brand-ivory px-8 py-4 font-bold tracking-tight text-brand-black transition-all hover:bg-white"
-        >
-          <Save className="h-4 w-4" />
-          Guardar preferencias
-        </button>
-        {saved && (
-          <span className="inline-flex items-center gap-2 text-sm text-emerald-400">
-            <CheckCircle2 className="h-4 w-4" />
-            Guardado
-          </span>
-        )}
-      </div>
+      {saved ? (
+        <p className="inline-flex items-center gap-2 text-sm text-emerald-400">
+          <CheckCircle2 className="h-4 w-4" />
+          Guardado
+        </p>
+      ) : null}
     </div>
   );
 };

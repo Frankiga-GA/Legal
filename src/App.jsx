@@ -18,6 +18,9 @@ import LegalPage from './components/LegalPage';
 import { getCurrentSession, onAuthStateChange, signOut } from './services/authService';
 import { getStoredDriveToken, onDriveTokenChange, onDriveTokenMessage } from './services/googleDriveService';
 import { setPendingAiInput, setActiveAssistant } from './services/aiBridge';
+import { getCases } from './services/caseStore';
+import { loadAllPreferences } from './services/userPreferencesStore';
+import { checkDeadlinesAndNotify } from './services/notificationService';
 
 // Simple Error Boundary to catch render errors
 class ErrorBoundary extends React.Component {
@@ -107,6 +110,31 @@ function App() {
       unsubscribeDriveChange();
     };
   }, []);
+
+  // Revisa plazos criticos y dispara notificaciones cuando hay sesion activa.
+  // Se ejecuta al login, al volver de background y cada 5 minutos.
+  useEffect(() => {
+    if (!session?.user?.id) return undefined;
+    const userId = session.user.id;
+
+    const runCheck = () => {
+      const prefs = loadAllPreferences(userId);
+      const deadlineAlerts = prefs?.notifications?.deadlineAlerts !== false;
+      if (!deadlineAlerts) return;
+      const cases = getCases();
+      checkDeadlinesAndNotify(cases, userId, { deadlineAlerts: true });
+    };
+
+    runCheck();
+    const onFocus = () => runCheck();
+    const interval = window.setInterval(runCheck, 5 * 60 * 1000);
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [session?.user?.id]);
 
   const handleLogin = (nextSession) => {
     setSession(nextSession);

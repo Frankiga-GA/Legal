@@ -7,7 +7,6 @@ para FastAPI.
 
 El backend real vive en `backend/main.py`. Lo importamos desde aca.
 """
-import logging
 import os
 import sys
 
@@ -16,9 +15,6 @@ import sys
 BACKEND_DIR = os.path.join(os.path.dirname(__file__), "..", "backend")
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("vercel-entry")
 
 from main import app  # noqa: E402
 from mangum import Mangum  # noqa: E402
@@ -36,25 +32,19 @@ def _strip_api_prefix(event):
     for key in ("rawPath", "path"):
         value = event.get(key)
         if isinstance(value, str) and value.startswith(api_prefix):
-            new_value = "/" + value[len(api_prefix):]
-            event[key] = new_value
-            logger.info("vercel-entry: rewrote %s %s -> %s", key, value, new_value)
-    # Tambien reescribir requestContext.http.path si esta presente
+            event[key] = "/" + value[len(api_prefix):]
     rc = event.get("requestContext") or {}
     http = rc.get("http") if isinstance(rc, dict) else None
     if isinstance(http, dict):
         path = http.get("path")
         if isinstance(path, str) and path.startswith(api_prefix):
-            new_path = "/" + path[len(api_prefix):]
-            http["path"] = new_path
-            logger.info("vercel-entry: rewrote requestContext.http.path %s -> %s", path, new_path)
+            http["path"] = "/" + path[len(api_prefix):]
     return event
 
 
 class LustiMangum(Mangum):
     def __call__(self, event, context):
-        event = _strip_api_prefix(event)
-        return super().__call__(event, context)
+        return super().__call__(_strip_api_prefix(event), context)
 
 
 # `lifespan="off"` evita que Mangum intente ejecutar el lifespan de FastAPI
