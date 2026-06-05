@@ -1,6 +1,6 @@
 // src/components/Sidebar.jsx
 import {
-  Clock,
+  CalendarDays,
   FileText,
   FileSearch,
   HardDrive,
@@ -10,7 +10,6 @@ import {
   Newspaper,
   Scale,
   Settings,
-  CalendarDays,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
@@ -25,7 +24,6 @@ const Sidebar = ({ activeTab, setActiveTab, onHome, onLogout, userEmail, collaps
   const secondaryItems = [
     { id: 'monitor', label: 'Seguimiento', icon: FileSearch },
     { id: 'elperuano', label: 'Normas', icon: Newspaper },
-    { id: 'deadlines', label: 'Calculadora', icon: Clock },
     { id: 'calendar', label: 'Calendario', icon: CalendarDays },
     { id: 'settings', label: 'Configuracion', icon: Settings },
   ];
