@@ -1,12 +1,11 @@
 import { isSupabaseConfigured, supabase } from '../utils/supabase';
 
-// En produccion (Vercel) todos los endpoints pasan por el mismo rewrite
-// `/api/*` -> serverless function. En desarrollo local, VITE_DOCUMENT_BACKEND_URL
-// apunta al backend en localhost y Vite proxea /api a esa URL.
-const useLocalBackend = Boolean(import.meta.env.VITE_DOCUMENT_BACKEND_URL);
-const backendUrl = useLocalBackend
-  ? import.meta.env.VITE_DOCUMENT_BACKEND_URL
-  : '/api';
+// Siempre usamos `/api` como prefijo:
+//   - En desarrollo: Vite proxy redirige `/api/*` a localhost:8000 (vite.config.js)
+//   - En produccion (Vercel): vercel.json rewrite `/api/*` -> serverless function
+// De este modo el frontend no depende de la env var VITE_DOCUMENT_BACKEND_URL
+// y nunca apunta directo a 127.0.0.1.
+const backendUrl = '/api';
 
 const fetchWithTimeout = async (input, init = {}, timeoutMs = 15000) => {
   const controller = new AbortController();
