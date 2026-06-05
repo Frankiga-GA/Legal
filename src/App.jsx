@@ -152,8 +152,40 @@ function App() {
     await signOut();
     setSession(null);
     setActiveTab('library');
-    setIsLanding(false);
+    setIsLanding(true);
   };
+
+  // Bloquea el boton "Atras" del navegador para que no saque al usuario
+  // del sistema y lo mande a la landing. La navegacion interna se hace
+  // por el sidebar.
+  useEffect(() => {
+    if (!session) return undefined;
+    if (typeof window === 'undefined') return undefined;
+
+    const APP_STATE = { app: true };
+    const pushAppState = () => {
+      try {
+        window.history.pushState(APP_STATE, '', window.location.pathname);
+      } catch {
+        /* noop */
+      }
+    };
+
+    pushAppState();
+
+    const onPopState = () => {
+      if (!window.history.state?.app) {
+        pushAppState();
+      } else {
+        // Vuelve a empujar el estado para evitar que el siguiente back
+        // salga de la app
+        pushAppState();
+      }
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [session]);
 
   const openGlobalChat = async ({ pendingInput = null, assistant = null } = {}) => {
     if (pendingInput) setPendingAiInput(pendingInput);
