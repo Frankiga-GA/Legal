@@ -12,6 +12,7 @@ import {
   Bot,
   Edit3,
   FileText,
+  Library,
   Loader2,
   MessageSquare,
   Mic,
@@ -35,6 +36,9 @@ import {
   clearGlobalChats,
 } from '../services/chatHistoryStore';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
+import AiMessage from './AiMessage';
+import CitationPanel from './CitationPanel';
+import { collectCitations } from '../utils/citationParser';
 
 const HISTORY_LIMIT = 10;
 const ACCEPTED_TYPES = '.pdf,.docx,.doc,.txt,.md,.rtf';
@@ -57,6 +61,8 @@ const QUICK_ACTIONS = [
 const GlobalChat = ({ onBack }) => {
   const [activeAssistant, setActiveAssistant] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [citationPanelOpen, setCitationPanelOpen] = useState(false);
+  const allCitations = collectCitations(messages);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [error, setError] = useState('');
@@ -249,6 +255,17 @@ const GlobalChat = ({ onBack }) => {
             </button>
           </div>
         ) : null}
+        {allCitations.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setCitationPanelOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-medium text-amber-200 transition-colors hover:bg-amber-500/20"
+            title="Ver todas las fuentes citadas en esta conversacion"
+          >
+            <Library className="h-3.5 w-3.5" />
+            Fuentes ({allCitations.length})
+          </button>
+        )}
       </header>
 
       {showEmptyState ? (
@@ -291,6 +308,12 @@ const GlobalChat = ({ onBack }) => {
           />
         </>
       )}
+
+      <CitationPanel
+        open={citationPanelOpen}
+        onClose={() => setCitationPanelOpen(false)}
+        citations={allCitations}
+      />
     </div>
   );
 };
@@ -552,7 +575,11 @@ const MessageBubble = ({ role, content }) => {
             LUSTI
           </div>
         ) : null}
-        <p className="whitespace-pre-wrap font-light">{content}</p>
+        {!isUser ? (
+          <AiMessage content={content} author="ai" />
+        ) : (
+          <p className="whitespace-pre-wrap font-light">{content}</p>
+        )}
       </div>
     </div>
   );

@@ -9,6 +9,21 @@
 
 import { isSupabaseConfigured, supabase } from '../utils/supabase';
 
+// -----------------------------------------------------------------------------
+// Reglas de citacion legal. Se concatenan al final de cualquier prompt del
+// sistema para que la IA mencione referencias concretas y verificables.
+// -----------------------------------------------------------------------------
+const CITATION_RULES = `
+Citas y referencias legales (OBLIGATORIO cuando la respuesta toque normas o jurisprudencia):
+- Cuando menciones una norma peruana, cita siempre su referencia exacta en este formato:
+  "Art. N° del [Cuerpo Legal]" (ej.: "Art. 23° de la Constitucion", "Art. 1245° del Codigo Civil").
+- Cuando menciones una ley o decreto, usa el formato "Ley N.° 27037", "D.Leg. N.° 650", "D.S. N.° 001-2023-TR", "D.U. N.° 001-2024".
+- Cuando cites jurisprudencia del Poder Judicial: "Cas. N.° 1234-2021-Lima" o "Casacion N.° 1234-2021-Lima".
+- Cuando cites sentencia del Tribunal Constitucional: "STC Exp. N.° 0008-2020-PI/TC".
+- Cuando cites resoluciones administrativas: "Res. N.° 456-2023/SUNARP".
+- NO inventes numeros exactos: si no estas seguro del numero o la fecha, indicalo explicitamente ("(numero a confirmar)").
+- Incluye las referencias dentro del mismo parrafo, entre parentesis o como frase aparte, pero siempre presentes.`;
+
 const isProductionBuild = import.meta.env.PROD;
 
 if (isProductionBuild) {
@@ -125,8 +140,10 @@ Si la pregunta pide resumen de expediente, avance, seguimiento o estado del caso
 5. Proxima accion concreta para el abogado.
 6. Urgencia: Alta, Media o Baja, con motivo.
 
-Contexto del expediente:
+ Contexto del expediente:
 ${JSON.stringify(context, null, 2)}
+
+${CITATION_RULES}
 
 Pregunta del usuario:
 ${question}
@@ -191,10 +208,12 @@ Impacto probable:
 Materias afectadas:
 Expedientes sugeridos:
 Acciones recomendadas:
-Datos faltantes:
-
+ Datos faltantes:
+ 
 Contexto:
 ${JSON.stringify(context, null, 2)}
+
+${CITATION_RULES}
 `;
 
 export const analyzeOfficialRegistryItem = async ({ item, cases }) => {
@@ -232,8 +251,10 @@ Cuando haya documento adjunto y el usuario pida resumen o analisis, responde ord
 Si el usuario pide extraer datos, organiza por partes, fechas, montos, obligaciones y observaciones.
 Responde completo: no cortes frases ni dejes campos a medias.
 
-Pregunta del usuario:
+ Pregunta del usuario:
 ${question}
+
+${CITATION_RULES}
 `;
 
 export const askGeminiSpecializedAssistant = async ({ bot, question, attachmentContext = '' }) => {
@@ -275,8 +296,10 @@ ${JSON.stringify(cases.map((caseItem) => ({
   normas: Array.isArray(caseItem.officialReferences) ? caseItem.officialReferences.length : 0,
 })), null, 2)}
 
-Pregunta:
+ Pregunta:
 ${question}
+
+${CITATION_RULES}
 `;
 
 export const askGeminiVaultAssistant = async ({ question, cases }) => {

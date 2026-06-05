@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   FileText,
   Gavel,
+  Library,
   MessageSquare,
   Plus,
   Trash2,
@@ -25,6 +26,9 @@ import { askGeminiAboutCase, isGeminiConfigured, extractResolutionDetails } from
 import { uploadDocumentToBackend } from '../services/documentBackendService';
 import { getCases, updateCaseAsync, deleteCaseAsync } from '../services/caseStore';
 import { loadCaseChats, saveCaseChat, clearCaseChats } from '../services/chatHistoryStore';
+import AiMessage from './AiMessage';
+import CitationPanel from './CitationPanel';
+import { collectCitations } from '../utils/citationParser';
 
 const CaseWorkspace = ({ caseId, onClose }) => {
   const [caseData, setCaseData] = useState(null);
@@ -38,8 +42,9 @@ const CaseWorkspace = ({ caseId, onClose }) => {
   // Right panel AI State
   const [aiInput, setAiInput] = useState('');
   const [isAiThinking, setIsAiThinking] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [aiMessages, setAiMessages] = useState([]);
+  const [citationPanelOpen, setCitationPanelOpen] = useState(false);
+  const caseCitations = collectCitations(aiMessages);
 
   // Audiencia (link de la audiencia virtual)
   const [editingHearing, setEditingHearing] = useState(false);
@@ -681,6 +686,17 @@ const CaseWorkspace = ({ caseId, onClose }) => {
             <h3 className="text-sm font-bold text-brand-ivory">Asistente Legal del Caso</h3>
             <p className="text-[10px] uppercase tracking-wider text-brand-accent font-semibold">Contexto: {caseData.id}</p>
           </div>
+          {caseCitations.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setCitationPanelOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-200 transition-colors hover:bg-amber-500/20"
+              title="Ver todas las fuentes citadas en esta conversacion"
+            >
+              <Library className="h-3.5 w-3.5" />
+              Fuentes ({caseCitations.length})
+            </button>
+          )}
           <button
             onClick={handleClearChat}
             title="Borrar historial de conversación"
@@ -696,9 +712,11 @@ const CaseWorkspace = ({ caseId, onClose }) => {
               <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
                 msg.role === 'user' ? 'bg-brand-gold text-brand-black rounded-br-none' : 'bg-white/[0.03] border border-white/[0.08] text-brand-ivory rounded-bl-none'
               }`}>
-                {msg.content.split('\n').map((line, lIdx) => (
-                  <p key={lIdx} className="min-h-[1em]">{line}</p>
-                ))}
+                {msg.role === 'ai'
+                  ? <AiMessage content={msg.content} author="ai" />
+                  : msg.content.split('\n').map((line, lIdx) => (
+                      <p key={lIdx} className="min-h-[1em]">{line}</p>
+                    ))}
               </div>
             </div>
           ))}
@@ -744,6 +762,12 @@ const CaseWorkspace = ({ caseId, onClose }) => {
           </form>
         </div>
       </div>
+
+      <CitationPanel
+        open={citationPanelOpen}
+        onClose={() => setCitationPanelOpen(false)}
+        citations={caseCitations}
+      />
     </div>
   );
 };
