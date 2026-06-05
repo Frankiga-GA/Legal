@@ -16,6 +16,7 @@ import {
   ExternalLink,
   ChevronRight,
   Globe,
+  Loader2,
   Video,
   Pencil
 } from 'lucide-react';
@@ -37,6 +38,7 @@ const CaseWorkspace = ({ caseId, onClose }) => {
   const [activeTab, setActiveTab] = useState('summary');
   const [noteText, setNoteText] = useState('');
   const [documentUploadStatus, setDocumentUploadStatus] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const [deadlineForm, setDeadlineForm] = useState({ title: '', date: '', priority: 'Media' });
 
   // Right panel AI State
@@ -419,10 +421,24 @@ const CaseWorkspace = ({ caseId, onClose }) => {
                   <h4 className="text-lg font-bold text-brand-ivory">Documentos del caso</h4>
                   <p className="mt-1 text-xs text-brand-accent">Sube aquí las notificaciones o escritos.</p>
                 </div>
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-brand-dark px-4 py-2.5 text-xs font-bold text-brand-ivory transition-colors hover:bg-white/[0.04] shadow-sm">
-                  <Upload className="h-4 w-4" />
-                  Subir Documento
-                  <input type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={handleFileUpload} className="hidden" />
+                <label
+                  className={`inline-flex cursor-pointer items-center gap-2 rounded-lg bg-brand-dark px-4 py-2.5 text-xs font-bold text-brand-ivory transition-colors hover:bg-white/[0.04] shadow-sm ${
+                    isUploading ? 'pointer-events-none opacity-60' : ''
+                  }`}
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4" />
+                  )}
+                  {isUploading ? 'Subiendo...' : 'Subir Documento'}
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.jpg,.png"
+                    onChange={handleFileUpload}
+                    disabled={isUploading}
+                    className="hidden"
+                  />
                 </label>
               </div>
               {documentUploadStatus && (
