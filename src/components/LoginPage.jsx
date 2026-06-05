@@ -91,6 +91,14 @@ const LoginPage = ({ onLogin, onBack }) => {
         return;
       }
 
+      // Marca que el auth se disparo desde esta pestana para que el
+      // handler global de auth no muestre el overlay de "sesion duplicada".
+      try {
+        window.sessionStorage.setItem('lusti_self_auth', '1');
+      } catch {
+        /* noop */
+      }
+
       if (isRegistering) {
         const result = await signUpWithEmail({ email, password });
         if (result.session) {
@@ -107,6 +115,11 @@ const LoginPage = ({ onLogin, onBack }) => {
         onLogin(session);
       }
     } catch (authError) {
+      try {
+        window.sessionStorage.removeItem('lusti_self_auth');
+      } catch {
+        /* noop */
+      }
       setError(getFriendlyAuthError(authError.message));
     } finally {
       setIsSubmitting(false);

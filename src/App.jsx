@@ -56,9 +56,24 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isDriveConnected, setIsDriveConnected] = useState(() => Boolean(getStoredDriveToken()?.access_token));
+  const [showAlreadyLoggedIn, setShowAlreadyLoggedIn] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
+    let channel = null;
+    const tabId = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Sincroniza el inicio de sesion entre pestanas para evitar que el
+    // magic link deje dos sesiones abiertas a la vez.
+    if (typeof BroadcastChannel !== 'undefined') {
+      channel = new BroadcastChannel('lusti_auth_sync');
+      channel.onmessage = (event) => {
+        if (!isMounted) return;
+        if (event.data?.type === 'AUTH_COMPLETE' && event.data.tabId !== tabId) {
+          setShowAlreadyLoggedIn(true);
+        }
+      };
+    }
 
     getCurrentSession()
       .then((currentSession) => {
@@ -74,13 +89,57 @@ function App() {
       });
 
     const subscription = onAuthStateChange((nextSession) => {
+      if (!isMounted) return;
       setSession(nextSession);
-      if (nextSession) setIsLanding(false);
+      if (!nextSession) return;
+
+      setIsLanding(false);
+
+      // Detecta si esta pestana es la que abrio el magic link
+      // (la URL trae los tokens en el hash o en el query).
+      const hasTokensInUrl =
+        (window.location.hash && window.location.hash.includes('access_token')) ||
+        (window.location.search && window.location.search.includes('access_token'));
+
+      if (hasTokensInUrl) {
+        // Pestana principal: limpia los tokens de la URL para que no
+        // queden en el historial ni en la barra de direcciones, y avisa
+        // a las demas pestanas.
+        try {
+          window.history.replaceState(
+            null,
+            '',
+            window.location.pathname + window.location.search
+          );
+        } catch {
+          /* noop */
+        }
+        if (channel) {
+          channel.postMessage({ type: 'AUTH_COMPLETE', tabId });
+        }
+      } else {
+        // Pestana secundaria: detecta si el SIGNED_IN lo disparo esta
+        // misma pestana (login con password) o si vino por sync desde
+        // otra pestana (magic link abierto en una ventana nueva).
+        let selfTriggered = false;
+        try {
+          selfTriggered = window.sessionStorage.getItem('lusti_self_auth') === '1';
+          if (selfTriggered) {
+            window.sessionStorage.removeItem('lusti_self_auth');
+          }
+        } catch {
+          /* noop */
+        }
+        if (!selfTriggered) {
+          setShowAlreadyLoggedIn(true);
+        }
+      }
     });
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      if (channel) channel.close();
     };
   }, []);
 
@@ -326,6 +385,51 @@ function App() {
             setShowOnboarding(false);
           }}
         />
+      )}
+
+      {showAlreadyLoggedIn && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+          <div className="relative w-full max-w-md rounded-2xl border border-white/[0.08] bg-brand-dark p-8 shadow-2xl text-center">
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gold/10 border border-brand-gold/30">
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-brand-gold">
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+            </div>
+            <h2 className="font-serif text-2xl text-brand-ivory mb-2">Tu sesion ya se inicio</h2>
+            <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+              LUSTI se abrio en otra ventana cuando hiciste clic en el enlace magico. Para evitar duplicados, te recomendamos cerrar esta pestana y volver a la original.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  window.close();
+                  // Si el navegador no permite cerrarla (pestana abierta manualmente),
+                  // el usuario vera un mensaje de respaldo.
+                  setTimeout(() => setShowAlreadyLoggedIn(false), 300);
+                }}
+                className="w-full rounded-lg bg-brand-gold px-4 py-3 text-sm font-semibold text-brand-black hover:bg-brand-gold/90 transition-colors"
+              >
+                Cerrar esta pestana
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAlreadyLoggedIn(false);
+                  window.location.reload();
+                }}
+                className="w-full rounded-lg border border-white/[0.08] bg-transparent px-4 py-3 text-sm font-medium text-brand-ivory hover:bg-white/[0.04] transition-colors"
+              >
+                Usar esta ventana de todas formas
+              </button>
+            </div>
+            <p className="mt-5 text-[10px] uppercase tracking-[0.2em] text-slate-500">
+              Sesion activa en otra pestana
+            </p>
+          </div>
+        </div>
       )}
     </div>
     </ErrorBoundary>
