@@ -255,8 +255,11 @@ const CaseWorkspace = ({ caseId, onClose }) => {
   const submitAiQuestion = async (question) => {
     if (!question.trim() || isAiThinking) return;
 
-    const userMessage = { role: 'user', content: question };
-    setAiMessages(prev => [...prev, userMessage]);
+    const pendingId = Date.now();
+    setAiMessages(prev => [...prev,
+      { role: 'user', content: question },
+      { role: 'ai', content: '', pending: true, pendingId },
+    ]);
     saveCaseChat(caseData.id, 'user', question).catch((err) =>
       console.warn('No se pudo guardar el mensaje en Supabase.', err?.message)
     );
@@ -275,14 +278,21 @@ const CaseWorkspace = ({ caseId, onClose }) => {
         officialReferences,
         history,
       });
-      setAiMessages(prev => [...prev, { role: 'ai', content: response }]);
+      setAiMessages(prev => prev.map((m) =>
+        m.pending && m.pendingId === pendingId
+          ? { role: 'ai', content: response }
+          : m
+      ));
       saveCaseChat(caseData.id, 'ai', response).catch((err) =>
         console.warn('No se pudo guardar el mensaje en Supabase.', err?.message)
       );
     } catch (error) {
       const errorMsg = 'Hubo un error de conexión con la IA. Inténtalo de nuevo.';
-      setAiMessages(prev => [...prev, { role: 'ai', content: errorMsg }]);
-      saveCaseChat(caseData.id, 'ai', errorMsg).catch(() => {});
+      setAiMessages(prev => prev.map((m) =>
+        m.pending && m.pendingId === pendingId
+          ? { role: 'ai', content: errorMsg }
+          : m
+      ));
     }
     setIsAiThinking(false);
   };
@@ -740,23 +750,24 @@ const CaseWorkspace = ({ caseId, onClose }) => {
               <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
                 msg.role === 'user' ? 'bg-brand-gold text-brand-black rounded-br-none' : 'bg-white/[0.03] border border-white/[0.08] text-brand-ivory rounded-bl-none'
               }`}>
-                {msg.role === 'ai'
-                  ? <AiMessage content={msg.content} author="ai" />
-                  : msg.content.split('\n').map((line, lIdx) => (
-                      <p key={lIdx} className="min-h-[1em]">{line}</p>
-                    ))}
+                {msg.role === 'ai' && msg.pending ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '0ms' }} />
+                      <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '150ms' }} />
+                      <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <span className="text-[11px] font-light text-slate-500">Pensando...</span>
+                  </div>
+                ) : msg.role === 'ai' ? (
+                  <AiMessage content={msg.content} author="ai" />
+                ) : msg.content.split('\n').map((line, lIdx) => (
+                    <p key={lIdx} className="min-h-[1em]">{line}</p>
+                  ))}
               </div>
             </div>
           ))}
-          {isAiThinking && (
-            <div className="flex justify-start">
-              <div className="rounded-2xl bg-brand-dark border border-white/[0.08] px-4 py-3 text-sm text-brand-accent rounded-bl-none flex gap-1 items-center">
-                <div className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce"></div>
-                <div className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce" style={{animationDelay: '150ms'}}></div>
-                <div className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce" style={{animationDelay: '300ms'}}></div>
-              </div>
-            </div>
-          )}
+          <div ref={messagesEndRef} />
         </div>
 
         <div className="border-t border-white/[0.08] bg-brand-dark p-4 shrink-0">

@@ -121,11 +121,17 @@ const GlobalChat = ({ onBack }) => {
     if (!question || isThinking) return;
 
     setHasInteracted(true);
-    const userMessage = { role: 'user', content: question };
-    setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsThinking(true);
     setError('');
+
+    // Agrega el mensaje del usuario + placeholder de la IA al instante
+    const pendingId = Date.now();
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: question },
+      { role: 'ai', content: '', pending: true, pendingId },
+    ]);
 
     // Capturamos el archivo adjunto (si lo hay) y lo limpiamos del estado
     // para que no quede "pegado" entre mensajes.
@@ -152,16 +158,28 @@ const GlobalChat = ({ onBack }) => {
         fileName: fileContext?.fileName || null,
         fileText: fileContext?.fileText || null,
       });
-      setMessages((prev) => [...prev, { role: 'ai', content: text }]);
+      // Reemplaza el placeholder con la respuesta real
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.pending && m.pendingId === pendingId
+            ? { role: 'ai', content: text }
+            : m
+        )
+      );
       saveGlobalChat(activeAssistant?.id || null, 'ai', text).catch((err) => {
         console.warn('No se pudo guardar la respuesta en Supabase.', err?.message);
       });
     } catch (err) {
       const msg = err?.message || 'Error desconocido al llamar a la IA.';
       setError(msg);
-      const errorBubble = { role: 'ai', content: `Hubo un error: ${msg}` };
-      setMessages((prev) => [...prev, errorBubble]);
-      saveGlobalChat(activeAssistant?.id || null, 'ai', errorBubble.content).catch(() => {});
+      // Reemplaza el placeholder con el mensaje de error
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.pending && m.pendingId === pendingId
+            ? { role: 'ai', content: `Hubo un error: ${msg}` }
+            : m
+        )
+      );
     } finally {
       setIsThinking(false);
     }
@@ -288,9 +306,8 @@ const GlobalChat = ({ onBack }) => {
           <div className="flex-1 overflow-y-auto px-5 py-6">
             <div className="mx-auto flex max-w-3xl flex-col gap-4">
               {messages.map((message, index) => (
-                <MessageBubble key={index} role={message.role} content={message.content} />
+                <MessageBubble key={index} role={message.role} content={message.content} pending={message.pending} />
               ))}
-              {isThinking ? <TypingBubble /> : null}
               <div ref={messagesEndRef} />
             </div>
           </div>
@@ -559,7 +576,7 @@ const AttachmentChip = ({ attachedFile, onRemove }) => {
   );
 };
 
-const MessageBubble = ({ role, content }) => {
+const MessageBubble = ({ role, content, pending }) => {
   const isUser = role === 'user';
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -570,13 +587,22 @@ const MessageBubble = ({ role, content }) => {
             : 'rounded-bl-sm border border-white/[0.05] bg-brand-dark text-brand-ivory'
         }`}
       >
-        {!isUser ? (
+        {!isUser && (
           <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-gold/80">
             <Sparkles className="h-3 w-3" />
             LUSTI
           </div>
-        ) : null}
-        {!isUser ? (
+        )}
+        {!isUser && pending ? (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '0ms' }} />
+              <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '150ms' }} />
+              <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '300ms' }} />
+            </div>
+            <span className="text-[11px] font-light text-slate-500">Pensando...</span>
+          </div>
+        ) : !isUser ? (
           <AiMessage content={content} author="ai" />
         ) : (
           <p className="whitespace-pre-wrap font-light">{content}</p>
@@ -585,15 +611,5 @@ const MessageBubble = ({ role, content }) => {
     </div>
   );
 };
-
-const TypingBubble = () => (
-  <div className="flex justify-start">
-    <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-white/[0.05] bg-brand-dark px-4 py-3">
-      <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '0ms' }} />
-      <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '150ms' }} />
-      <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '300ms' }} />
-    </div>
-  </div>
-);
 
 export default GlobalChat;
