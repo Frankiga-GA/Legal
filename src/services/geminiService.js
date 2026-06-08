@@ -9,6 +9,67 @@
 
 import { isSupabaseConfigured, supabase } from '../utils/supabase';
 
+// Control de peticion activa. Al iniciar una nueva, se aborta la anterior
+// automaticamente. Cada componente llama a abortActiveRequest() al
+// desmontarse para cancelar cualquier fetch en vuelo.
+let activeController = null;
+
+export const abortActiveRequest = () => {
+  if (activeController) {
+    activeController.abort();
+    activeController = null;
+  }
+};
+
+const fetchWithSignal = (url, options = {}) => {
+  abortActiveRequest();
+  activeController = new AbortController();
+  return fetch(url, { ...options, signal: activeController.signal });
+};
+
+const fetchWithRetry = async (url, options, retries = 2) => {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const response = await fetchWithSignal(url, options);
+      return response;
+    } catch (err) {
+      if (err.name === 'AbortError') throw err;
+      if (i === retries) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+};
+
+// Cache simple de respuestas para evitar pedidos duplicados.
+const responseCache = new Map();
+const CACHE_MAX = 60;
+const CACHE_TTL = 5 * 60 * 1000;
+
+const cacheKey = (params) =>
+  JSON.stringify({
+    p: params.prompt?.slice(0, 200),
+    s: params.systemPrompt?.slice(0, 100),
+    h: params.history?.length || 0,
+    f: params.fileName || null,
+  });
+
+const cacheGet = (key) => {
+  const entry = responseCache.get(key);
+  if (entry && Date.now() - entry.t < CACHE_TTL) return entry.v;
+  responseCache.delete(key);
+  return null;
+};
+
+const cacheSet = (key, value) => {
+  if (responseCache.size >= CACHE_MAX) {
+    const first = responseCache.keys().next().value;
+    if (first) responseCache.delete(first);
+  }
+  responseCache.set(key, { v: value, t: Date.now() });
+};
+
+export const clearCache = () => responseCache.clear();
+
 // -----------------------------------------------------------------------------
 // Reglas de citacion legal. Se concatenan al final de cualquier prompt del
 // sistema para que la IA mencione referencias concretas y verificables.
@@ -40,11 +101,17 @@ const getAccessToken = async () => {
 };
 
 export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens = 2048, responseJson = false, systemPrompt = null, history = null, fileName = null, fileText = null }) => {
+  const key = cacheKey({ prompt, systemPrompt, history, fileName });
+  if (key && !fileText) {
+    const cached = cacheGet(key);
+    if (cached) return cached;
+  }
+
   const token = await getAccessToken();
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const response = await fetch('/api/ai/raw', {
+  const response = await fetchWithRetry('/api/ai/raw', {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -66,6 +133,8 @@ export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens =
 
   const data = await response.json();
   if (!data?.text) throw new Error('Backend devolvio una respuesta vacia.');
+
+  if (key && !fileText) cacheSet(key, data.text);
   return data.text;
 };
 

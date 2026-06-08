@@ -29,7 +29,7 @@ import {
   getActiveAssistant,
   clearActiveAssistant,
 } from '../services/aiBridge';
-import { isGeminiConfigured, askBackend } from '../services/geminiService';
+import { isGeminiConfigured, askBackend, abortActiveRequest } from '../services/geminiService';
 import {
   loadGlobalChats,
   saveGlobalChat,
@@ -80,6 +80,7 @@ const GlobalChat = ({ onBack }) => {
       setInput(pending);
       setHasInteracted(true);
     }
+    return () => abortActiveRequest();
   }, []);
 
   // Carga historial desde Supabase cuando cambia el asistente activo

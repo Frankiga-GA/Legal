@@ -1,23 +1,24 @@
 // src/App.jsx
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 
-import Sidebar from './components/Sidebar';
-import CaseLibrary from './components/CaseLibrary';
-import CaseWorkspace from './components/CaseWorkspace';
-import ManagerBot from './components/ManagerBot';
-import GlobalChat from './components/GlobalChat';
-import Dashboard from './components/Dashboard';
-import Settings from './components/Settings';
-import LoginPage from './components/LoginPage';
 import LandingPage from './components/LandingPage';
-import ElPeruano from './components/ElPeruano';
-import LegalMonitor from './components/LegalMonitor';
-import DriveVault from './components/DriveVault';
-import DeadlineCalculator from './components/DeadlineCalculator';
-import CalendarView from './components/CalendarView';
-import OnboardingTour from './components/OnboardingTour';
+import LoginPage from './components/LoginPage';
 import LegalPage from './components/LegalPage';
+
+const Sidebar = lazy(() => import('./components/Sidebar'));
+const CaseLibrary = lazy(() => import('./components/CaseLibrary'));
+const CaseWorkspace = lazy(() => import('./components/CaseWorkspace'));
+const ManagerBot = lazy(() => import('./components/ManagerBot'));
+const GlobalChat = lazy(() => import('./components/GlobalChat'));
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Settings = lazy(() => import('./components/Settings'));
+const ElPeruano = lazy(() => import('./components/ElPeruano'));
+const LegalMonitor = lazy(() => import('./components/LegalMonitor'));
+const DriveVault = lazy(() => import('./components/DriveVault'));
+const DeadlineCalculator = lazy(() => import('./components/DeadlineCalculator'));
+const CalendarView = lazy(() => import('./components/CalendarView'));
+const OnboardingTour = lazy(() => import('./components/OnboardingTour'));
 import { getCurrentSession, onAuthStateChange, signOut, hasCompletedOnboarding } from './services/authService';
 import { getStoredDriveToken, onDriveTokenChange, onDriveTokenMessage } from './services/googleDriveService';
 import { setPendingAiInput, setActiveAssistant } from './services/aiBridge';
@@ -373,16 +374,18 @@ function App() {
             ></div>
           )}
           <div className="h-full bg-brand-dark border-r border-white/[0.08]">
-            <Sidebar
-              activeTab={activeTab}
-              setActiveTab={handleTabChange}
-              onHome={() => setIsLanding(true)}
-              onLogout={handleLogout}
-              userEmail={session.user?.email}
-              collapsed={isSidebarCollapsed}
-              onToggleCollapse={() => setIsSidebarCollapsed((value) => !value)}
-              showDrive={isDriveConnected}
-            />
+            <Suspense fallback={<div className="h-full w-64 bg-brand-dark animate-pulse" />}>
+              <Sidebar
+                activeTab={activeTab}
+                setActiveTab={handleTabChange}
+                onHome={() => setIsLanding(true)}
+                onLogout={handleLogout}
+                userEmail={session.user?.email}
+                collapsed={isSidebarCollapsed}
+                onToggleCollapse={() => setIsSidebarCollapsed((value) => !value)}
+                showDrive={isDriveConnected}
+              />
+            </Suspense>
           </div>
         </div>
       )}
@@ -390,9 +393,24 @@ function App() {
       <main className="flex-1 overflow-hidden relative z-10 bg-brand-black">
         <div className="h-full w-full pt-16 md:pt-0 overflow-hidden flex flex-col">
           <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <div key={activeTab} className={`h-full ${activeTab === 'case-workspace' ? 'animate-fade-in-up' : 'animate-fade-in'}`}>
-              {SafeRender()}
-            </div>
+            <Suspense fallback={
+              <div className="h-full flex items-start justify-center p-8 animate-pulse">
+                <div className="w-full max-w-3xl space-y-4 pt-8">
+                  <div className="h-6 w-48 rounded bg-white/[0.06]" />
+                  <div className="h-4 w-72 rounded bg-white/[0.06]" />
+                  <div className="mt-8 h-3 w-full rounded bg-white/[0.06]" />
+                  <div className="h-3 w-11/12 rounded bg-white/[0.06]" />
+                  <div className="h-3 w-4/5 rounded bg-white/[0.06]" />
+                  <div className="mt-6 h-24 w-full rounded-lg bg-white/[0.04]" />
+                  <div className="h-3 w-10/12 rounded bg-white/[0.06]" />
+                  <div className="h-3 w-9/12 rounded bg-white/[0.06]" />
+                </div>
+              </div>
+            }>
+              <div key={activeTab} className={`h-full ${activeTab === 'case-workspace' ? 'animate-fade-in-up' : 'animate-fade-in'}`}>
+                {SafeRender()}
+              </div>
+            </Suspense>
           </div>
         </div>
       </main>
@@ -400,14 +418,16 @@ function App() {
         <Toaster />
 
       {showOnboarding && session?.user?.id && (
-        <OnboardingTour
-          userId={session.user.id}
-          onComplete={() => setShowOnboarding(false)}
-          onNavigate={(tab) => {
-            setActiveTab(tab);
-            setShowOnboarding(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <OnboardingTour
+            userId={session.user.id}
+            onComplete={() => setShowOnboarding(false)}
+            onNavigate={(tab) => {
+              setActiveTab(tab);
+              setShowOnboarding(false);
+            }}
+          />
+        </Suspense>
       )}
 
       {showAlreadyLoggedIn && (

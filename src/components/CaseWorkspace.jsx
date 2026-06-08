@@ -23,7 +23,7 @@ import {
 // src/components/CaseWorkspace.jsx
 import toast, { Toaster } from 'react-hot-toast';
 
-import { askGeminiAboutCase, isGeminiConfigured, extractResolutionDetails } from '../services/geminiService';
+import { askGeminiAboutCase, isGeminiConfigured, extractResolutionDetails, abortActiveRequest } from '../services/geminiService';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
 import { getCases, updateCaseAsync, deleteCaseAsync } from '../services/caseStore';
 import { loadCaseChats, saveCaseChat, clearCaseChats } from '../services/chatHistoryStore';
@@ -75,9 +75,21 @@ const CaseWorkspace = ({ caseId, onClose }) => {
         }
       });
     }
+    return () => abortActiveRequest();
   }, [caseId]);
 
-  if (!caseData) return <div className="p-8 text-brand-accent">Cargando expediente...</div>;
+  if (!caseData) return (
+    <div className="flex h-full items-center justify-center p-8">
+      <div className="w-full max-w-2xl animate-pulse space-y-5">
+        <div className="h-8 w-64 rounded bg-white/[0.06]" />
+        <div className="h-4 w-48 rounded bg-white/[0.06]" />
+        <div className="mt-8 h-3 w-full rounded bg-white/[0.06]" />
+        <div className="h-3 w-11/12 rounded bg-white/[0.06]" />
+        <div className="h-3 w-4/5 rounded bg-white/[0.06]" />
+        <div className="mt-6 h-32 w-full rounded-lg bg-white/[0.04]" />
+      </div>
+    </div>
+  );
 
   const documents = Array.isArray(caseData.documents) ? caseData.documents : [];
   const notes = Array.isArray(caseData.notes) ? caseData.notes : [];

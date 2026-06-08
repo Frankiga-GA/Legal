@@ -330,6 +330,7 @@ const LoginPage = ({ onLogin, onBack }) => {
           <img
             src="/Lega2.jpeg"
             alt="Firma legal usando LUSTI"
+            loading="lazy"
             className="absolute inset-0 h-full w-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/65 to-slate-950/25"></div>
