@@ -61,8 +61,9 @@ function App() {
   const [showTakeOverMessage, setShowTakeOverMessage] = useState(false);
   const [closeFailed, setCloseFailed] = useState(false);
 
-  const tabId = useRef(`tab_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`).current;
-  const channelRef = useRef(null);
+    const tabId = useRef(`tab_${crypto.randomUUID?.() ?? Date.now()}_${Math.random().toString(36).slice(2, 8)}`).current;
+    const channelRef = useRef(null);
+    const isChannelOpen = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -72,6 +73,7 @@ function App() {
     if (typeof BroadcastChannel !== 'undefined') {
       const channel = new BroadcastChannel('lusti_auth_sync');
       channelRef.current = channel;
+      isChannelOpen.current = true;
       channel.onmessage = (event) => {
         if (!isMounted) return;
         if (event.data?.type === 'AUTH_COMPLETE' && event.data.tabId !== tabId) {
@@ -133,8 +135,12 @@ function App() {
         } catch {
           /* noop */
         }
-        if (channelRef.current) {
-          channelRef.current.postMessage({ type: 'AUTH_COMPLETE', tabId });
+        if (channelRef.current && isChannelOpen.current) {
+          try {
+            channelRef.current.postMessage({ type: 'AUTH_COMPLETE', tabId });
+          } catch {
+            /* canal cerrado */
+          }
         }
       } else {
         // Pestana secundaria: detecta si el SIGNED_IN lo disparo esta
@@ -161,6 +167,7 @@ function App() {
       isMounted = false;
       subscription.unsubscribe();
       if (channelRef.current) {
+        isChannelOpen.current = false;
         channelRef.current.close();
         channelRef.current = null;
       }
@@ -238,9 +245,8 @@ function App() {
     setIsLanding(true);
   };
 
-  // Bloquea el boton "Atras" del navegador para que no saque al usuario
-  // del sistema y lo mande a la landing. La navegacion interna se hace
-  // por el sidebar.
+  // Bloquea el boton "Atras" del navegador solo si intenta salir de la app
+  // (landing, login, etc.). La navegacion interna la maneja el sidebar.
   useEffect(() => {
     if (!session) return undefined;
     if (typeof window === 'undefined') return undefined;
@@ -257,11 +263,11 @@ function App() {
     pushAppState();
 
     const onPopState = () => {
+      // Si el estado anterior NO es de la app (landing, login, etc.),
+      // empujamos nuestro estado para mantener al usuario en la app.
+      // Si YA es de la app, NO hacemos nada: dejamos que el back navegue
+      // normalmente (cierra modales, vuelve a tabs previos, etc.).
       if (!window.history.state?.app) {
-        pushAppState();
-      } else {
-        // Vuelve a empujar el estado para evitar que el siguiente back
-        // salga de la app
         pushAppState();
       }
     };
@@ -489,8 +495,12 @@ function App() {
                   } catch {
                     /* noop */
                   }
-                  if (channelRef.current) {
-                    channelRef.current.postMessage({ type: 'TAKE_OVER', fromTabId: tabId });
+                  if (channelRef.current && isChannelOpen.current) {
+                    try {
+                      channelRef.current.postMessage({ type: 'TAKE_OVER', fromTabId: tabId });
+                    } catch {
+                      /* canal cerrado */
+                    }
                   }
                   setShowAlreadyLoggedIn(false);
                 }}

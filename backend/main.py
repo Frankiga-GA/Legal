@@ -762,7 +762,7 @@ async def ai_raw(
             file_text=payload.file_text,
         )
     except Exception as error:
-        raise HTTPException(status_code=502, detail=f"No se pudo llamar a Gemini: {error}") from error
+        raise HTTPException(status_code=502, detail=f"No se pudo llamar a Groq: {error}") from error
     return RawAskResponse(text=text)
 
 

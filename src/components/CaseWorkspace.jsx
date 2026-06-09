@@ -1,24 +1,24 @@
 // src/components/CaseWorkspace.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft,
   Bot,
   Calendar,
+  Check,
   CheckCircle2,
   FileText,
   Gavel,
   Library,
+  Loader2,
   MessageSquare,
+  Pencil,
   Plus,
+  Send,
   Trash2,
   Upload,
   User,
-  ExternalLink,
-  ChevronRight,
-  Globe,
-  Loader2,
   Video,
-  Pencil
+  X,
 } from 'lucide-react';
 // src/components/CaseWorkspace.jsx
 import toast, { Toaster } from 'react-hot-toast';
@@ -26,7 +26,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { askGeminiAboutCase, isGeminiConfigured, extractResolutionDetails, abortActiveRequest } from '../services/geminiService';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
 import { getCases, updateCaseAsync, deleteCaseAsync } from '../services/caseStore';
-import { loadCaseChats, saveCaseChat, clearCaseChats } from '../services/chatHistoryStore';
+import { loadCaseChats, saveCaseChat, clearCaseChats, deleteCaseChatMsg, deleteCaseChatMessages } from '../services/chatHistoryStore';
 import AiMessage from './AiMessage';
 import CitationPanel from './CitationPanel';
 import { collectCitations } from '../utils/citationParser';
@@ -47,6 +47,7 @@ const CaseWorkspace = ({ caseId, onClose }) => {
   const [aiMessages, setAiMessages] = useState([]);
   const [citationPanelOpen, setCitationPanelOpen] = useState(false);
   const caseCitations = collectCitations(aiMessages);
+  const messagesEndRef = useRef(null);
 
   // Audiencia (link de la audiencia virtual)
   const [editingHearing, setEditingHearing] = useState(false);
@@ -268,7 +269,7 @@ const CaseWorkspace = ({ caseId, onClose }) => {
     try {
       // Pasamos los ultimos 10 mensajes (sin contar el actual) para que la IA
       // tenga contexto de la conversacion. El backend los recibe como historial.
-      const history = aiMessages.slice(-10);
+      const history = aiMessages.slice(-4);
       const response = await askGeminiAboutCase({
         question,
         caseData,
@@ -312,6 +313,61 @@ const CaseWorkspace = ({ caseId, onClose }) => {
     } else {
       toast.success('Historial borrado.');
     }
+  };
+
+  const handleEditAiMessage = async (index, newText) => {
+    if (!newText.trim() || isAiThinking) return;
+
+    const pendingId = Date.now();
+    const msgsToDelete = aiMessages.slice(index).map((m) => m.id).filter(Boolean);
+
+    setAiMessages((prev) => [
+      ...prev.slice(0, index),
+      { role: 'user', content: newText },
+      { role: 'ai', content: '', pending: true, pendingId },
+    ]);
+    setIsAiThinking(true);
+
+    if (msgsToDelete.length) deleteCaseChatMessages(msgsToDelete).catch(() => {});
+
+    try {
+      const history = aiMessages.slice(0, index).slice(-4);
+      const response = await askGeminiAboutCase({
+        question: newText,
+        caseData,
+        documents,
+        notes,
+        importantDates,
+        officialReferences,
+        history,
+      });
+      setAiMessages((prev) =>
+        prev.map((m) =>
+          m.pending && m.pendingId === pendingId
+            ? { role: 'ai', content: response }
+            : m
+        )
+      );
+      saveCaseChat(caseData.id, 'ai', response).catch((err) =>
+        console.warn('No se pudo guardar el mensaje en Supabase.', err?.message)
+      );
+    } catch (error) {
+      const errorMsg = 'Hubo un error de conexión con la IA. Inténtalo de nuevo.';
+      setAiMessages((prev) =>
+        prev.map((m) =>
+          m.pending && m.pendingId === pendingId
+            ? { role: 'ai', content: errorMsg }
+            : m
+        )
+      );
+    }
+    setIsAiThinking(false);
+  };
+
+  const handleDeleteAiMessage = (index) => {
+    const msg = aiMessages[index];
+    setAiMessages((prev) => prev.filter((_, i) => i !== index));
+    if (msg?.id) deleteCaseChatMsg(msg.id).catch(() => {});
   };
 
   const handleAskAi = async (e) => {
@@ -746,26 +802,12 @@ const CaseWorkspace = ({ caseId, onClose }) => {
 
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
           {aiMessages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
-                msg.role === 'user' ? 'bg-brand-gold text-brand-black rounded-br-none' : 'bg-white/[0.03] border border-white/[0.08] text-brand-ivory rounded-bl-none'
-              }`}>
-                {msg.role === 'ai' && msg.pending ? (
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1">
-                      <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '0ms' }} />
-                      <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '150ms' }} />
-                      <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '300ms' }} />
-                    </div>
-                    <span className="text-[11px] font-light text-slate-500">Pensando...</span>
-                  </div>
-                ) : msg.role === 'ai' ? (
-                  <AiMessage content={msg.content} author="ai" />
-                ) : msg.content.split('\n').map((line, lIdx) => (
-                    <p key={lIdx} className="min-h-[1em]">{line}</p>
-                  ))}
-              </div>
-            </div>
+            <CaseMessageBubble
+              key={msg.id || idx}
+              msg={msg}
+              onEdit={(newText) => handleEditAiMessage(idx, newText)}
+              onDelete={() => handleDeleteAiMessage(idx)}
+            />
           ))}
           <div ref={messagesEndRef} />
         </div>
@@ -788,7 +830,13 @@ const CaseWorkspace = ({ caseId, onClose }) => {
               type="text"
               value={aiInput}
               onChange={(e) => setAiInput(e.target.value)}
-              placeholder="Pide un borrador, pregunta dudas..."
+              onKeyDown={(e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAskAi(e);
+                }
+              }}
+              placeholder="Pide un borrador, pregunta dudas...  (Ctrl+Enter)"
               className="flex-1 rounded-xl border border-white/[0.08] bg-brand-black px-4 py-3 text-sm outline-none focus:border-brand-gold/50 focus:bg-brand-dark transition-all shadow-inner"
             />
             <button
@@ -796,7 +844,7 @@ const CaseWorkspace = ({ caseId, onClose }) => {
               disabled={isAiThinking || !aiInput.trim()}
               className="flex items-center justify-center rounded-xl bg-brand-dark px-4 text-brand-ivory hover:bg-white/[0.04] disabled:opacity-50 transition-colors shadow-sm"
             >
-              <ArrowLeft className="h-5 w-5 rotate-180" />
+              <Send className="h-5 w-5" />
             </button>
           </form>
         </div>
@@ -807,6 +855,113 @@ const CaseWorkspace = ({ caseId, onClose }) => {
         onClose={() => setCitationPanelOpen(false)}
         citations={caseCitations}
       />
+    </div>
+  );
+};
+
+const CaseMessageBubble = ({ msg, onEdit, onDelete }) => {
+  const isUser = msg.role === 'user';
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(msg.content);
+  const editRef = useRef(null);
+
+  useEffect(() => {
+    if (isEditing) editRef.current?.focus();
+  }, [isEditing]);
+
+  const handleSaveEdit = () => {
+    if (!editText.trim() || editText === msg.content) {
+      setIsEditing(false);
+      setEditText(msg.content);
+      return;
+    }
+    setIsEditing(false);
+    onEdit(editText);
+  };
+
+  return (
+    <div className="group flex relative">
+      <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
+        <div className="relative max-w-[85%]">
+          <div className={`absolute ${isUser ? '-left-10' : '-right-10'} top-2 hidden gap-1 group-hover:flex`}>
+            {isUser && !msg.pending && (
+              <button
+                type="button"
+                onClick={() => { setEditText(msg.content); setIsEditing(true); }}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-dark/80 text-slate-500 hover:bg-brand-dark hover:text-brand-ivory transition-colors"
+                title="Editar mensaje"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            )}
+            {!msg.pending && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-dark/80 text-slate-500 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                title="Borrar mensaje"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
+            isUser ? 'bg-brand-gold text-brand-black rounded-br-none' : 'bg-white/[0.03] border border-white/[0.08] text-brand-ivory rounded-bl-none'
+          }`}>
+            {isEditing ? (
+              <div className="flex flex-col gap-2">
+                <textarea
+                  ref={editRef}
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveEdit();
+                    }
+                    if (e.key === 'Escape') {
+                      setIsEditing(false);
+                      setEditText(msg.content);
+                    }
+                  }}
+                  className="w-full resize-none bg-transparent text-sm text-brand-black outline-none"
+                  rows={2}
+                />
+                <div className="flex items-center gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setIsEditing(false); setEditText(msg.content); }}
+                    className="px-3 py-1 text-[11px] text-slate-500 hover:text-brand-black transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveEdit}
+                    className="flex items-center gap-1 rounded-lg bg-brand-black/10 px-3 py-1 text-[11px] font-medium text-brand-black hover:bg-brand-black/20 transition-colors"
+                  >
+                    <Check className="h-3 w-3" />
+                    Guardar
+                  </button>
+                </div>
+              </div>
+            ) : msg.role === 'ai' && msg.pending ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '0ms' }} />
+                  <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '150ms' }} />
+                  <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '300ms' }} />
+                </div>
+                <span className="text-[11px] font-light text-slate-500">Pensando...</span>
+              </div>
+            ) : msg.role === 'ai' ? (
+              <AiMessage content={msg.content} author="ai" />
+            ) : msg.content.split('\n').map((line, lIdx) => (
+                <p key={lIdx} className="min-h-[1em]">{line}</p>
+              ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

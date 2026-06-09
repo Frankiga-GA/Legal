@@ -6,10 +6,11 @@
 // Supabase (tabla global_chats) para sincronizar entre dispositivos.
 // =============================================================================
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   ArrowLeft,
   Bot,
+  Check,
   Edit3,
   FileText,
   Library,
@@ -17,6 +18,7 @@ import {
   MessageSquare,
   Mic,
   Paperclip,
+  Pencil,
   Plus,
   Search,
   Send,
@@ -34,13 +36,15 @@ import {
   loadGlobalChats,
   saveGlobalChat,
   clearGlobalChats,
+  deleteGlobalChatMsg,
+  deleteGlobalChatMessages,
 } from '../services/chatHistoryStore';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
 import AiMessage from './AiMessage';
 import CitationPanel from './CitationPanel';
 import { collectCitations } from '../utils/citationParser';
 
-const HISTORY_LIMIT = 10;
+const HISTORY_LIMIT = 4;
 const ACCEPTED_TYPES = '.pdf,.docx,.doc,.txt,.md,.rtf';
 
 const QUICK_ACTIONS = [
@@ -152,7 +156,7 @@ const GlobalChat = ({ onBack }) => {
       const text = await askBackend({
         prompt: question,
         temperature: 0.4,
-        maxOutputTokens: 1500,
+        maxOutputTokens: 600,
         systemPrompt,
         history,
         fileName: fileContext?.fileName || null,
@@ -223,6 +227,58 @@ const GlobalChat = ({ onBack }) => {
       : null;
     setMessages(greeting ? [{ role: 'ai', content: greeting }] : []);
     setHasInteracted(false);
+  };
+
+  const handleEditMessage = async (index, newText) => {
+    if (!newText.trim() || isThinking) return;
+
+    const pendingId = Date.now();
+    const msgsToDelete = messages.slice(index).map((m) => m.id).filter(Boolean);
+
+    setMessages((prev) => [
+      ...prev.slice(0, index),
+      { role: 'user', content: newText },
+      { role: 'ai', content: '', pending: true, pendingId },
+    ]);
+    setIsThinking(true);
+
+    if (msgsToDelete.length) deleteGlobalChatMessages(msgsToDelete).catch(() => {});
+
+    try {
+      const systemPrompt = activeAssistant?.systemPrompt || null;
+      const history = messages.slice(0, index).slice(-HISTORY_LIMIT);
+      const text = await askBackend({
+        prompt: newText,
+        temperature: 0.4,
+        maxOutputTokens: 600,
+        systemPrompt,
+        history,
+      });
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.pending && m.pendingId === pendingId
+            ? { role: 'ai', content: text }
+            : m
+        )
+      );
+    } catch (err) {
+      const msg = err?.message || 'Error desconocido.';
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.pending && m.pendingId === pendingId
+            ? { role: 'ai', content: `Hubo un error: ${msg}` }
+            : m
+        )
+      );
+    } finally {
+      setIsThinking(false);
+    }
+  };
+
+  const handleDeleteMessage = (index) => {
+    const msg = messages[index];
+    setMessages((prev) => prev.filter((_, i) => i !== index));
+    if (msg?.id) deleteGlobalChatMsg(msg.id).catch(() => {});
   };
 
   const handleDeactivateAssistant = () => {
@@ -306,7 +362,14 @@ const GlobalChat = ({ onBack }) => {
           <div className="flex-1 overflow-y-auto px-5 py-6">
             <div className="mx-auto flex max-w-3xl flex-col gap-4">
               {messages.map((message, index) => (
-                <MessageBubble key={index} role={message.role} content={message.content} pending={message.pending} />
+                <MessageBubble
+                  key={index}
+                  role={message.role}
+                  content={message.content}
+                  pending={message.pending}
+                  onEdit={(newText) => handleEditMessage(index, newText)}
+                  onDelete={() => handleDeleteMessage(index)}
+                />
               ))}
               <div ref={messagesEndRef} />
             </div>
@@ -376,6 +439,10 @@ const EmptyState = ({
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                onSend();
+              }
+              if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
                 event.preventDefault();
                 onSend();
               }
@@ -488,6 +555,10 @@ const ChatFooter = ({
               event.preventDefault();
               onSend();
             }
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+              event.preventDefault();
+              onSend();
+            }
           }}
           placeholder="Pregunta lo que quieras"
           rows={1}
@@ -576,37 +647,118 @@ const AttachmentChip = ({ attachedFile, onRemove }) => {
   );
 };
 
-const MessageBubble = ({ role, content, pending }) => {
+const MessageBubble = ({ role, content, pending, onEdit, onDelete }) => {
   const isUser = role === 'user';
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(content);
+  const editRef = useRef(null);
+
+  useEffect(() => {
+    if (isEditing) editRef.current?.focus();
+  }, [isEditing]);
+
+  const handleSaveEdit = () => {
+    if (!editText.trim() || editText === content) {
+      setIsEditing(false);
+      setEditText(content);
+      return;
+    }
+    setIsEditing(false);
+    onEdit(editText);
+  };
+
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
-          isUser
-            ? 'rounded-br-sm bg-brand-gold/15 text-brand-ivory'
-            : 'rounded-bl-sm border border-white/[0.05] bg-brand-dark text-brand-ivory'
-        }`}
-      >
-        {!isUser && (
-          <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-gold/80">
-            <Sparkles className="h-3 w-3" />
-            LUSTI
-          </div>
-        )}
-        {!isUser && pending ? (
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '0ms' }} />
-              <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '150ms' }} />
-              <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '300ms' }} />
+    <div className={`group flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className="relative max-w-[85%]">
+        {/* Botones de accion en hover */}
+        <div className={`absolute ${isUser ? '-left-10' : '-right-10'} top-2 hidden gap-1 group-hover:flex`}>
+          {isUser && !pending && (
+            <button
+              type="button"
+              onClick={() => { setEditText(content); setIsEditing(true); }}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-dark/80 text-slate-500 hover:bg-brand-dark hover:text-brand-ivory transition-colors"
+              title="Editar mensaje"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+          )}
+          {!pending && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-dark/80 text-slate-500 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+              title="Borrar mensaje"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+
+        <div
+          className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
+            isUser
+              ? 'rounded-br-sm bg-brand-gold/15 text-brand-ivory'
+              : 'rounded-bl-sm border border-white/[0.05] bg-brand-dark text-brand-ivory'
+          }`}
+        >
+          {!isUser && (
+            <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-gold/80">
+              <Sparkles className="h-3 w-3" />
+              LUSTI
             </div>
-            <span className="text-[11px] font-light text-slate-500">Pensando...</span>
-          </div>
-        ) : !isUser ? (
-          <AiMessage content={content} author="ai" />
-        ) : (
-          <p className="whitespace-pre-wrap font-light">{content}</p>
-        )}
+          )}
+          {isEditing ? (
+            <div className="flex flex-col gap-2">
+              <textarea
+                ref={editRef}
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSaveEdit();
+                  }
+                  if (e.key === 'Escape') {
+                    setIsEditing(false);
+                    setEditText(content);
+                  }
+                }}
+                className="w-full resize-none bg-transparent text-sm text-brand-ivory outline-none"
+                rows={2}
+              />
+              <div className="flex items-center gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => { setIsEditing(false); setEditText(content); }}
+                  className="px-3 py-1 text-[11px] text-slate-400 hover:text-brand-ivory transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  className="flex items-center gap-1 rounded-lg bg-brand-gold/20 px-3 py-1 text-[11px] font-medium text-brand-gold hover:bg-brand-gold/30 transition-colors"
+                >
+                  <Check className="h-3 w-3" />
+                  Guardar
+                </button>
+              </div>
+            </div>
+          ) : !isUser && pending ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '0ms' }} />
+                <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '150ms' }} />
+                <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '300ms' }} />
+              </div>
+              <span className="text-[11px] font-light text-slate-500">Pensando...</span>
+            </div>
+          ) : !isUser ? (
+            <AiMessage content={content} author="ai" />
+          ) : (
+            <p className="whitespace-pre-wrap font-light">{content}</p>
+          )}
+        </div>
       </div>
     </div>
   );

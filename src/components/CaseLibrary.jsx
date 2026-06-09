@@ -36,6 +36,7 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [dataSource, setDataSource] = useState('local');
+  const [visibleCount, setVisibleCount] = useState(24);
 
   // Spreadsheet and Simplified UX states
   const [viewMode, setViewMode] = useState('cards'); // 'cards' (default) | 'excel' | 'standard'
@@ -287,6 +288,13 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId }) => {
       });
   }, [cases, searchTerm, focusTab, typeFilter, sortBy]);
 
+  const displayedCases = filteredCases.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredCases.length;
+
+  useEffect(() => {
+    setVisibleCount(24);
+  }, [searchTerm, focusTab, typeFilter, sortBy]);
+
   const vaultStats = useMemo(() => {
     const totalDocs = cases.reduce((total, caso) => total + getCount(caso.documents), 0);
     const totalDates = cases.reduce((total, caso) => total + getCount(caso.importantDates), 0);
@@ -459,7 +467,7 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId }) => {
         </div>
 
         <div className="px-2 text-xs font-medium text-brand-accent">
-          Mostrando <span className="text-brand-ivory font-bold">{filteredCases.length}</span> de <span className="text-brand-ivory font-bold">{cases.length}</span> expedientes
+          Mostrando <span className="text-brand-ivory font-bold">{displayedCases.length}</span> de <span className="text-brand-ivory font-bold">{filteredCases.length}</span> expedientes
           <span className="ml-3 text-emerald-400/80 font-medium inline-flex items-center gap-1.5">
             <span className={`h-1.5 w-1.5 rounded-full ${dataSource === 'local' ? 'bg-brand-gold' : 'bg-emerald-400'}`}></span>
             {dataSource === 'local' ? 'Guardado en este equipo' : 'Sincronizado en la nube'}
@@ -468,9 +476,10 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId }) => {
 
         {/* View Mode: Tarjetas (default) */}
         {viewMode === 'cards' ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredCases.length > 0 ? (
-              filteredCases.map((caso) => (
+              displayedCases.map((caso) => (
                 <CaseCard
                   key={caso.id}
                   caso={caso}
@@ -500,7 +509,20 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId }) => {
               </div>
             )}
           </div>
+          {hasMore && (
+            <div className="flex justify-center pt-4 pb-2">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((c) => c + 24)}
+                className="rounded-xl border border-white/[0.08] bg-brand-dark px-6 py-2.5 text-sm font-medium text-brand-accent transition-colors hover:border-brand-gold/30 hover:text-brand-ivory"
+              >
+                Ver más expedientes ({filteredCases.length - visibleCount} restantes)
+              </button>
+            </div>
+          )}
+          </>
         ) : viewMode === 'excel' ? (
+          <>
           <div className="overflow-hidden rounded-lg border border-white/[0.08] bg-brand-dark shadow-lg">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.08] bg-white/[0.02] px-6 py-3.5 gap-2">
               <div className="flex items-center gap-2 text-xs text-brand-gold">
@@ -529,7 +551,7 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId }) => {
                 </thead>
                 <tbody className="divide-y divide-white/[0.06]">
                   {filteredCases.length > 0 ? (
-                    filteredCases.map((caso) => {
+                    displayedCases.map((caso) => {
                       const nextDate = getNextImportantDate(caso.importantDates);
                       const isUploading = uploadingCaseId === caso.id;
                       const urgencyRowClass = getUrgencyRowClass(getEffectiveUrgency(caso));
@@ -747,8 +769,21 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId }) => {
               </table>
             </div>
           </div>
+          {hasMore && (
+            <div className="flex justify-center pt-4 pb-2">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((c) => c + 24)}
+                className="rounded-xl border border-white/[0.08] bg-brand-dark px-6 py-2.5 text-sm font-medium text-brand-accent transition-colors hover:border-brand-gold/30 hover:text-brand-ivory"
+              >
+                Ver más expedientes ({filteredCases.length - visibleCount} restantes)
+              </button>
+            </div>
+          )}
+          </>
         ) : (
-          /* View Mode Standard (Original UI with high contrast texts) */
+          <>
+          {/* View Mode Standard (Original UI with high contrast texts) */}
           <div className="overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.01]">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left">
@@ -765,7 +800,7 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId }) => {
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
                   {filteredCases.length > 0 ? (
-                    filteredCases.map((caso) => {
+                    displayedCases.map((caso) => {
                       const nextDate = getNextImportantDate(caso.importantDates);
                       const urgencyRowClass = getUrgencyRowClass(getEffectiveUrgency(caso));
 
@@ -855,6 +890,18 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId }) => {
               </table>
             </div>
           </div>
+          {hasMore && (
+            <div className="flex justify-center pt-4 pb-2">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((c) => c + 24)}
+                className="rounded-xl border border-white/[0.08] bg-brand-dark px-6 py-2.5 text-sm font-medium text-brand-accent transition-colors hover:border-brand-gold/30 hover:text-brand-ivory"
+              >
+                Ver más expedientes ({filteredCases.length - visibleCount} restantes)
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
 

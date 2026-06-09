@@ -27,7 +27,12 @@ export const loadCaseChats = async (caseId) => {
 
   if (error) return { messages: [], error, skipped: false };
   return {
-    messages: (data || []).map((row) => ({ role: row.role, content: row.content })),
+    messages: (data || []).map((row) => ({
+      id: row.id,
+      role: row.role,
+      content: row.content,
+      created_at: row.created_at,
+    })),
     error: null,
     skipped: false,
   };
@@ -90,7 +95,12 @@ export const loadGlobalChats = async (assistantId = null) => {
   const { data, error } = await query;
   if (error) return { messages: [], error, skipped: false };
   return {
-    messages: (data || []).map((row) => ({ role: row.role, content: row.content })),
+    messages: (data || []).map((row) => ({
+      id: row.id,
+      role: row.role,
+      content: row.content,
+      created_at: row.created_at,
+    })),
     error: null,
     skipped: false,
   };
@@ -130,5 +140,48 @@ export const clearGlobalChats = async (assistantId = null) => {
     : query.eq('assistant_id', normalized);
 
   const { error } = await query;
+  return { error, skipped: false };
+};
+
+// ---------------------------------------------------------------------------
+// Borrado individual de un mensaje (usado por editar/borrar mensaje)
+// ---------------------------------------------------------------------------
+export const deleteCaseChatMsg = async (msgId) => {
+  if (!canUseChatHistory() || !msgId) return { error: null, skipped: true };
+  const { error } = await supabase.from(TABLE_NAME).delete().eq('id', msgId);
+  return { error, skipped: false };
+};
+
+export const deleteGlobalChatMsg = async (msgId) => {
+  if (!canUseChatHistory() || !msgId) return { error: null, skipped: true };
+  const { error } = await supabase.from(GLOBAL_TABLE).delete().eq('id', msgId);
+  return { error, skipped: false };
+};
+
+export const deleteCaseChatMessages = async (ids) => {
+  if (!canUseChatHistory() || !ids?.length) return { error: null, skipped: true };
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: null, skipped: true };
+
+  const { error } = await supabase
+    .from(TABLE_NAME)
+    .delete()
+    .in('id', ids)
+    .eq('user_id', userId);
+
+  return { error, skipped: false };
+};
+
+export const deleteGlobalChatMessages = async (ids) => {
+  if (!canUseChatHistory() || !ids?.length) return { error: null, skipped: true };
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: null, skipped: true };
+
+  const { error } = await supabase
+    .from(GLOBAL_TABLE)
+    .delete()
+    .in('id', ids)
+    .eq('user_id', userId);
+
   return { error, skipped: false };
 };

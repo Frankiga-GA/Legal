@@ -21,19 +21,29 @@ export const abortActiveRequest = () => {
   }
 };
 
+const REQUEST_TIMEOUT = 20000; // 20s max antes de abortar
+
 const fetchWithSignal = (url, options = {}) => {
   abortActiveRequest();
   activeController = new AbortController();
-  return fetch(url, { ...options, signal: activeController.signal });
+  const timeoutId = setTimeout(() => activeController.abort(), REQUEST_TIMEOUT);
+
+  return fetch(url, { ...options, signal: activeController.signal }).finally(() => {
+    clearTimeout(timeoutId);
+  });
 };
 
-const fetchWithRetry = async (url, options, retries = 2) => {
+const fetchWithRetry = async (url, options, retries = 1) => {
   for (let i = 0; i <= retries; i++) {
     try {
       const response = await fetchWithSignal(url, options);
+      if (!response.ok && i === retries) return response;
+      if (!response.ok) continue;
       return response;
     } catch (err) {
-      if (err.name === 'AbortError') throw err;
+      if (err.name === 'AbortError') {
+        throw new Error('La IA no respondió a tiempo. Intentalo de nuevo.');
+      }
       if (i === retries) throw err;
       await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)));
     }
@@ -51,6 +61,9 @@ const cacheKey = (params) =>
     s: params.systemPrompt?.slice(0, 100),
     h: params.history?.length || 0,
     f: params.fileName || null,
+    t: params.temperature ?? 0.25,
+    m: params.maxOutputTokens ?? 2048,
+    r: params.responseJson ?? false,
   });
 
 const cacheGet = (key) => {
@@ -101,7 +114,7 @@ const getAccessToken = async () => {
 };
 
 export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens = 2048, responseJson = false, systemPrompt = null, history = null, fileName = null, fileText = null }) => {
-  const key = cacheKey({ prompt, systemPrompt, history, fileName });
+  const key = cacheKey({ prompt, systemPrompt, history, fileName, temperature, maxOutputTokens, responseJson });
   if (key && !fileText) {
     const cached = cacheGet(key);
     if (cached) return cached;
@@ -128,7 +141,10 @@ export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens =
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || `Backend /ai/raw devolvio ${response.status}.`);
+    const is502 = response.status === 502;
+    throw new Error(is502
+      ? 'El servidor de IA no está disponible (502). Groq puede estar saturado. Esperá unos segundos e intentá de nuevo.'
+      : errorText || `Backend /ai/raw devolvio ${response.status}.`);
   }
 
   const data = await response.json();
