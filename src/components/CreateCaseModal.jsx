@@ -22,7 +22,7 @@ const CreateCaseModal = ({ onClose, onSave }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!clientName.trim() || !dni.trim()) return;
+    if (!clientName.trim()) return;
 
     const newCase = {
       id: '',
@@ -84,7 +84,7 @@ const CreateCaseModal = ({ onClose, onSave }) => {
 
           <div className="space-y-2">
             <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/70">
-              DNI o RUC
+              DNI o RUC <span className="text-brand-accent/40">(opcional)</span>
             </label>
             <div className="relative">
               <Hash className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-accent/30" />
@@ -94,7 +94,6 @@ const CreateCaseModal = ({ onClose, onSave }) => {
                 onChange={(e) => setDni(e.target.value)}
                 placeholder="12345678"
                 className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3.5 pl-12 pr-5 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/30 focus:border-brand-gold/40"
-                required
               />
             </div>
           </div>

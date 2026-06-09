@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   FileText,
   Gavel,
+  Globe,
   Library,
   Loader2,
   MessageSquare,
