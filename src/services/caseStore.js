@@ -71,16 +71,14 @@ export const getCases = () => {
     const storedCases = window.localStorage.getItem(STORAGE_KEY);
 
     if (!storedCases) {
-      const initialCases = getDemoCases();
-      saveCases(initialCases);
-      return initialCases;
+      return [];
     }
 
     const parsedCases = JSON.parse(storedCases);
-    return Array.isArray(parsedCases) ? upgradeLocalDemo(parsedCases) : getDemoCases();
+    return Array.isArray(parsedCases) ? upgradeLocalDemo(parsedCases) : [];
   } catch (error) {
     console.warn('No se pudieron cargar los expedientes locales.', error);
-    return getDemoCases();
+    return [];
   }
 };
 
@@ -101,13 +99,6 @@ export const loadCases = async () => {
     }
 
     const normalizedCases = cases.map(normalizeCase);
-    if (isOldDemoState(normalizedCases)) {
-      const demoCases = getDemoCases();
-      await replaceSupabaseCases(demoCases);
-      saveCases(demoCases);
-      return { cases: demoCases, source: 'supabase-seeded', error: null };
-    }
-
     saveCases(normalizedCases);
     return { cases: normalizedCases, source: 'supabase', error: null };
   } catch (error) {

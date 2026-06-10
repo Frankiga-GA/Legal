@@ -133,7 +133,7 @@ const GlobalChat = ({ onBack }) => {
     const pendingId = Date.now();
     setMessages((prev) => [
       ...prev,
-      { role: 'user', content: question },
+      { role: 'user', content: fileContext ? `${question}\n\n📎 ${fileContext.fileName}` : question },
       { role: 'ai', content: '', pending: true, pendingId },
     ]);
 
@@ -145,7 +145,7 @@ const GlobalChat = ({ onBack }) => {
     setAttachedFile(null);
 
     // Persistir el mensaje del usuario (fire-and-forget)
-    saveGlobalChat(activeAssistant?.id || null, 'user', question).catch((err) => {
+    saveGlobalChat(activeAssistant?.id || null, 'user', fileContext ? `${question}\n\n📎 ${fileContext.fileName}` : question).catch((err) => {
       console.warn('No se pudo guardar el mensaje en Supabase.', err?.message);
     });
 
@@ -235,9 +235,14 @@ const GlobalChat = ({ onBack }) => {
     const pendingId = Date.now();
     const msgsToDelete = messages.slice(index).map((m) => m.id).filter(Boolean);
 
+    // Preservar adjunto si el mensaje original lo tenía
+    const originalMsg = messages[index];
+    const hasAttachment = originalMsg?.content?.includes('\n\n📎 ');
+    const fileName = hasAttachment ? originalMsg.content.split('\n\n📎 ')[1] : null;
+
     setMessages((prev) => [
       ...prev.slice(0, index),
-      { role: 'user', content: newText },
+      { role: 'user', content: hasAttachment ? `${newText}\n\n📎 ${fileName}` : newText },
       { role: 'ai', content: '', pending: true, pendingId },
     ]);
     setIsThinking(true);
