@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LUSTI - System Status</title>
+  <meta name="robots" content="noindex, nofollow">
+  <style>
+    body{font-family:system-ui;margin:0;background:#0a0a0a;color:#fafafa;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:2rem}
+    .card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:1.5rem;margin:1rem 0;max-width:600px;width:100%}
+    .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.5rem}
+    .ok{color:#4ade80}.warn{color:#fbbf24}.err{color:#f87171}
+    button{background:#d4a843;color:#000;border:none;padding:.75rem 1.5rem;border-radius:8px;font-weight:600;cursor:pointer}
+    pre{background:#0a0a0a;padding:1rem;border-radius:8px;overflow:auto;font-size:.85rem;white-space:pre-wrap;word-break:break-word}
+    h1{font-weight:400;letter-spacing:.05em}
+    .timestamp{font-size:.75rem;color:#666;margin-top:1rem}
+  </style>
+</head>
+<body>
+  <h1>LUSTI System Status</h1>
+  <div class="card" id="backend"><h3>Backend API <span class="dot" id="b-dot"></span></h3><pre id="b-out">Checking...</pre></div>
+  <div class="card" id="groq"><h3>Groq AI <span class="dot" id="g-dot"></span></h3><pre id="g-out">Checking...</pre></div>
+  <div class="card" id="supabase"><h3>Supabase <span class="dot" id="s-dot"></span></h3><pre id="s-out">Checking...</pre></div>
+  <div class="card" id="email"><h3>Email (SMTP) <span class="dot" id="e-dot"></span></h3><pre id="e-out">Checking...</pre></div>
+  <button onclick="checkAll()">🔄 Re-check</button>
+  <p class="timestamp" id="ts"></p>
+
+  <script>
+    const API = '/api';
+    async function check(name, url, validator) {
+      const dot = document.getElementById(name+'-dot');
+      const out = document.getElementById(name+'-out');
+      const card = document.getElementById(name);
+      const t0 = Date.now();
+      try {
+        const res = await fetch(url, {method:'GET', cache:'no-store'});
+        const ms = Date.now() - t0;
+        const data = await res.json().catch(()=>({}));
+        const ok = validator ? validator(data, res) : res.ok;
+        dot.className = 'dot ' + (ok ? 'ok' : 'err');
+        out.textContent = `${ok?'✅':'❌'} ${res.status} (${ms}ms)\n${JSON.stringify(data,null,2)}`;
+        card.style.borderColor = ok ? '#4ade80' : '#f87171';
+        return ok;
+      } catch(e) {
+        dot.className = 'dot err';
+        out.textContent = `❌ Network error: ${e.message}`;
+        card.style.borderColor = '#f87171';
+        return false;
+      }
+    }
+    async function checkAll() {
+      document.getElementById('ts').textContent = 'Última verificación: ' + new Date().toLocaleString();
+      await Promise.all([
+        check('backend', `${API}/health`, d => d?.status==='ok'),
+        check('groq', `${API}/health/groq`, d => d?.ok),
+        check('supabase', `${API}/health/supabase`, d => d?.ok),
+        check('email', `${API}/health/email`, d => d?.ok),
+      ]);
+    }
+    checkAll();
+    setInterval(checkAll, 60000);
+  </script>
+</body>
+</html>

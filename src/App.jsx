@@ -61,9 +61,9 @@ function App() {
   const [showTakeOverMessage, setShowTakeOverMessage] = useState(false);
   const [closeFailed, setCloseFailed] = useState(false);
 
-    const tabId = useRef(`tab_${crypto.randomUUID?.() ?? Date.now()}_${Math.random().toString(36).slice(2, 8)}`).current;
-    const channelRef = useRef(null);
-    const isChannelOpen = useRef(false);
+  const tabId = useRef(() => `tab_${crypto.randomUUID?.() ?? Date.now()}_${Math.random().toString(36).slice(2, 8)}`).current;
+  const channelRef = useRef(null);
+  const isChannelOpen = useRef(false);
 
   useEffect(() => {
     let isMounted = true;

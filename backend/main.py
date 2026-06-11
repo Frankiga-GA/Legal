@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import os
 import re
+import smtplib
 import unicodedata
 from datetime import datetime
 from pathlib import Path
@@ -724,6 +725,65 @@ def me(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
         "email": user.email,
         "role": user.role,
     }
+
+
+# =============================================================================
+# Health Checks (para monitoreo interno)
+# =============================================================================
+
+@app.get("/health")
+async def health() -> dict[str, Any]:
+    return {"status": "ok", "ts": datetime.utcnow().isoformat() + "Z"}
+
+
+@app.get("/health/groq")
+async def health_groq() -> dict[str, Any]:
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return {"ok": False, "error": "GROQ_API_KEY no configurada"}
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(
+                "https://api.groq.com/openai/v1/models",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+        return {"ok": resp.status_code == 200, "status": resp.status_code}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/health/supabase")
+async def health_supabase() -> dict[str, Any]:
+    url = os.getenv("SUPABASE_URL")
+    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not service_key:
+        return {"ok": False, "error": "Supabase no configurado"}
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(
+                f"{url.rstrip('/')}/rest/v1/cases?select=id&limit=1",
+                headers={
+                    "apikey": service_key,
+                    "Authorization": f"Bearer {service_key}",
+                },
+            )
+        return {"ok": resp.status_code == 200, "status": resp.status_code}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/health/email")
+async def health_email() -> dict[str, Any]:
+    gmail_user = os.getenv("GMAIL_USER")
+    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
+    if not gmail_user or not gmail_pass:
+        return {"ok": False, "error": "SMTP no configurado"}
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=5) as server:
+            server.login(gmail_user, gmail_pass)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 @app.post("/upload")
