@@ -19,7 +19,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!google.*\\.html).*)",
+      "source": "/((?!google.*\\.html|health\\.html).*)",
       "destination": "/index.html"
     }
   ]

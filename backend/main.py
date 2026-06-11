@@ -554,9 +554,10 @@ def _build_txt_bytes(content: str) -> bytes:
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
+def health() -> dict[str, Any]:
     return {
         "status": "ok",
+        "ts": datetime.utcnow().isoformat() + "Z",
         "groq_configured": "yes" if os.getenv("GROQ_API_KEY") else "no",
         "groq_model": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
         "auth_required": "yes" if os.getenv("SUPABASE_JWT_SECRET") else "no",
@@ -731,9 +732,7 @@ def me(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
 # Health Checks (para monitoreo interno)
 # =============================================================================
 
-@app.get("/health")
-async def health() -> dict[str, Any]:
-    return {"status": "ok", "ts": datetime.utcnow().isoformat() + "Z"}
+
 
 
 @app.get("/health/groq")
