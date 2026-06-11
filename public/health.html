@@ -5,60 +5,470 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LUSTI - System Status</title>
   <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
-    body{font-family:system-ui;margin:0;background:#0a0a0a;color:#fafafa;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:2rem}
-    .card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:1.5rem;margin:1rem 0;max-width:600px;width:100%}
-    .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.5rem}
-    .ok{color:#4ade80}.warn{color:#fbbf24}.err{color:#f87171}
-    button{background:#d4a843;color:#000;border:none;padding:.75rem 1.5rem;border-radius:8px;font-weight:600;cursor:pointer}
-    pre{background:#0a0a0a;padding:1rem;border-radius:8px;overflow:auto;font-size:.85rem;white-space:pre-wrap;word-break:break-word}
-    h1{font-weight:400;letter-spacing:.05em}
-    .timestamp{font-size:.75rem;color:#666;margin-top:1rem}
+    body {
+      font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+      margin: 0;
+      background-color: #070708;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(212, 168, 67, 0.08) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(212, 168, 67, 0.03) 0px, transparent 50%);
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 3rem 2rem;
+      box-sizing: border-box;
+    }
+
+    .progress-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.03);
+      z-index: 1000;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #d4a843, #f59e0b, #10b981);
+      transform-origin: left;
+      transform: scaleX(1);
+      transition: transform 1s linear;
+    }
+
+    h1 {
+      font-weight: 500;
+      letter-spacing: -0.03em;
+      margin: 0 0 0.5rem 0;
+      font-size: 2.4rem;
+      background: linear-gradient(135deg, #ffffff 0%, #a3a3a3 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-align: center;
+    }
+
+    .system-badge {
+      padding: 0.5rem 1.25rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      margin-bottom: 2rem;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .system-ok {
+      background: rgba(16, 185, 129, 0.08);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.2);
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);
+    }
+    .system-err {
+      background: rgba(239, 68, 68, 0.08);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.2);
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.1);
+    }
+    .checking {
+      background: rgba(245, 158, 11, 0.08);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.2);
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.1);
+    }
+
+    .services-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 900px;
+      margin: 1rem 0 2.5rem 0;
+    }
+    @media (min-width: 768px) {
+      .services-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .card {
+      background: rgba(20, 20, 23, 0.6);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 20px;
+      padding: 1.75rem;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+      background: rgba(24, 24, 28, 0.7);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+    .card-ok {
+      border-color: rgba(52, 211, 153, 0.15);
+    }
+    .card-ok:hover {
+      border-color: rgba(52, 211, 153, 0.3);
+    }
+    .card-err {
+      border-color: rgba(248, 113, 113, 0.15);
+    }
+    .card-err:hover {
+      border-color: rgba(248, 113, 113, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .card-title h3 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 500;
+      color: #fafafa;
+      letter-spacing: -0.01em;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #52525b;
+      transition: all 0.4s ease;
+    }
+    .dot.ok {
+      background-color: #10b981;
+      box-shadow: 0 0 14px 2px #10b981;
+    }
+    .dot.err {
+      background-color: #ef4444;
+      box-shadow: 0 0 14px 2px #ef4444;
+    }
+    .dot.loading {
+      background-color: #f59e0b;
+      box-shadow: 0 0 14px 2px #f59e0b;
+      animation: pulse 1.5s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.25); opacity: 0.5; }
+    }
+
+    .svc-refresh-btn, .main-refresh-btn {
+      background: rgba(255, 255, 255, 0.03);
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .svc-refresh-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+    }
+    .svc-refresh-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fafafa;
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .main-refresh-btn {
+      background: #d4a843;
+      color: #050505;
+      border: none;
+      padding: 0.85rem 2rem;
+      border-radius: 14px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      gap: 0.6rem;
+      box-shadow: 0 4px 20px rgba(212, 168, 67, 0.15);
+      outline: none;
+    }
+    .main-refresh-btn:hover {
+      background: #f59e0b;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(245, 158, 11, 0.35);
+    }
+    .main-refresh-btn:active {
+      transform: translateY(0);
+    }
+
+    .spinning svg {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    details {
+      margin-top: 1.25rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.03);
+      padding-top: 1rem;
+    }
+    summary {
+      font-size: 0.8rem;
+      color: #64748b;
+      cursor: pointer;
+      user-select: none;
+      transition: color 0.2s;
+      outline: none;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    summary:hover {
+      color: #cbd5e1;
+    }
+    pre {
+      background: #09090b;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      padding: 1rem;
+      border-radius: 10px;
+      overflow: auto;
+      font-size: 0.8rem;
+      font-family: 'Fira Code', 'Courier New', Courier, monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 0.75rem;
+      color: #a1a1aa;
+      max-height: 180px;
+    }
+
+    .timestamp {
+      font-size: 0.8rem;
+      color: #52525b;
+      margin-top: 1.5rem;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
+  <div class="progress-container"><div id="progress-bar" class="progress-bar"></div></div>
+
   <h1>LUSTI System Status</h1>
-  <div class="card" id="backend"><h3>Backend API <span class="dot" id="backend-dot"></span></h3><pre id="backend-out">Checking...</pre></div>
-  <div class="card" id="groq"><h3>Groq AI <span class="dot" id="groq-dot"></span></h3><pre id="groq-out">Checking...</pre></div>
-  <div class="card" id="supabase"><h3>Supabase <span class="dot" id="supabase-dot"></span></h3><pre id="supabase-out">Checking...</pre></div>
-  <div class="card" id="email"><h3>Email (SMTP) <span class="dot" id="email-dot"></span></h3><pre id="email-out">Checking...</pre></div>
-  <button onclick="checkAll()">🔄 Re-check</button>
+  <div id="system-badge" class="system-badge checking">
+    <span>Checking Systems...</span>
+  </div>
+
+  <div class="services-grid">
+    <!-- Backend API -->
+    <div class="card" id="backend">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="dot" id="backend-dot"></span>
+          <h3>Backend API</h3>
+        </div>
+        <button class="svc-refresh-btn" id="backend-btn" onclick="checkService('backend')" title="Refrescar este servicio">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
+      </div>
+      <details>
+        <summary>Detalles de respuesta</summary>
+        <pre id="backend-out">Checking...</pre>
+      </details>
+    </div>
+
+    <!-- Groq AI -->
+    <div class="card" id="groq">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="dot" id="groq-dot"></span>
+          <h3>Groq AI</h3>
+        </div>
+        <button class="svc-refresh-btn" id="groq-btn" onclick="checkService('groq')" title="Refrescar este servicio">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
+      </div>
+      <details>
+        <summary>Detalles de respuesta</summary>
+        <pre id="groq-out">Checking...</pre>
+      </details>
+    </div>
+
+    <!-- Supabase -->
+    <div class="card" id="supabase">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="dot" id="supabase-dot"></span>
+          <h3>Supabase</h3>
+        </div>
+        <button class="svc-refresh-btn" id="supabase-btn" onclick="checkService('supabase')" title="Refrescar este servicio">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
+      </div>
+      <details>
+        <summary>Detalles de respuesta</summary>
+        <pre id="supabase-out">Checking...</pre>
+      </details>
+    </div>
+
+    <!-- Email (SMTP) -->
+    <div class="card" id="email">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="dot" id="email-dot"></span>
+          <h3>Email (SMTP)</h3>
+        </div>
+        <button class="svc-refresh-btn" id="email-btn" onclick="checkService('email')" title="Refrescar este servicio">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
+      </div>
+      <details>
+        <summary>Detalles de respuesta</summary>
+        <pre id="email-out">Checking...</pre>
+      </details>
+    </div>
+  </div>
+
+  <button class="main-refresh-btn" id="main-btn" onclick="checkAll()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+    🔄 Re-check All
+  </button>
+  
   <p class="timestamp" id="ts"></p>
 
   <script>
     const API = '/api';
-    async function check(name, url, validator) {
-      const dot = document.getElementById(name+'-dot');
-      const out = document.getElementById(name+'-out');
+    
+    const SERVICES = {
+      backend: { url: `${API}/health`, validator: d => d?.status === 'ok' },
+      groq: { url: `${API}/health/groq`, validator: d => d?.ok },
+      supabase: { url: `${API}/health/supabase`, validator: d => d?.ok },
+      email: { url: `${API}/health/email`, validator: d => d?.ok }
+    };
+
+    let serviceStates = {};
+    let timeLeft = 60;
+    let timerInterval = null;
+
+    async function checkService(name) {
+      const svc = SERVICES[name];
+      if (!svc) return false;
+
+      const dot = document.getElementById(`${name}-dot`);
+      const out = document.getElementById(`${name}-out`);
       const card = document.getElementById(name);
+      const btn = document.getElementById(`${name}-btn`);
+
+      dot.className = 'dot loading';
+      if (btn) btn.classList.add('spinning');
+
       const t0 = Date.now();
       try {
-        const res = await fetch(url, {method:'GET', cache:'no-store'});
+        const res = await fetch(svc.url, { method: 'GET', cache: 'no-store' });
         const ms = Date.now() - t0;
-        const data = await res.json().catch(()=>({}));
-        const ok = validator ? validator(data, res) : res.ok;
+        const data = await res.json().catch(() => ({}));
+        const ok = svc.validator ? svc.validator(data, res) : res.ok;
+
         dot.className = 'dot ' + (ok ? 'ok' : 'err');
-        out.textContent = `${ok?'✅':'❌'} ${res.status} (${ms}ms)\n${JSON.stringify(data,null,2)}`;
-        card.style.borderColor = ok ? '#4ade80' : '#f87171';
+        out.textContent = `${ok ? '✅' : '❌'} ${res.status} (${ms}ms)\n${JSON.stringify(data, null, 2)}`;
+        card.className = 'card ' + (ok ? 'card-ok' : 'card-err');
+        
+        if (btn) btn.classList.remove('spinning');
+        serviceStates[name] = ok;
+        updateOverallStatus();
         return ok;
-      } catch(e) {
+      } catch (e) {
         dot.className = 'dot err';
         out.textContent = `❌ Network error: ${e.message}`;
-        card.style.borderColor = '#f87171';
+        card.className = 'card card-err';
+        
+        if (btn) btn.classList.remove('spinning');
+        serviceStates[name] = false;
+        updateOverallStatus();
         return false;
       }
     }
+
+    function updateOverallStatus() {
+      const badge = document.getElementById('system-badge');
+      const serviceNames = Object.keys(SERVICES);
+      
+      const finishedChecks = serviceNames.filter(name => serviceStates[name] !== undefined);
+      if (finishedChecks.length < serviceNames.length) {
+        badge.className = 'system-badge checking';
+        badge.innerHTML = `<span>Checking Systems (${finishedChecks.length}/${serviceNames.length})...</span>`;
+        return;
+      }
+
+      const allOk = serviceNames.every(name => serviceStates[name] === true);
+      if (allOk) {
+        badge.className = 'system-badge system-ok';
+        badge.innerHTML = `<span>🟢 Todos los sistemas operativos</span>`;
+      } else {
+        badge.className = 'system-badge system-err';
+        badge.innerHTML = `<span>🔴 Alerta: Algunos servicios presentan fallas</span>`;
+      }
+    }
+
     async function checkAll() {
       document.getElementById('ts').textContent = 'Última verificación: ' + new Date().toLocaleString();
-      await Promise.all([
-        check('backend', `${API}/health`, d => d?.status==='ok'),
-        check('groq', `${API}/health/groq`, d => d?.ok),
-        check('supabase', `${API}/health/supabase`, d => d?.ok),
-        check('email', `${API}/health/email`, d => d?.ok),
-      ]);
+      
+      const mainBtn = document.getElementById('main-btn');
+      if (mainBtn) mainBtn.classList.add('spinning');
+
+      serviceStates = {};
+      updateOverallStatus();
+
+      await Promise.all(
+        Object.keys(SERVICES).map(name => checkService(name))
+      );
+
+      if (mainBtn) mainBtn.classList.remove('spinning');
+      resetTimer();
     }
+
+    function resetTimer() {
+      timeLeft = 60;
+      if (timerInterval) clearInterval(timerInterval);
+      updateTimerUI();
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerUI();
+        if (timeLeft <= 0) {
+          checkAll();
+        }
+      }, 1000);
+    }
+
+    function updateTimerUI() {
+      const bar = document.getElementById('progress-bar');
+      if (bar) {
+        const scale = timeLeft / 60;
+        bar.style.transform = `scaleX(${scale})`;
+      }
+    }
+
+    // Initialize
     checkAll();
-    setInterval(checkAll, 60000);
   </script>
 </body>
 </html>
