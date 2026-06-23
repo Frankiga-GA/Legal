@@ -8,6 +8,8 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from collections import defaultdict
+import time
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -105,6 +107,80 @@ app.add_middleware(
     expose_headers=["X-Lusti-Filename"],
     max_age=600,
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
+# =============================================================================
+# Utilidades de Seguridad (Validación y Rate Limiting)
+# =============================================================================
+
+_rate_limits = defaultdict(list)
+
+
+def check_rate_limit(user_id: str, limit: int = 15, period: int = 60) -> None:
+    """Valida si un usuario excedió el límite de peticiones (Rate Limit)."""
+    now = time.time()
+    user_requests = _rate_limits[user_id]
+    
+    # Filtrar marcas de tiempo fuera del periodo de gracia
+    active_requests = [t for t in user_requests if now - t < period]
+    _rate_limits[user_id] = active_requests
+    
+    if len(active_requests) >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail="Demasiadas peticiones. Por favor, intenta de nuevo más tarde."
+        )
+    _rate_limits[user_id].append(now)
+
+
+def _validate_file(file: UploadFile, max_size_mb: int = 15) -> None:
+    """Valida la extensión del archivo (whitelist) y su tamaño (máx 15MB)."""
+    # 1. Validar extensión
+    allowed_extensions = {".pdf", ".docx", ".txt", ".md", ".json", ".csv"}
+    filename = (file.filename or "").lower()
+    suffix = Path(filename).suffix
+    if suffix not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Extensión de archivo '{suffix}' no permitida. Permitidos: {', '.join(allowed_extensions)}"
+        )
+    
+    # 2. Validar tamaño por header
+    max_size_bytes = max_size_mb * 1024 * 1024
+    content_length = file.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > max_size_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"El archivo excede el tamaño máximo permitido de {max_size_mb}MB."
+                )
+        except ValueError:
+            pass
+            
+    # 3. Validar tamaño por descriptor en disco/memoria (en caso de que falte el header)
+    try:
+        file.file.seek(0, 2)
+        size = file.file.tell()
+        file.file.seek(0)
+    except Exception:
+        size = 0
+
+    if size > max_size_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"El archivo excede el tamaño máximo permitido de {max_size_mb}MB."
+        )
 
 
 class ChatRequest(BaseModel):
@@ -790,10 +866,12 @@ async def upload_file(
     file: UploadFile = File(...),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, str]:
+    _validate_file(file)
     try:
         extracted_text = _read_text_from_upload(file)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+        print(f"Error processing file in upload_file: {e}")
+        raise HTTPException(status_code=500, detail="Error al procesar el archivo.")
 
     return {
         "file_name": file.filename or "",
@@ -809,6 +887,7 @@ async def ai_raw(
     user: CurrentUser = Depends(current_user),
 ) -> RawAskResponse:
     """Pasa un prompt completo a Gemini sin template del backend. Usado por el frontend."""
+    check_rate_limit(user.user_id, limit=15, period=60)
     try:
         text = await _ask_gemini(
             payload.prompt,
@@ -821,7 +900,8 @@ async def ai_raw(
             file_text=payload.file_text,
         )
     except Exception as error:
-        raise HTTPException(status_code=502, detail=f"No se pudo llamar a Groq: {error}") from error
+        print(f"Error calling Groq in ai_raw: {error}")
+        raise HTTPException(status_code=502, detail="No se pudo procesar la solicitud con el servicio de IA.")
     return RawAskResponse(text=text)
 
 
@@ -830,6 +910,7 @@ async def chat(
     payload: ChatRequest,
     user: CurrentUser = Depends(current_user),
 ) -> ChatResponse:
+    check_rate_limit(user.user_id, limit=20, period=60)
     if not payload.message.strip():
         raise HTTPException(status_code=400, detail="message is required")
 
@@ -844,10 +925,8 @@ async def chat(
     try:
         response_text = await _ask_gemini(prompt_text)
     except Exception as error:
-        response_text = (
-            "No se pudo usar Gemini en el backend. "
-            f"Detalle: {str(error).strip() or 'error desconocido'}."
-        )
+        print(f"Error calling Groq in chat: {error}")
+        response_text = "No se pudo procesar la solicitud con el servicio de IA en este momento."
 
     return ChatResponse(
         message=response_text,
@@ -864,11 +943,13 @@ async def generate_document(
     file: UploadFile | None = File(None),
     user: CurrentUser = Depends(current_user),
 ):
+    check_rate_limit(user.user_id, limit=15, period=60)
     extracted_text = ""
     file_name = None
     file_type = None
 
     if file is not None:
+        _validate_file(file)
         file_name = file.filename
         file_type = file.content_type
         extracted_text = _read_text_from_upload(file)
@@ -888,6 +969,7 @@ async def generate_file(
     payload: GenerateFileRequest,
     user: CurrentUser = Depends(current_user),
 ):
+    check_rate_limit(user.user_id, limit=15, period=60)
     output_format = payload.output_format.lower()
     document_type = (payload.document_type or "documento").strip()
 
@@ -897,7 +979,8 @@ async def generate_file(
         try:
             content = await _ask_gemini(prompt_text)
         except Exception as error:
-            raise HTTPException(status_code=502, detail=f"No se pudo generar el contenido con IA: {error}") from error
+            print(f"Error calling Groq in generate_file: {error}")
+            raise HTTPException(status_code=502, detail="No se pudo procesar la solicitud con el servicio de IA.")
 
     if not content:
         raise HTTPException(status_code=400, detail="No hay contenido para generar el archivo")

@@ -303,6 +303,15 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
     const userMessage = input.trim();
     const requestedOutputFormat = detectOutputFormatIntent(userMessage);
     
+    // Formatear el historial para que la IA tenga memoria del contexto anterior
+    const history = messages
+      .filter((m) => m.role === 'user' || m.role === 'ai' || m.role === 'assistant')
+      .map((m) => ({
+        role: m.role === 'ai' ? 'assistant' : m.role,
+        content: m.content
+      }))
+      .slice(-6); // Tomamos los últimos 6 mensajes del historial
+    
     let baseQuestion = userMessage;
     const currentCase = selectedCaseId ? cases.find(c => c.id === selectedCaseId) : null;
     if (currentCase) {
@@ -428,6 +437,7 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
                   'Texto extraido:',
                   attachmentFileText,
                 ].join('\n'),
+                history,
               })
             : buildLocalAssistantResponse(userMessage);
         }
@@ -461,9 +471,10 @@ const BotChat = ({ bot, onBack, onSaveGeneratedDocument }) => {
         const responseContent = isGeminiConfigured
             ? await askGeminiSpecializedAssistant({
                 bot,
-              question: aiQuestion,
-              attachmentContext: attachmentFileText || attachmentFileName || '',
-            })
+                question: aiQuestion,
+                attachmentContext: attachmentFileText || attachmentFileName || '',
+                history,
+              })
             : buildLocalAssistantResponse(userMessage);
         const shouldExport = shouldExposeDocumentActions({
           message: userMessage,

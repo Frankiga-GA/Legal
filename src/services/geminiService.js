@@ -342,7 +342,7 @@ ${question}
 ${CITATION_RULES}
 `;
 
-export const askGeminiSpecializedAssistant = async ({ bot, question, attachmentContext = '' }) => {
+export const askGeminiSpecializedAssistant = async ({ bot, question, attachmentContext = '', history = null }) => {
   if (!isGeminiConfigured) {
     throw new Error('Gemini no esta configurado.');
   }
@@ -355,6 +355,7 @@ export const askGeminiSpecializedAssistant = async ({ bot, question, attachmentC
     }),
     temperature: 0.25,
     maxOutputTokens: 4096,
+    history,
   });
   return cleanAssistantText(text);
 };

@@ -129,6 +129,19 @@ const GlobalChat = ({ onBack }) => {
     setIsThinking(true);
     setError('');
 
+    // Capturamos el archivo adjunto ANTES de usarlo (estaba declarado después, causando bug)
+    const fileContext = attachedFile && attachedFile.status === 'ready'
+      ? { fileName: attachedFile.name, fileText: attachedFile.text }
+      : null;
+    setAttachedFile(null);
+
+    // Historial de conversación para dar memoria a la IA (últimos 6 mensajes)
+    const history = messages
+      .filter((m) => m.role === 'user' || m.role === 'ai')
+      .filter((m) => !m.pending && m.content)
+      .map((m) => ({ role: m.role === 'ai' ? 'assistant' : m.role, content: m.content }))
+      .slice(-6);
+
     // Agrega el mensaje del usuario + placeholder de la IA al instante
     const pendingId = Date.now();
     setMessages((prev) => [
@@ -137,13 +150,6 @@ const GlobalChat = ({ onBack }) => {
       { role: 'ai', content: '', pending: true, pendingId },
     ]);
 
-    // Capturamos el archivo adjunto (si lo hay) y lo limpiamos del estado
-    // para que no quede "pegado" entre mensajes.
-    const fileContext = attachedFile && attachedFile.status === 'ready'
-      ? { fileName: attachedFile.name, fileText: attachedFile.text }
-      : null;
-    setAttachedFile(null);
-
     // Persistir el mensaje del usuario (fire-and-forget)
     saveGlobalChat(activeAssistant?.id || null, 'user', fileContext ? `${question}\n\n📎 ${fileContext.fileName}` : question).catch((err) => {
       console.warn('No se pudo guardar el mensaje en Supabase.', err?.message);
@@ -151,8 +157,6 @@ const GlobalChat = ({ onBack }) => {
 
     try {
       const systemPrompt = activeAssistant?.systemPrompt || null;
-      // Tomamos los ultimos N mensajes previos para que la IA recuerde
-      const history = messages.slice(-HISTORY_LIMIT);
       const text = await askBackend({
         prompt: question,
         temperature: 0.4,
