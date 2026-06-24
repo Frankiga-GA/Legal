@@ -36,6 +36,8 @@ import DriveFilePicker from './DriveFilePicker';
 import { collectCitations } from '../utils/citationParser';
 import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
 import { getStoredDriveToken } from '../services/googleDriveService';
+import { pdf } from '@react-pdf/renderer';
+import CasePdfExport from './CasePdfExport';
 
 const CaseWorkspace = ({ caseId, onClose }) => {
   const [caseData, setCaseData] = useState(null);
@@ -225,6 +227,23 @@ const CaseWorkspace = ({ caseId, onClose }) => {
     }));
     handleUpdate({ documents: [...documents, ...newDocs] });
     toast.success(`${newDocs.length} archivo(s) importado(s) desde Drive`);
+  };
+
+  const handleExportPdf = async () => {
+    try {
+      const blob = await pdf(<CasePdfExport caseData={caseData} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeName = (caseData.name || 'expediente').replace(/[<>:"/\\|?*]/g, '_');
+      a.download = `${caseData.id} - ${safeName}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('PDF exportado correctamente');
+    } catch (e) {
+      console.error('PDF export error:', e);
+      toast.error('Error al exportar PDF: ' + (e.message || 'desconocido'));
+    }
   };
 
   const handleDeleteDoc = (docId) => {
@@ -481,6 +500,13 @@ const CaseWorkspace = ({ caseId, onClose }) => {
               <div className="flex flex-col items-center"><span className="text-lg font-bold text-brand-ivory">{documents.length}</span> Docs</div>
               <div className="flex flex-col items-center"><span className="text-lg font-bold text-brand-ivory">{importantDates.length}</span> Plazos</div>
             </div>
+            <button
+              onClick={handleExportPdf}
+              className="rounded-lg border border-white/[0.08] p-2 text-brand-accent hover:border-brand-gold/40 hover:bg-brand-gold/10 hover:text-brand-gold transition-colors"
+              title="Exportar PDF"
+            >
+              <FileText className="h-4 w-4" />
+            </button>
             <button
               onClick={handleDeleteCase}
               className="rounded-lg border border-white/[0.08] p-2 text-brand-accent hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 transition-colors"

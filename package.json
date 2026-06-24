@@ -12,6 +12,7 @@
     "security:install-hooks": "git config core.hooksPath .githooks"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
     "@supabase/supabase-js": "^2.106.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.14.0",
