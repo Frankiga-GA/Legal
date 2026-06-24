@@ -495,9 +495,13 @@ const DriveIntegrationCard = () => {
     <div className="group rounded-lg border border-white/[0.05] bg-white/[0.01] p-6 transition-colors hover:bg-white/[0.03]">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h4 className="text-xl font-serif font-medium text-brand-ivory">Google Drive</h4>
+          <h4 className="flex items-center gap-2 text-xl font-serif font-medium text-brand-ivory">
+            <span>Conectar con Google</span>
+            <span className="text-base" title="Google Drive">📁</span>
+            <span className="text-base" title="Google Calendar">📅</span>
+          </h4>
           <p className="mt-2 text-sm font-light leading-relaxed text-brand-accent/40">
-            Boveda de activos documentales externa
+            Acceso a Google Drive y Google Calendar
           </p>
         </div>
         <span className={`rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-widest ${
@@ -508,8 +512,7 @@ const DriveIntegrationCard = () => {
       </div>
 
       <div className="mb-6 space-y-2 text-sm text-brand-accent/45">
-        <p>{isGoogleDriveConfigured ? 'La cuenta puede autorizarse para leer Drive.' : 'Falta configurar VITE_GOOGLE_OAUTH_CLIENT_ID.'}</p>
-        <p>{loading ? 'Sincronizando carpetas y archivos...' : `${folders.length} carpetas y ${files.length} archivos visibles.`}</p>
+        <p>{isGoogleDriveConfigured ? 'La cuenta puede autorizarse para acceder a Drive y Calendar.' : 'Falta configurar VITE_GOOGLE_OAUTH_CLIENT_ID.'}</p>
       </div>
 
       {error ? <p className="mb-4 text-sm text-red-400">{error}</p> : null}
@@ -522,7 +525,7 @@ const DriveIntegrationCard = () => {
           className="inline-flex items-center gap-2 rounded-xl bg-brand-gold px-4 py-3 text-xs font-bold uppercase tracking-widest text-brand-black transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCcw className="h-4 w-4" />
-          {token ? 'Reconectar' : 'Conectar Drive'}
+          {token ? 'Reconectar' : 'Conectar Google'}
         </button>
         <button
           type="button"
@@ -532,11 +535,6 @@ const DriveIntegrationCard = () => {
           <Unplug className="h-4 w-4" />
           Desconectar
         </button>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <DriveList title="Carpetas" items={folders} />
-        <DriveList title="Archivos" items={files} />
       </div>
     </div>
   );

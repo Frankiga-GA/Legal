@@ -32,6 +32,8 @@ import { loadCaseChats, saveCaseChat, clearCaseChats, deleteCaseChatMsg, deleteC
 import AiMessage from './AiMessage';
 import CitationPanel from './CitationPanel';
 import { collectCitations } from '../utils/citationParser';
+import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
+import { getStoredDriveToken } from '../services/googleDriveService';
 
 const CaseWorkspace = ({ caseId, onClose }) => {
   const [caseData, setCaseData] = useState(null);
@@ -103,6 +105,20 @@ const CaseWorkspace = ({ caseId, onClose }) => {
     const allCases = getCases();
     const result = await updateCaseAsync(allCases, caseData.id, changes);
     setCaseData(result.updatedCase);
+    syncCalendar(allCases);
+  };
+
+  const syncCalendar = async (allCases) => {
+    if (!getStoredDriveToken()?.access_token) return;
+    const allDeadlines = (allCases || getCases()).flatMap(c =>
+      (c.importantDates || []).map(d => ({ ...d, caseId: c.id, caseName: c.name || '' }))
+    );
+    if (!allDeadlines.length) return;
+    try {
+      await syncDeadlinesToCalendar(allDeadlines);
+    } catch {
+      // Silencio — no molestar al usuario por errores de sync automatico
+    }
   };
 
   const handleFileUpload = async (e) => {

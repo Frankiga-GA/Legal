@@ -1,6 +1,7 @@
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
-const DRIVE_SCOPES = [
+const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/calendar.events',
 ];
 
 const STORAGE_KEY = 'lusti-google-drive-token';
@@ -14,6 +15,10 @@ export const getStoredDriveToken = () => {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.access_token) return null;
+    if (parsed.expires_at && Date.now() > parsed.expires_at) {
+      clearStoredDriveToken();
+      return null;
+    }
     return parsed;
   } catch {
     return null;
@@ -54,7 +59,7 @@ export const connectGoogleDrive = async () => {
   url.searchParams.set('client_id', GOOGLE_CLIENT_ID);
   url.searchParams.set('redirect_uri', redirectUri);
   url.searchParams.set('response_type', 'token');
-  url.searchParams.set('scope', DRIVE_SCOPES.join(' '));
+  url.searchParams.set('scope', GOOGLE_SCOPES.join(' '));
   url.searchParams.set('include_granted_scopes', 'true');
   url.searchParams.set('prompt', 'consent');
 

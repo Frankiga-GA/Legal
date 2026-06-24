@@ -5,9 +5,12 @@
 // para que el abogado vea de un vistazo lo que se vence esta semana / mes.
 // =============================================================================
 
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock, Filter, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Clock, Filter, X, RefreshCw } from 'lucide-react';
 import { getCases } from '../services/caseStore';
+import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
+import { getStoredDriveToken, onDriveTokenChange } from '../services/googleDriveService';
+import toast from 'react-hot-toast';
 
 const PRIORITY_TONE = {
   Alta: {
@@ -102,6 +105,33 @@ const CalendarView = ({ onOpenCase }) => {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [caseFilter, setCaseFilter] = useState('all');
   const [selectedDate, setSelectedDate] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
+  const [isCalendarConnected, setIsCalendarConnected] = useState(Boolean(getStoredDriveToken()?.access_token));
+
+  useEffect(() => onDriveTokenChange((token) => {
+    setIsCalendarConnected(Boolean(token?.access_token));
+  }), []);
+
+  const handleSync = async (silent = false) => {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncProgress(0);
+    try {
+      const allDeadlines = collectDeadlines(cases);
+      if (!allDeadlines.length) {
+        if (!silent) toast('No hay plazos para sincronizar.');
+        return;
+      }
+      const result = await syncDeadlinesToCalendar(allDeadlines, setSyncProgress);
+      if (!silent) toast.success(`Calendar: ${result.created} creados, ${result.updated} actualizados, ${result.deleted} eliminados`);
+    } catch (e) {
+      if (!silent) toast.error(e.message || 'Error al sincronizar con Google Calendar');
+    } finally {
+      setSyncing(false);
+      setSyncProgress(0);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -117,10 +147,17 @@ const CalendarView = ({ onOpenCase }) => {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
+
+  // Auto-sync al cargar expedientes si hay token
+  const autoSync = useRef(false);
+  useEffect(() => {
+    if (!loading && cases.length > 0 && isCalendarConnected && !autoSync.current) {
+      autoSync.current = true;
+      handleSync(true);
+    }
+  }, [loading, cases, isCalendarConnected]);
 
   const deadlines = useMemo(() => collectDeadlines(cases), [cases]);
   const filtered = useMemo(
@@ -226,6 +263,17 @@ const CalendarView = ({ onOpenCase }) => {
                 Semana
               </button>
             </div>
+            {isCalendarConnected && (
+              <button
+                type="button"
+                onClick={handleSync}
+                disabled={syncing}
+                className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs font-semibold text-brand-ivory transition-colors hover:bg-white/[0.06] disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? `${syncProgress}%` : 'Sync Calendar'}
+              </button>
+            )}
             <button
               type="button"
               onClick={goToday}
