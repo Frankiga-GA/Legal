@@ -7,6 +7,7 @@ import {
   ClipboardCopy,
   Edit3,
   FileText,
+  HardDrive,
   MessageSquare,
   Plus,
   Save,
@@ -15,6 +16,9 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { getStoredDriveToken, listDriveFolders, listDriveChildren, downloadDriveFileAsFile, DRIVE_TEXT_MIME_TYPES } from '../services/googleDriveService';
+import { uploadDocumentToBackend } from '../services/documentBackendService';
 import {
   PROMPT_CATEGORIES,
   copyPromptToClipboard,
@@ -208,6 +212,12 @@ const ManagerBot = ({ onUseInChat }) => {
   const [isCreatingPrompt, setIsCreatingPrompt] = useState(false);
   const [actionMessage, setActionMessage] = useState({ type: '', text: '' });
   const [isLoading, setIsLoading] = useState(true);
+  const [showDriveImport, setShowDriveImport] = useState(false);
+  const [driveItems, setDriveItems] = useState([]);
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [selectedDriveFile, setSelectedDriveFile] = useState(null);
+  const [driveFolder, setDriveFolder] = useState(null);
+  const [driveFolderPath, setDriveFolderPath] = useState([]);
 
   const refresh = async () => {
     setIsLoading(true);
@@ -302,6 +312,92 @@ const ManagerBot = ({ onUseInChat }) => {
     flash(ok ? 'ok' : 'error', ok ? 'Prompt copiado al portapapeles.' : 'No se pudo copiar.');
   };
 
+  const openDriveImport = async () => {
+    if (!getStoredDriveToken()?.access_token) {
+      toast.error('Conecta Google Drive primero desde Configuracion.');
+      return;
+    }
+    setDriveLoading(true);
+    setShowDriveImport(true);
+    setDriveFolder(null);
+    setDriveFolderPath([]);
+    await loadDriveItems();
+  };
+
+  const loadDriveItems = async (folderId) => {
+    setDriveLoading(true);
+    try {
+      let items;
+      if (folderId) {
+        items = await listDriveChildren(folderId);
+      } else {
+        const folders = await listDriveFolders();
+        items = folders;
+      }
+      const fileTypes = new Set([...DRIVE_TEXT_MIME_TYPES, 'application/vnd.google-apps.folder']);
+      const filtered = items.filter((f) => fileTypes.has(f.mimeType));
+      setDriveItems(filtered);
+    } catch (e) {
+      toast.error(e.message || 'No se pudo leer Drive.');
+    } finally {
+      setDriveLoading(false);
+    }
+  };
+
+  const openDriveFolder = async (folder) => {
+    setDriveFolder(folder);
+    setDriveFolderPath((prev) => [...prev, folder]);
+    setSelectedDriveFile(null);
+    await loadDriveItems(folder.id);
+  };
+
+  const goBackDrive = async () => {
+    if (driveFolderPath.length <= 1) {
+      setDriveFolder(null);
+      setDriveFolderPath([]);
+      setSelectedDriveFile(null);
+      await loadDriveItems();
+    } else {
+      const parentPath = driveFolderPath.slice(0, -1);
+      const parent = parentPath[parentPath.length - 1] || null;
+      setDriveFolder(parent);
+      setDriveFolderPath(parentPath);
+      setSelectedDriveFile(null);
+      await loadDriveItems(parent?.id);
+    }
+  };
+
+  const handleImportDriveFile = async () => {
+    if (!selectedDriveFile) return;
+    try {
+      let text = '';
+      const isPlainText = selectedDriveFile.mimeType === 'text/plain' || selectedDriveFile.mimeType === 'text/markdown';
+      if (isPlainText) {
+        const file = await downloadDriveFileAsFile(selectedDriveFile);
+        text = await file.text();
+      } else {
+        const file = await downloadDriveFileAsFile(selectedDriveFile);
+        const result = await uploadDocumentToBackend(file);
+        text = result?.extracted_text || '';
+      }
+      if (!text.trim()) {
+        toast.error('No se pudo extraer texto del archivo.');
+        return;
+      }
+      const name = selectedDriveFile.name.replace(/\.[^.]+$/, '');
+      await createSavedPrompt({ name, content: text, category: 'Consulta general' });
+      flash('ok', `Prompt "${name}" importado desde Drive.`);
+      setShowDriveImport(false);
+      setSelectedDriveFile(null);
+      setDriveItems([]);
+      setDriveFolder(null);
+      setDriveFolderPath([]);
+      await refresh();
+    } catch (e) {
+      toast.error(e.message || 'Error al importar el archivo.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-brand-black p-6 md:p-10">
       <div className="mx-auto max-w-6xl space-y-8">
@@ -369,17 +465,27 @@ const ManagerBot = ({ onUseInChat }) => {
                 Nuevo asistente
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingPrompt(null);
-                  setIsCreatingPrompt(true);
-                }}
-                className="inline-flex items-center gap-2 rounded-lg border border-brand-gold/30 bg-brand-gold/10 px-4 py-2.5 text-sm font-semibold text-brand-gold transition-colors hover:bg-brand-gold/20"
-              >
-                <Plus className="h-4 w-4" />
-                Nuevo prompt
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={openDriveImport}
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] px-4 py-2.5 text-sm font-semibold text-brand-accent transition-colors hover:bg-white/[0.04] hover:text-brand-ivory"
+                >
+                  <HardDrive className="h-4 w-4" />
+                  Importar desde Drive
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingPrompt(null);
+                    setIsCreatingPrompt(true);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-brand-gold/30 bg-brand-gold/10 px-4 py-2.5 text-sm font-semibold text-brand-gold transition-colors hover:bg-brand-gold/20"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nuevo prompt
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -451,6 +557,7 @@ const ManagerBot = ({ onUseInChat }) => {
             setIsCreatingAssistant(false);
           }}
           onSave={handleSaveAssistant}
+          prompts={prompts}
         />
       )}
 
@@ -464,6 +571,81 @@ const ManagerBot = ({ onUseInChat }) => {
           }}
           onSave={handleSavePrompt}
         />
+      )}
+
+      {/* Modal de importacion desde Drive */}
+      {showDriveImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setShowDriveImport(false); setSelectedDriveFile(null); }}>
+          <div className="mx-4 flex h-[70vh] w-full max-w-lg flex-col rounded-xl border border-white/[0.08] bg-brand-dark shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-white/[0.08] p-4">
+              <div className="flex items-center gap-2">
+                <HardDrive className="h-4 w-4 text-brand-gold" />
+                <h3 className="text-sm font-bold text-brand-ivory">Importar prompt desde Drive</h3>
+              </div>
+              <button onClick={() => { setShowDriveImport(false); setSelectedDriveFile(null); }} className="rounded p-1 text-brand-accent hover:bg-white/[0.06]">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex items-center gap-1 border-b border-white/[0.05] px-4 py-2 text-xs text-brand-accent">
+              <button onClick={() => { setDriveFolder(null); setDriveFolderPath([]); setSelectedDriveFile(null); loadDriveItems(); }} className="hover:text-brand-ivory">Drive</button>
+              {driveFolderPath.map((f, i) => (
+                <span key={f.id} className="flex items-center gap-1">
+                  <span className="text-brand-accent/40">/</span>
+                  <span className="text-brand-ivory truncate max-w-[120px]">{f.name}</span>
+                </span>
+              ))}
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {driveLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-gold border-t-transparent" />
+                </div>
+              ) : driveItems.length === 0 ? (
+                <p className="py-12 text-center text-sm text-brand-accent/50">Esta carpeta esta vacia.</p>
+              ) : (
+                <div className="space-y-1">
+                  {driveFolder && (
+                    <button onClick={goBackDrive} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm text-brand-accent hover:bg-white/[0.04]">
+                      <span className="text-lg">...</span>
+                      <span className="text-xs">Volver</span>
+                    </button>
+                  )}
+                  {driveItems.map((item) => {
+                    const isFolder = item.mimeType === 'application/vnd.google-apps.folder';
+                    if (isFolder) {
+                      return (
+                        <button key={item.id} onClick={() => openDriveFolder(item)} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm text-brand-accent hover:bg-white/[0.04]">
+                          <span className="text-base">📁</span>
+                          <span className="truncate text-left">{item.name}</span>
+                        </button>
+                      );
+                    }
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setSelectedDriveFile(item)}
+                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm transition-colors ${
+                          selectedDriveFile?.id === item.id ? 'bg-brand-gold/10 text-brand-ivory border border-brand-gold/30' : 'text-brand-accent hover:bg-white/[0.04] border border-transparent'
+                        }`}
+                      >
+                        <span className="text-base shrink-0">{item.mimeType === 'application/pdf' ? '📄' : '📝'}</span>
+                        <span className="truncate text-left">{item.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-white/[0.08] p-4">
+              <button onClick={() => { setShowDriveImport(false); setSelectedDriveFile(null); }} className="rounded-lg border border-white/[0.08] px-4 py-2 text-xs font-bold text-brand-accent hover:bg-white/[0.06]">
+                Cancelar
+              </button>
+              <button onClick={handleImportDriveFile} disabled={!selectedDriveFile} className="rounded-lg bg-brand-gold px-4 py-2 text-xs font-bold text-brand-black hover:bg-white disabled:opacity-50">
+                Importar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -638,7 +820,7 @@ const PromptsList = ({ items, onEdit, onDelete, onCopy, onCreate, onUse }) => {
   );
 };
 
-const AssistantForm = ({ initial, editingId, onClose, onSave }) => {
+const AssistantForm = ({ initial, editingId, onClose, onSave, prompts }) => {
   const [form, setForm] = useState({
     name: initial.name || '',
     description: initial.description || '',
@@ -646,6 +828,7 @@ const AssistantForm = ({ initial, editingId, onClose, onSave }) => {
     specialty: initial.specialty || 'General',
   });
   const [error, setError] = useState('');
+  const [showPromptPicker, setShowPromptPicker] = useState(false);
 
   const update = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
@@ -689,13 +872,25 @@ const AssistantForm = ({ initial, editingId, onClose, onSave }) => {
           />
         </FormField>
         <FormField label="Prompt de sistema" hint="Define el tono, las reglas y el enfoque del asistente.">
-          <textarea
-            value={form.systemPrompt}
-            onChange={(event) => update('systemPrompt', event.target.value)}
-            placeholder="Eres un abogado especialista en derecho laboral peruano..."
-            className={textareaClass}
-            rows={8}
-          />
+          <div className="space-y-2">
+            <textarea
+              value={form.systemPrompt}
+              onChange={(event) => update('systemPrompt', event.target.value)}
+              placeholder="Eres un abogado especialista en derecho laboral peruano..."
+              className={textareaClass}
+              rows={8}
+            />
+            {prompts?.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowPromptPicker(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-brand-gold/30 bg-brand-gold/10 px-3 py-1.5 text-xs font-semibold text-brand-gold transition-colors hover:bg-brand-gold/20"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Elegir prompt guardado
+              </button>
+            )}
+          </div>
         </FormField>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <div className="flex items-center justify-end gap-3 border-t border-white/[0.05] pt-4">
@@ -715,6 +910,39 @@ const AssistantForm = ({ initial, editingId, onClose, onSave }) => {
           </button>
         </div>
       </form>
+
+      {/* Modal selector de prompts guardados */}
+      {showPromptPicker && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowPromptPicker(false)}>
+          <div className="mx-4 flex h-[60vh] w-full max-w-lg flex-col rounded-xl border border-white/[0.08] bg-brand-dark shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-white/[0.08] p-4">
+              <h3 className="text-sm font-bold text-brand-ivory">Seleccionar prompt guardado</h3>
+              <button onClick={() => setShowPromptPicker(false)} className="rounded p-1 text-brand-accent hover:bg-white/[0.06]">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-2">
+                {prompts.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      update('systemPrompt', p.content);
+                      setShowPromptPicker(false);
+                    }}
+                    className="flex w-full flex-col gap-1 rounded-lg border border-white/[0.05] p-4 text-left transition-colors hover:border-brand-gold/30 hover:bg-white/[0.02]"
+                  >
+                    <span className="text-sm font-semibold text-brand-ivory">{p.name}</span>
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-brand-accent">{p.category}</span>
+                    <p className="mt-1 line-clamp-2 text-xs text-brand-accent/60">{p.content}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 };

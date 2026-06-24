@@ -1,9 +1,8 @@
 import { mockCases } from '../data/mockData';
-import { demoDocumentsByCaseId } from '../data/demoDocuments';
 import { fetchSupabaseCases, replaceSupabaseCases, upsertSupabaseCase, deleteSupabaseCase } from './supabaseCaseStore';
 
 const STORAGE_KEY = 'lusti-cases';
-const DEMO_CASE_IDS = new Set(mockCases.map((caseItem) => caseItem.id));
+const DELETED_IDS_KEY = 'lusti-deleted-case-ids';
 
 const cloneCases = (cases) => JSON.parse(JSON.stringify(cases));
 
@@ -19,22 +18,13 @@ const generateCaseId = (cases) => {
   return `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
 };
 
-const mergeDemoDocuments = (caseData) => {
-  const documents = Array.isArray(caseData.documents) ? caseData.documents : [];
-  const demoDocuments = demoDocumentsByCaseId[caseData.id] || [];
-  const existingKeys = new Set(documents.map((doc) => doc.id || doc.name));
-  const missingDemoDocuments = demoDocuments.filter((doc) => !existingKeys.has(doc.id) && !existingKeys.has(doc.name));
-
-  return [...documents, ...missingDemoDocuments];
-};
-
 const normalizeCase = (caseData) => ({
   ...caseData,
   latestProgress: caseData.latestProgress || 'Sin avance registrado.',
   hearingLink: caseData.hearingLink || '',
   counterparty: caseData.counterparty || '',
   urgency: caseData.urgency || 'Media',
-  documents: mergeDemoDocuments(caseData),
+  documents: Array.isArray(caseData.documents) ? caseData.documents : [],
   notes: Array.isArray(caseData.notes) ? caseData.notes : [],
   importantDates: Array.isArray(caseData.importantDates) ? caseData.importantDates : [],
   officialReferences: Array.isArray(caseData.officialReferences) ? caseData.officialReferences : [],
@@ -42,28 +32,9 @@ const normalizeCase = (caseData) => ({
 
 const getDemoCases = () => cloneCases(mockCases).map(normalizeCase);
 
-const isOldDemoState = (cases) => {
-  if (!Array.isArray(cases) || cases.length === 0) return true;
-  if (cases.length > 3) return false;
-  return cases.every((caseItem) => DEMO_CASE_IDS.has(caseItem.id));
-};
-
 const upgradeLocalDemo = (cases) => {
-  if (isOldDemoState(cases)) {
-    const demoCases = getDemoCases();
-    saveCases(demoCases);
-    return demoCases;
-  }
-
-  const normalizedCases = cases.map(normalizeCase);
-  const existingIds = new Set(normalizedCases.map((caseItem) => caseItem.id));
-  const missingDemoCases = getDemoCases().filter((caseItem) => !existingIds.has(caseItem.id));
-
-  if (!missingDemoCases.length) return normalizedCases;
-
-  const nextCases = [...normalizedCases, ...missingDemoCases];
-  saveCases(nextCases);
-  return nextCases;
+  // Solo normalizar y devolver — nunca restaurar casos borrados ni agregar demos
+  return cases.map(normalizeCase);
 };
 
 export const getCases = () => {
@@ -99,8 +70,14 @@ export const loadCases = async () => {
     }
 
     const normalizedCases = cases.map(normalizeCase);
-    saveCases(normalizedCases);
-    return { cases: normalizedCases, source: 'supabase', error: null };
+    // Filtrar expedientes que fueron borrados localmente mientras Supabase no respondia
+    const locallyDeleted = (() => {
+      try { return JSON.parse(window.localStorage.getItem(DELETED_IDS_KEY) || '[]'); }
+      catch { return []; }
+    })();
+    const filteredCases = normalizedCases.filter((c) => !locallyDeleted.includes(c.id));
+    saveCases(filteredCases);
+    return { cases: filteredCases, source: 'supabase', error: null };
   } catch (error) {
     console.warn('Supabase no esta disponible. Usando almacenamiento local.', error);
     return { cases: localCases, source: 'local', error };
@@ -168,12 +145,30 @@ export const resetCasesAsync = async () => {
 export const deleteCase = (cases, caseId) => {
   const nextCases = cases.filter((caseItem) => caseItem.id !== caseId);
   saveCases(nextCases);
+  // Track localmente que este ID fue borrado, para evitar que Supabase lo rescate
+  try {
+    const deleted = JSON.parse(window.localStorage.getItem(DELETED_IDS_KEY) || '[]');
+    if (!deleted.includes(caseId)) {
+      deleted.push(caseId);
+      window.localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(deleted));
+    }
+  } catch { /* ignore */ }
   return nextCases;
 };
 
 export const deleteCaseAsync = async (cases, caseId) => {
   const nextCases = deleteCase(cases, caseId);
-  const { error } = await deleteSupabaseCase(caseId);
-  if (error) console.warn('No se pudo eliminar el expediente de Supabase.', error.message);
-  return { cases: nextCases, error };
+  deleteSupabaseCase(caseId).then(({ error }) => {
+    if (!error) {
+      // Supabase confirmo el borrado, ya no necesario trackearlo
+      try {
+        const deleted = JSON.parse(window.localStorage.getItem(DELETED_IDS_KEY) || '[]');
+        const filtered = deleted.filter((id) => id !== caseId);
+        window.localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(filtered));
+      } catch { /* ignore */ }
+    } else {
+      console.warn('No se pudo eliminar el expediente de Supabase.', error.message);
+    }
+  });
+  return { cases: nextCases, error: null };
 };

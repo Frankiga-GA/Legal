@@ -60,6 +60,7 @@ function App() {
   const [showAlreadyLoggedIn, setShowAlreadyLoggedIn] = useState(false);
   const [showTakeOverMessage, setShowTakeOverMessage] = useState(false);
   const [closeFailed, setCloseFailed] = useState(false);
+  const [libraryFocusTab, setLibraryFocusTab] = useState('hoy');
 
   const tabId = useRef(() => `tab_${crypto.randomUUID?.() ?? Date.now()}_${Math.random().toString(36).slice(2, 8)}`).current;
   const channelRef = useRef(null);
@@ -288,7 +289,7 @@ function App() {
     switch (activeTab) {
       case 'case-workspace': return <CaseWorkspace caseId={activeCaseId} onClose={() => setActiveTab('library')} />;
       case 'dashboard': return <Dashboard setActiveTab={setActiveTab} isDriveConnected={isDriveConnected} />;
-      case 'library': return <CaseLibrary setActiveTab={setActiveTab} onOpenCase={(id) => { setActiveCaseId(id); setActiveTab('case-workspace'); }} userId={session?.user?.id} />;
+      case 'library': return <CaseLibrary setActiveTab={setActiveTab} onOpenCase={(id) => { setActiveCaseId(id); setActiveTab('case-workspace'); }} userId={session?.user?.id} focusTab={libraryFocusTab} onFocusTabChange={setLibraryFocusTab} />;
       case 'monitor': return <LegalMonitor setActiveTab={setActiveTab} />;
       case 'drive': return <DriveVault />;
       case 'ai-chat': return <ManagerBot onUseInChat={openGlobalChat} />;

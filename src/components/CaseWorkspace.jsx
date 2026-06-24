@@ -9,6 +9,7 @@ import {
   FileText,
   Gavel,
   Globe,
+  HardDrive,
   Library,
   Loader2,
   MessageSquare,
@@ -31,6 +32,7 @@ import { getCases, updateCaseAsync, deleteCaseAsync } from '../services/caseStor
 import { loadCaseChats, saveCaseChat, clearCaseChats, deleteCaseChatMsg, deleteCaseChatMessages } from '../services/chatHistoryStore';
 import AiMessage from './AiMessage';
 import CitationPanel from './CitationPanel';
+import DriveFilePicker from './DriveFilePicker';
 import { collectCitations } from '../utils/citationParser';
 import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
 import { getStoredDriveToken } from '../services/googleDriveService';
@@ -56,6 +58,8 @@ const CaseWorkspace = ({ caseId, onClose }) => {
   // Audiencia (link de la audiencia virtual)
   const [editingHearing, setEditingHearing] = useState(false);
   const [hearingInput, setHearingInput] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [showDrivePicker, setShowDrivePicker] = useState(false);
 
   useEffect(() => {
     const allCases = getCases();
@@ -207,14 +211,49 @@ const CaseWorkspace = ({ caseId, onClose }) => {
     }
   };
 
+  const handleImportFromDrive = (driveFiles) => {
+    const today = new Date().toISOString().split('T')[0];
+    const newDocs = driveFiles.map((f) => ({
+      id: `drive-${Date.now()}-${f.id}`,
+      name: f.name,
+      date: today,
+      size: 'Drive',
+      source: 'drive',
+      driveFileId: f.id,
+      mimeType: f.mimeType,
+      webViewLink: f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`,
+    }));
+    handleUpdate({ documents: [...documents, ...newDocs] });
+    toast.success(`${newDocs.length} archivo(s) importado(s) desde Drive`);
+  };
+
   const handleDeleteDoc = (docId) => {
-    if (!window.confirm("¿Eliminar este documento?")) return;
-    handleUpdate({ documents: documents.filter((doc) => doc.id !== docId) });
+    setDeleteConfirm({ type: 'doc', id: docId });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    if (deleteConfirm.type === 'doc') {
+      handleUpdate({ documents: documents.filter((doc) => doc.id !== deleteConfirm.id) });
+    } else if (deleteConfirm.type === 'date') {
+      handleUpdate({ importantDates: importantDates.filter((d) => d.id !== deleteConfirm.id) });
+    } else if (deleteConfirm.type === 'note') {
+      handleUpdate({ notes: notes.filter((n) => n.id !== deleteConfirm.id) });
+    } else if (deleteConfirm.type === 'case') {
+      try {
+        const allCases = getCases();
+        await deleteCaseAsync(allCases, caseData.id);
+        onClose();
+      } catch (error) {
+        console.error('Error al eliminar expediente:', error);
+        toast.error('Error al eliminar el expediente');
+      }
+    }
+    setDeleteConfirm(null);
   };
 
   const handleDeleteDate = (dateId) => {
-    if (!window.confirm("¿Eliminar este plazo?")) return;
-    handleUpdate({ importantDates: importantDates.filter((d) => d.id !== dateId) });
+    setDeleteConfirm({ type: 'date', id: dateId });
   };
 
   // Marca o desmarca un plazo como completado (cambia el status)
@@ -226,22 +265,11 @@ const CaseWorkspace = ({ caseId, onClose }) => {
   };
 
   const handleDeleteNote = (noteId) => {
-    if (!window.confirm("¿Eliminar esta nota?")) return;
-    handleUpdate({ notes: notes.filter((n) => n.id !== noteId) });
+    setDeleteConfirm({ type: 'note', id: noteId });
   };
 
-  const handleDeleteCase = async () => {
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar el expediente ${caseData.id} de ${caseData.clientName}? Esta acción borrará permanentemente todos sus documentos, fechas, notas y resúmenes.`)) {
-      return;
-    }
-    try {
-      const allCases = getCases();
-      await deleteCaseAsync(allCases, caseData.id);
-      onClose();
-    } catch (error) {
-      console.error('Error al eliminar expediente:', error);
-      window.alert(`Error al eliminar: ${error?.message || 'desconocido'}`);
-    }
+  const handleDeleteCase = () => {
+    setDeleteConfirm({ type: 'case' });
   };
 
   const handleAddNote = (e) => {
@@ -539,6 +567,14 @@ const CaseWorkspace = ({ caseId, onClose }) => {
                     className="hidden"
                   />
                 </label>
+                <button
+                  type="button"
+                  onClick={() => setShowDrivePicker(true)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] px-4 py-2.5 text-xs font-bold text-brand-ivory transition-colors hover:bg-white/[0.06]"
+                >
+                  <HardDrive className="h-4 w-4" />
+                  Desde Drive
+                </button>
               </div>
               {documentUploadStatus && (
                 <p className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-xs font-medium text-brand-ivory animate-pulse">
@@ -555,7 +591,14 @@ const CaseWorkspace = ({ caseId, onClose }) => {
                           <FileText className="h-5 w-5" />
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-brand-ivory">{doc.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="truncate text-sm font-bold text-brand-ivory">{doc.name}</p>
+                            {doc.source === 'drive' && (
+                              <a href={doc.webViewLink} target="_blank" rel="noopener noreferrer" className="shrink-0 text-brand-gold hover:text-brand-ivory" title="Abrir en Google Drive">
+                                <HardDrive className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                          </div>
                           <p className="mt-0.5 text-xs text-brand-accent">{doc.date} • {doc.size}</p>
                         </div>
                       </div>
@@ -876,6 +919,41 @@ const CaseWorkspace = ({ caseId, onClose }) => {
         onClose={() => setCitationPanelOpen(false)}
         citations={caseCitations}
       />
+
+      {showDrivePicker && (
+        <DriveFilePicker
+          onSelect={handleImportFromDrive}
+          onClose={() => setShowDrivePicker(false)}
+        />
+      )}
+
+      {/* Confirmacion de eliminacion */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)}>
+          <div className="mx-4 w-full max-w-sm rounded-xl border border-white/[0.08] bg-brand-dark p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-serif font-medium text-brand-ivory">Confirmar</h3>
+            <p className="mt-2 text-sm text-brand-accent/70">
+              {deleteConfirm.type === 'case'
+                ? `¿Eliminar el expediente ${caseData.id} de ${caseData.clientName}? Esta accion borrara permanentemente todos sus documentos, fechas, notas y resumenes.`
+                : deleteConfirm.type === 'doc' ? '¿Eliminar este documento?' : deleteConfirm.type === 'date' ? '¿Eliminar este plazo?' : '¿Eliminar esta nota?'}
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="rounded-lg border border-white/[0.08] px-4 py-2 text-xs font-bold text-brand-accent transition-colors hover:bg-white/[0.06]"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="rounded-lg bg-red-500 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-red-600"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

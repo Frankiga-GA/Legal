@@ -28,7 +28,7 @@ import { addCaseAsync, deleteCaseAsync, getCases, loadCases, resetCasesAsync, up
 import { uploadDocumentToBackend } from '../services/documentBackendService';
 import { extractResolutionDetails } from '../services/geminiService';
 
-const CaseLibrary = ({ setActiveTab, onOpenCase, userId }) => {
+const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusTab, onFocusTabChange }) => {
   const [cases, setCases] = useState(() => getCases());
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('Todas');
@@ -47,7 +47,8 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId }) => {
   const [aiAnalysisResult, setAiAnalysisResult] = useState(null); // { caseId, latestProgress, hearingLink, urgency, newDeadlines }
 
   // Focus tab: HOY (default) / Todos / Activos / Pendientes / Cerrados
-  const [focusTab, setFocusTab] = useState('hoy');
+  const [focusTab, setFocusTabInternal] = useState(defaultFocusTab);
+  const setFocusTab = (tab) => { setFocusTabInternal(tab); onFocusTabChange?.(tab); };
 
   // Onboarding: muestra una vez por usuario (key separada por userId)
   const onboardingKey = userId ? `lusti-onboarding-dismissed-${userId}` : 'lusti-onboarding-dismissed-anon';
