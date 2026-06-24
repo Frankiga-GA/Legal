@@ -148,13 +148,17 @@ export const clearGlobalChats = async (assistantId = null) => {
 // ---------------------------------------------------------------------------
 export const deleteCaseChatMsg = async (msgId) => {
   if (!canUseChatHistory() || !msgId) return { error: null, skipped: true };
-  const { error } = await supabase.from(TABLE_NAME).delete().eq('id', msgId);
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: null, skipped: true };
+  const { error } = await supabase.from(TABLE_NAME).delete().eq('id', msgId).eq('user_id', userId);
   return { error, skipped: false };
 };
 
 export const deleteGlobalChatMsg = async (msgId) => {
   if (!canUseChatHistory() || !msgId) return { error: null, skipped: true };
-  const { error } = await supabase.from(GLOBAL_TABLE).delete().eq('id', msgId);
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: null, skipped: true };
+  const { error } = await supabase.from(GLOBAL_TABLE).delete().eq('id', msgId).eq('user_id', userId);
   return { error, skipped: false };
 };
 

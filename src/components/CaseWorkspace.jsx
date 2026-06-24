@@ -25,6 +25,7 @@ import {
 import toast, { Toaster } from 'react-hot-toast';
 
 import { askGeminiAboutCase, isGeminiConfigured, extractResolutionDetails, abortActiveRequest } from '../services/geminiService';
+import { searchLegalContext } from '../services/ragService';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
 import { getCases, updateCaseAsync, deleteCaseAsync } from '../services/caseStore';
 import { loadCaseChats, saveCaseChat, clearCaseChats, deleteCaseChatMsg, deleteCaseChatMessages } from '../services/chatHistoryStore';
@@ -268,11 +269,12 @@ const CaseWorkspace = ({ caseId, onClose }) => {
     setIsAiThinking(true);
 
     try {
-      // Pasamos los ultimos 10 mensajes (sin contar el actual) para que la IA
-      // tenga contexto de la conversacion. El backend los recibe como historial.
+      // Pasamos los ultimos mensajes para contexto de conversacion
       const history = aiMessages.slice(-4);
+      const legalContext = await searchLegalContext(question);
+      const enrichedQuestion = legalContext ? `${legalContext}\n\nPregunta del usuario:\n${question}` : question;
       const response = await askGeminiAboutCase({
-        question,
+        question: enrichedQuestion,
         caseData,
         documents,
         notes,
@@ -333,8 +335,10 @@ const CaseWorkspace = ({ caseId, onClose }) => {
 
     try {
       const history = aiMessages.slice(0, index).slice(-4);
+      const legalContext = await searchLegalContext(newText);
+      const enrichedQuestion = legalContext ? `${legalContext}\n\nPregunta del usuario:\n${newText}` : newText;
       const response = await askGeminiAboutCase({
-        question: newText,
+        question: enrichedQuestion,
         caseData,
         documents,
         notes,

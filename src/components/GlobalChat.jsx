@@ -31,7 +31,8 @@ import {
   getActiveAssistant,
   clearActiveAssistant,
 } from '../services/aiBridge';
-import { isGeminiConfigured, askBackend, abortActiveRequest } from '../services/geminiService';
+import { isGeminiConfigured, askBackend, abortActiveRequest, SYSTEM_PROMPT_LEGAL_PERU, cleanAssistantText } from '../services/geminiService';
+import { searchLegalContext } from '../services/ragService';
 import {
   loadGlobalChats,
   saveGlobalChat,
@@ -74,6 +75,7 @@ const GlobalChat = ({ onBack }) => {
   const [attachedFile, setAttachedFile] = useState(null); // { name, text, status }
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const lastFileRef = useRef(null); // persiste el ultimo archivo adjunto entre mensajes
 
   // Lee asistente activo + prompt pendiente al montar
   useEffect(() => {
@@ -129,10 +131,12 @@ const GlobalChat = ({ onBack }) => {
     setIsThinking(true);
     setError('');
 
-    // Capturamos el archivo adjunto ANTES de usarlo (estaba declarado después, causando bug)
+    // Capturamos el archivo adjunto ANTES de usarlo
     const fileContext = attachedFile && attachedFile.status === 'ready'
       ? { fileName: attachedFile.name, fileText: attachedFile.text }
       : null;
+    // Guardamos el ultimo archivo para que persista en mensajes siguientes
+    if (fileContext) lastFileRef.current = fileContext;
     setAttachedFile(null);
 
     // Historial de conversación para dar memoria a la IA (últimos 6 mensajes)
@@ -156,16 +160,20 @@ const GlobalChat = ({ onBack }) => {
     });
 
     try {
-      const systemPrompt = activeAssistant?.systemPrompt || null;
-      const text = await askBackend({
-        prompt: question,
-        temperature: 0.4,
-        maxOutputTokens: 600,
+      const systemPrompt = activeAssistant?.systemPrompt || SYSTEM_PROMPT_LEGAL_PERU;
+      // Busca normativa relevante en El Peruano para enriquecer la respuesta
+      const legalContext = await searchLegalContext(question);
+      const enrichedPrompt = legalContext ? `${legalContext}\n\nPregunta del usuario:\n${question}` : question;
+      const raw = await askBackend({
+        prompt: enrichedPrompt,
+        temperature: 0.15,
+        maxOutputTokens: 3000,
         systemPrompt,
         history,
-        fileName: fileContext?.fileName || null,
-        fileText: fileContext?.fileText || null,
+        fileName: fileContext?.fileName || lastFileRef.current?.fileName || null,
+        fileText: fileContext?.fileText || lastFileRef.current?.fileText || null,
       });
+      const text = cleanAssistantText(raw);
       // Reemplaza el placeholder con la respuesta real
       setMessages((prev) =>
         prev.map((m) =>
@@ -254,15 +262,20 @@ const GlobalChat = ({ onBack }) => {
     if (msgsToDelete.length) deleteGlobalChatMessages(msgsToDelete).catch(() => {});
 
     try {
-      const systemPrompt = activeAssistant?.systemPrompt || null;
+      const systemPrompt = activeAssistant?.systemPrompt || SYSTEM_PROMPT_LEGAL_PERU;
       const history = messages.slice(0, index).slice(-HISTORY_LIMIT);
-      const text = await askBackend({
-        prompt: newText,
-        temperature: 0.4,
-        maxOutputTokens: 600,
+      const legalContext = await searchLegalContext(newText);
+      const enrichedPrompt = legalContext ? `${legalContext}\n\nPregunta del usuario:\n${newText}` : newText;
+      const raw = await askBackend({
+        prompt: enrichedPrompt,
+        temperature: 0.15,
+        maxOutputTokens: 3000,
         systemPrompt,
         history,
+        fileName: hasAttachment ? fileName : lastFileRef.current?.fileName || null,
+        fileText: hasAttachment ? lastFileRef.current?.fileText || null : null,
       });
+      const text = cleanAssistantText(raw);
       setMessages((prev) =>
         prev.map((m) =>
           m.pending && m.pendingId === pendingId

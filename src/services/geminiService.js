@@ -83,20 +83,56 @@ const cacheSet = (key, value) => {
 
 export const clearCache = () => responseCache.clear();
 
-// -----------------------------------------------------------------------------
-// Reglas de citacion legal. Se concatenan al final de cualquier prompt del
-// sistema para que la IA mencione referencias concretas y verificables.
-// -----------------------------------------------------------------------------
+// =============================================================================
+// PROMPT MAESTRO - ABOGADO PERUANO
+// =============================================================================
+// Se inyecta como system_prompt en TODAS las llamadas a la IA para que la
+// calidad sea consistente sin importar desde donde se chatee.
+// =============================================================================
+export const SYSTEM_PROMPT_LEGAL_PERU = `
+Eres LUSTI, un abogado peruano senior especialista en derecho procesal civil, laboral, constitucional, tributario, penal y administrativo. Tu jurisdiccion es EXCLUSIVAMENTE PERU. No citas normas extranjeras.
+
+RESPETA ESTRICTAMENTE ESTAS REGLAS:
+
+1. FORMATO DE RESPUESTA (OBLIGATORIO para toda respuesta):
+   RESUMEN EJECUTIVO (2-3 lineas que respondan directamente)
+   FUNDAMENTO LEGAL (articulos y normativa aplicable)
+   JURISPRUDENCIA RELEVANTE (Cas. N. + Sala + Ano + ratio decidendi)
+   RIESGOS / CONTRAARGUMENTOS
+   PROXIMA ACCION CONCRETA (que debe hacer el abogado)
+
+   Si la pregunta es general o informativa, adapta el formato manteniendo siempre RESUMEN EJECUTIVO al inicio y PROXIMA ACCION al final.
+
+2. NO USES MARKDOWN. Prohibido: ##, ###, **, *, -, >. Usa solo texto limpio con parrafos separados por lineas en blanco. Para enumerar usa numeros o letras seguidas de punto (ej: 1. 2. a. b.).
+
+3. CITAS OBLIGATORIAS en formato exacto:
+   - Articulos: "Art. N. del [Cuerpo Legal]" (ej: "Art. 429 del CPC")
+   - Leyes: "Ley N. 29497", "D.Leg. N. 650", "D.S. N. 001-2023-TR"
+   - Casaciones: "Cas. N. 1234-2023-Lima"
+   - TC: "STC Exp. N. 0008-2020-PI/TC"
+   - Si no estas seguro del numero exacto: "(por confirmar)"
+
+4. PROHIBIDO:
+   - No inventes articulos, casaciones, fechas ni hechos
+   - No recomiendes asesoria externa. TU eres el abogado del estudio.
+   - No digas "No soy abogado" ni "consulte a un abogado"
+   - No cortes frases ni dejes la respuesta incompleta
+   - No uses el texto "No constituye asesoria legal"
+
+5. Si falta informacion: indica exactamente "FALTA: [dato necesario]"
+
+6. Cuando veas "📎" en el historial o recibas texto de un archivo adjunto, reconocelo. Si el usuario pregunta por un archivo que envio antes y el texto del archivo esta disponible en este mismo prompt, usalo. Si no ves el contenido del archivo en el prompt actual, no digas "no recibi ningun archivo". En su lugar indica: "El archivo que enviaste antes ya no esta disponible en esta conversacion. Por favor adjuntalo nuevamente para que pueda analizarlo."
+
+7. Tono: Profesional, directo, accionable. Como asociado senior que le informa al socio del estudio.`;
+
 const CITATION_RULES = `
-Citas y referencias legales (OBLIGATORIO cuando la respuesta toque normas o jurisprudencia):
-- Cuando menciones una norma peruana, cita siempre su referencia exacta en este formato:
-  "Art. N° del [Cuerpo Legal]" (ej.: "Art. 23° de la Constitucion", "Art. 1245° del Codigo Civil").
-- Cuando menciones una ley o decreto, usa el formato "Ley N.° 27037", "D.Leg. N.° 650", "D.S. N.° 001-2023-TR", "D.U. N.° 001-2024".
-- Cuando cites jurisprudencia del Poder Judicial: "Cas. N.° 1234-2021-Lima" o "Casacion N.° 1234-2021-Lima".
-- Cuando cites sentencia del Tribunal Constitucional: "STC Exp. N.° 0008-2020-PI/TC".
-- Cuando cites resoluciones administrativas: "Res. N.° 456-2023/SUNARP".
-- NO inventes numeros exactos: si no estas seguro del numero o la fecha, indicalo explicitamente ("(numero a confirmar)").
-- Incluye las referencias dentro del mismo parrafo, entre parentesis o como frase aparte, pero siempre presentes.`;
+CITAS OBLIGATORIAS (solo derecho peruano):
+- Art. N. del [Cuerpo]: "Art. 429 del CPC", "Art. 53 de la LPCL", "Art. 139 de la Constitucion"
+- Ley: "Ley N. 29497", "D.Leg. N. 650", "D.S. N. 001-2023-TR"
+- Casacion: "Cas. N. 1234-2023-Lima", "Casacion N. 1234-2023-Lima"
+- TC: "STC Exp. N. 0008-2020-PI/TC"
+- Admin: "Res. N. 456-2023/SUNARP"
+- NO inventes numeros. Si dudas: "(por confirmar)"`;
 
 const isProductionBuild = import.meta.env.PROD;
 
@@ -154,9 +190,11 @@ export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens =
   return data.text;
 };
 
-const cleanAssistantText = (text = '') => text
+export const cleanAssistantText = (text = '') => text
+  .replace(/^###?\s+/gm, '')
   .replace(/\*\*/g, '')
-  .replace(/^\s*\*\s+/gm, '- ')
+  .replace(/^\s*\*\s+/gm, '')
+  .replace(/^\s*-\s+/gm, '')
   .replace(/\n{3,}/g, '\n\n')
   .trim();
 
@@ -202,35 +240,12 @@ const buildCaseContext = ({ caseData, documents, notes, importantDates, official
 });
 
 const buildPrompt = (question, context) => `
-Eres LUSTI, un asistente legal para estudios juridicos peruanos.
-Responde en espanol claro, profesional y accionable.
-No uses Markdown. No uses asteriscos para negritas. Usa texto limpio, guiones simples y secciones cortas.
-No inventes informacion. Si falta contexto, dilo y pide el dato faltante.
-No presentes tu respuesta como asesoria legal definitiva; tratala como analisis preliminar para revision de un abogado.
-
-Formato preferido:
-- Respuesta breve inicial.
-- Hallazgos relevantes.
-- Riesgos o impactos.
-- Acciones recomendadas.
-- Datos faltantes, si aplica.
-
-Si la pregunta pide leer documentos, usa el campo "contenido" y cita los nombres de documentos disponibles.
-No digas que no puedes identificar el contenido si el contexto incluye extracto o contenido documental.
-Si la pregunta pide resumen de expediente, avance, seguimiento o estado del caso, no te limites a repetir partes, fechas, materia o sumilla. Entrega una lectura operativa:
-1. Que ha pasado en el caso hasta ahora.
-2. Ultimo avance relevante segun documentos, notas o fechas.
-3. Plazos, audiencias, links u obligaciones detectadas.
-4. Riesgos o puntos de atencion.
-5. Proxima accion concreta para el abogado.
-6. Urgencia: Alta, Media o Baja, con motivo.
-
- Contexto del expediente:
+CONTEXTO DEL EXPEDIENTE:
 ${JSON.stringify(context, null, 2)}
 
 ${CITATION_RULES}
 
-Pregunta del usuario:
+PREGUNTA DEL USUARIO:
 ${question}
 `;
 
@@ -250,9 +265,9 @@ export const askGeminiAboutCase = async ({
   const context = buildCaseContext({ caseData, documents, notes, importantDates, officialReferences });
   const text = await askBackend({
     prompt: buildPrompt(question, context),
-    temperature: 0.25,
-    maxOutputTokens: 1200,
-    systemPrompt,
+    temperature: 0.15,
+    maxOutputTokens: 3000,
+    systemPrompt: systemPrompt || SYSTEM_PROMPT_LEGAL_PERU,
     history,
   });
   return cleanAssistantText(text);
@@ -282,19 +297,9 @@ const buildRegistryContext = ({ item, cases }) => ({
 });
 
 const buildRegistryPrompt = (context) => `
-Eres LUSTI, un analista legal peruano para estudios juridicos.
 Analiza el registro oficial con prudencia: si no tienes texto completo, dilo claramente y trabaja solo con el titulo, resumen y metadatos entregados.
 No inventes articulos, plazos ni contenido no disponible.
 
-Entrega la respuesta en este formato:
-No uses Markdown ni asteriscos.
-Resumen legal:
-Impacto probable:
-Materias afectadas:
-Expedientes sugeridos:
-Acciones recomendadas:
- Datos faltantes:
- 
 Contexto:
 ${JSON.stringify(context, null, 2)}
 
@@ -308,38 +313,23 @@ export const analyzeOfficialRegistryItem = async ({ item, cases }) => {
   const context = buildRegistryContext({ item, cases });
   const text = await askBackend({
     prompt: buildRegistryPrompt(context),
-    temperature: 0.2,
-    maxOutputTokens: 1000,
+    temperature: 0.15,
+    maxOutputTokens: 2000,
+    systemPrompt: SYSTEM_PROMPT_LEGAL_PERU,
   });
   return cleanAssistantText(text);
 };
 
 const buildSpecializedAssistantPrompt = ({ bot, question, promptContext, attachmentContext }) => `
-Eres ${bot.name}, un asistente legal especializado para un estudio juridico peruano.
 Especialidad declarada: ${bot.description || 'Asistencia legal general'}.
 Documentos de referencia disponibles segun el sistema: ${bot.docs || 0}.
 ${promptContext ? `\nInstrucciones o prompts seleccionados para este asistente:\n${promptContext}\n` : ''}
 ${attachmentContext ? `\nDocumento adjunto cargado por el usuario:\n${attachmentContext}\n` : ''}
 
-Responde en espanol claro, profesional y util.
-No uses Markdown. No uses asteriscos para negritas. Usa texto limpio.
-Si el usuario saluda, saluda brevemente y ofrece formas concretas de ayuda segun tu especialidad.
-Si falta informacion para analizar un caso, pide los datos necesarios.
-No inventes documentos, normas, plazos ni hechos no entregados.
-No presentes la respuesta como asesoria legal definitiva; indica que es analisis preliminar para revision de un abogado.
-Cuando haya documento adjunto y el usuario pida resumen o analisis, responde ordenado:
-1. Resumen breve
-2. Datos clave encontrados
-3. Riesgos o puntos de atencion
-4. Informacion faltante
-5. Siguientes pasos recomendados
-Si el usuario pide extraer datos, organiza por partes, fechas, montos, obligaciones y observaciones.
-Responde completo: no cortes frases ni dejes campos a medias.
-
- Pregunta del usuario:
-${question}
-
 ${CITATION_RULES}
+
+PREGUNTA DEL USUARIO:
+${question}
 `;
 
 export const askGeminiSpecializedAssistant = async ({ bot, question, attachmentContext = '', history = null }) => {
@@ -353,17 +343,15 @@ export const askGeminiSpecializedAssistant = async ({ bot, question, attachmentC
       promptContext: bot.promptContext || '',
       attachmentContext,
     }),
-    temperature: 0.25,
+    temperature: 0.15,
     maxOutputTokens: 4096,
+    systemPrompt: SYSTEM_PROMPT_LEGAL_PERU,
     history,
   });
   return cleanAssistantText(text);
 };
 
 const buildVaultAssistantPrompt = ({ question, cases }) => `
-Eres LUSTI, asistente operativo de la boveda de expedientes de un estudio juridico peruano.
-Responde en espanol claro y breve.
-No uses Markdown. No uses asteriscos para negritas. Usa texto limpio.
 Usa solo los expedientes entregados como contexto. Si preguntan por conteos, calcula con estos datos.
 Si no encuentras un expediente, dilo sin tratarlo como error tecnico.
 
@@ -382,10 +370,10 @@ ${JSON.stringify(cases.map((caseItem) => ({
   normas: Array.isArray(caseItem.officialReferences) ? caseItem.officialReferences.length : 0,
 })), null, 2)}
 
- Pregunta:
-${question}
-
 ${CITATION_RULES}
+
+PREGUNTA:
+${question}
 `;
 
 export const askGeminiVaultAssistant = async ({ question, cases }) => {
@@ -394,8 +382,9 @@ export const askGeminiVaultAssistant = async ({ question, cases }) => {
   }
   const text = await askBackend({
     prompt: buildVaultAssistantPrompt({ question, cases }),
-    temperature: 0.2,
-    maxOutputTokens: 900,
+    temperature: 0.15,
+    maxOutputTokens: 2000,
+    systemPrompt: SYSTEM_PROMPT_LEGAL_PERU,
   });
   return cleanAssistantText(text);
 };
