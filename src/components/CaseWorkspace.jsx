@@ -122,8 +122,10 @@ const CaseWorkspace = ({ caseId, onClose }) => {
     if (!allDeadlines.length) return;
     try {
       await syncDeadlinesToCalendar(allDeadlines);
-    } catch {
-      // Silencio — no molestar al usuario por errores de sync automatico
+    } catch (e) {
+      if (e.message?.includes('Sesion de Google expirada') || e.message?.includes('calendar')) {
+        toast.error('Calendar no sincronizado. Re-conecta Google en Configuracion.');
+      }
     }
   };
 

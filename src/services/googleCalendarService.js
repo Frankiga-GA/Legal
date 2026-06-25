@@ -13,6 +13,9 @@ const handleResponse = async (response) => {
     clearStoredDriveToken();
     throw new Error('Sesion de Google expirada. Conecta Google Drive nuevamente.');
   }
+  if (response.status === 403) {
+    throw new Error('Falta permiso Calendar. Re-conecta Google en Configuracion.');
+  }
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`Google Calendar: ${response.status} - ${body}`);
