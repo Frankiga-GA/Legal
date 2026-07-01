@@ -943,7 +943,6 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
       {!onboardingDismissed && (
         <OnboardingModal
           onDismiss={dismissOnboarding}
-          onLoadDemo={handleResetCases}
           onCreateCase={() => {
             dismissOnboarding();
             setIsCreateModalOpen(true);
@@ -1315,7 +1314,7 @@ const CaseCard = ({ caso, isUploading, uploadStatus, onOpen, onUpload, onCycleSt
   );
 };
 
-const OnboardingModal = ({ onDismiss, onLoadDemo, onCreateCase, onOpenAssistant }) => {
+const OnboardingModal = ({ onDismiss, onCreateCase, onOpenAssistant }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-black/95 p-6">
       <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-brand-gold/20 bg-brand-dark shadow-2xl">
@@ -1332,21 +1331,6 @@ const OnboardingModal = ({ onDismiss, onLoadDemo, onCreateCase, onOpenAssistant 
         </div>
 
         <div className="space-y-3 p-8">
-          <button
-            type="button"
-            onClick={onLoadDemo}
-            className="flex w-full items-center gap-4 rounded-xl border border-white/[0.08] bg-white/[0.02] p-5 text-left transition-all hover:border-brand-gold/30 hover:bg-white/[0.04]"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15">
-              <Inbox className="h-5 w-5 text-emerald-400" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-brand-ivory">Cargar expedientes de ejemplo</p>
-              <p className="mt-1 text-xs text-brand-accent">3 casos demo para ver cómo se ve todo funcionando.</p>
-            </div>
-            <ChevronRight className="h-5 w-5 shrink-0 text-brand-accent" />
-          </button>
-
           <button
             type="button"
             onClick={onCreateCase}
