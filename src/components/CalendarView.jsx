@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Clock, Filter, X, RefreshCw } from 'lucide-react';
-import { getCases } from '../services/caseStore';
+import { loadCases } from '../services/caseStore';
 import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
 import { getStoredDriveToken, onDriveTokenChange } from '../services/googleDriveService';
 import toast from 'react-hot-toast';
@@ -137,12 +137,13 @@ const CalendarView = ({ onOpenCase }) => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await getCases();
+        const result = await loadCases();
         if (!cancelled) {
-          setCases(Array.isArray(data) ? data : []);
+          setCases(Array.isArray(result.cases) ? result.cases : []);
         }
       } catch (error) {
         console.error('No se pudieron cargar los expedientes para el calendario.', error);
+        toast.error('Error al cargar los expedientes. Verifique su conexión.');
       } finally {
         if (!cancelled) setLoading(false);
       }

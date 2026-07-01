@@ -24,12 +24,12 @@ import {
   Inbox,
 } from 'lucide-react';
 import CreateCaseModal from './CreateCaseModal';
-import { addCaseAsync, deleteCaseAsync, getCases, loadCases, resetCasesAsync, updateCaseAsync } from '../services/caseStore';
+import { addCaseAsync, deleteCaseAsync, loadCases, updateCaseAsync } from '../services/caseStore';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
 import { extractResolutionDetails } from '../services/geminiService';
 
 const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusTab, onFocusTabChange }) => {
-  const [cases, setCases] = useState(() => getCases());
+  const [cases, setCases] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('Todas');
   const [sortBy, setSortBy] = useState('urgencia'); // 'urgencia' | 'plazo' | 'reciente' | 'nombre'
@@ -37,6 +37,7 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
   const [statusMessage, setStatusMessage] = useState('');
   const [dataSource, setDataSource] = useState('local');
   const [visibleCount, setVisibleCount] = useState(24);
+  const [loading, setLoading] = useState(true);
 
   // Spreadsheet and Simplified UX states
   const [viewMode, setViewMode] = useState('cards'); // 'cards' (default) | 'excel' | 'standard'
@@ -99,15 +100,12 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
   };
 
   const handleDeleteCase = async (caseId) => {
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar el expediente ${caseId}? Esta acción borrará permanentemente todos sus documentos y datos.`)) {
+    if (!window.confirm(`¿Eliminar expediente ${caseId}? Esta acción no se puede deshacer.`)) {
       return;
     }
     const result = await deleteCaseAsync(cases, caseId);
     setCases(result.cases);
-    setStatusMessage(result.error
-      ? 'Expediente eliminado localmente. Supabase no respondió.'
-      : `Expediente ${caseId} eliminado.`
-    );
+    setStatusMessage(`Expediente ${caseId} eliminado permanentemente.`);
   };
 
   // Cambia el estado del expediente al siguiente en el ciclo: Activo → Pendiente → Cerrado → Activo
@@ -117,19 +115,6 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
     const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % STATUS_CYCLE.length;
     const nextStatus = STATUS_CYCLE[nextIndex];
     await handleUpdateCase(caso.id, { status: nextStatus });
-  };
-
-  const handleResetCases = async () => {
-    const result = await resetCasesAsync();
-    setCases(result.cases);
-    setSearchTerm('');
-    setTypeFilter('Todas');
-    setFocusTab('todos');
-    setStatusMessage(result.error
-      ? 'Bóveda restaurada localmente. Supabase no respondió.'
-      : 'Bóveda restaurada con los expedientes base.'
-    );
-    dismissOnboarding();
   };
 
   // Inline editing actions
@@ -212,14 +197,18 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
 
   useEffect(() => {
     let isMounted = true;
+    setLoading(true);
 
     loadCases().then((result) => {
       if (!isMounted) return;
       setCases(result.cases);
       setDataSource(result.source);
+      setLoading(false);
       if (result.error) {
         setStatusMessage('Supabase aún no está listo. Usando almacenamiento local.');
       }
+    }).catch(() => {
+      if (isMounted) setLoading(false);
     });
 
     return () => {
@@ -475,9 +464,47 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
           </span>
         </div>
 
-        {/* View Mode: Tarjetas (default) */}
+        {/* Skeleton loader */}
+        {loading && focusTab !== 'papelera' && (
+          <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-3">
+                <div className="h-4 w-3/4 rounded bg-white/[0.06]" />
+                <div className="h-3 w-1/2 rounded bg-white/[0.04]" />
+                <div className="h-3 w-5/6 rounded bg-white/[0.04]" />
+                <div className="flex gap-2 pt-2">
+                  <div className="h-6 w-16 rounded-full bg-white/[0.04]" />
+                  <div className="h-6 w-20 rounded-full bg-white/[0.04]" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loading && filteredCases.length === 0 && focusTab !== 'papelera' && (
+          <div className="mt-12 flex flex-col items-center justify-center text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.04]">
+              <FileText className="h-8 w-8 text-brand-accent/60" />
+            </div>
+            <h3 className="text-xl font-bold text-brand-ivory">Aún no tienes expedientes</h3>
+            <p className="mt-2 max-w-sm text-sm text-brand-accent">
+              Crea tu primer expediente y la IA de LUSTI empezará a ayudarte con plazos legales, búsqueda en El Peruano y más.
+            </p>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-brand-ivory px-6 py-3 font-bold text-brand-black transition-colors hover:bg-white"
+            >
+              <Plus className="h-5 w-5" />
+              Crear expediente
+            </button>
+          </div>
+        )}
+
         {viewMode === 'cards' ? (
           <>
+
+        {/* View Mode: Tarjetas (default) */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredCases.length > 0 ? (
               displayedCases.map((caso) => (

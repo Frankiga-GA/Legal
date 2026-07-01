@@ -13,6 +13,7 @@ import {
   Library,
   Loader2,
   MessageSquare,
+  PenLine,
   Pencil,
   Plus,
   Send,
@@ -28,16 +29,15 @@ import toast, { Toaster } from 'react-hot-toast';
 import { askGeminiAboutCase, isGeminiConfigured, extractResolutionDetails, abortActiveRequest } from '../services/geminiService';
 import { searchLegalContext } from '../services/ragService';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
-import { getCases, updateCaseAsync, deleteCaseAsync } from '../services/caseStore';
+import { loadCases, updateCaseAsync, deleteCaseAsync } from '../services/caseStore';
 import { loadCaseChats, saveCaseChat, clearCaseChats, deleteCaseChatMsg, deleteCaseChatMessages } from '../services/chatHistoryStore';
 import AiMessage from './AiMessage';
 import CitationPanel from './CitationPanel';
+import DocumentWriter from './DocumentWriter';
 import DriveFilePicker from './DriveFilePicker';
 import { collectCitations } from '../utils/citationParser';
 import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
 import { getStoredDriveToken } from '../services/googleDriveService';
-import { pdf } from '@react-pdf/renderer';
-import CasePdfExport from './CasePdfExport';
 
 const CaseWorkspace = ({ caseId, onClose }) => {
   const [caseData, setCaseData] = useState(null);
@@ -62,31 +62,36 @@ const CaseWorkspace = ({ caseId, onClose }) => {
   const [hearingInput, setHearingInput] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showDrivePicker, setShowDrivePicker] = useState(false);
+  const [showDocumentWriter, setShowDocumentWriter] = useState(false);
 
   useEffect(() => {
-    const allCases = getCases();
-    const data = allCases.find(c => c.id === caseId);
-    if (data) {
-      setCaseData(data);
-      if (aiMessages.length === 0) {
-        setAiMessages([
-          {
-            role: 'ai',
-            content: `¡Hola! Soy tu asistente para el caso ${data.id}. Ya tengo el expediente a la vista. Contame en qué te ayudo: resúmenes, plazos críticos, redacción de escritos, análisis de riesgos o lo que se te ocurra.`,
-          },
-        ]);
+    let cancelled = false;
+    loadCases().then(({ cases: allCases }) => {
+      if (cancelled) return;
+      const data = allCases.find(c => c.id === caseId);
+      if (data) {
+        setCaseData(data);
+        if (aiMessages.length === 0) {
+          setAiMessages([
+            {
+              role: 'ai',
+              content: `¡Hola! Soy tu asistente para el caso ${data.id}. Ya tengo el expediente a la vista. Contame en qué te ayudo: resúmenes, plazos críticos, redacción de escritos, análisis de riesgos o lo que se te ocurra.`,
+            },
+          ]);
+        }
+        loadCaseChats(caseId).then(({ messages, error }) => {
+          if (cancelled) return;
+          if (error) {
+            console.warn('No se pudo cargar el historial de chat.', error.message);
+            return;
+          }
+          if (messages && messages.length > 0) {
+            setAiMessages(messages);
+          }
+        });
       }
-      loadCaseChats(caseId).then(({ messages, error }) => {
-        if (error) {
-          console.warn('No se pudo cargar el historial de chat.', error.message);
-          return;
-        }
-        if (messages && messages.length > 0) {
-          setAiMessages(messages);
-        }
-      });
-    }
-    return () => abortActiveRequest();
+    });
+    return () => { cancelled = true; abortActiveRequest(); };
   }, [caseId]);
 
   if (!caseData) return (
@@ -108,7 +113,7 @@ const CaseWorkspace = ({ caseId, onClose }) => {
   const officialReferences = Array.isArray(caseData.officialReferences) ? caseData.officialReferences : [];
 
   const handleUpdate = async (changes) => {
-    const allCases = getCases();
+    const { cases: allCases } = await loadCases();
     const result = await updateCaseAsync(allCases, caseData.id, changes);
     setCaseData(result.updatedCase);
     syncCalendar(allCases);
@@ -116,7 +121,7 @@ const CaseWorkspace = ({ caseId, onClose }) => {
 
   const syncCalendar = async (allCases) => {
     if (!getStoredDriveToken()?.access_token) return;
-    const allDeadlines = (allCases || getCases()).flatMap(c =>
+    const allDeadlines = allCases.flatMap(c =>
       (c.importantDates || []).map(d => ({ ...d, caseId: c.id, caseName: c.name || '' }))
     );
     if (!allDeadlines.length) return;
@@ -233,6 +238,10 @@ const CaseWorkspace = ({ caseId, onClose }) => {
 
   const handleExportPdf = async () => {
     try {
+      const [{ pdf }, { default: CasePdfExport }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./CasePdfExport'),
+      ]);
       const blob = await pdf(<CasePdfExport caseData={caseData} />).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -262,7 +271,7 @@ const CaseWorkspace = ({ caseId, onClose }) => {
       handleUpdate({ notes: notes.filter((n) => n.id !== deleteConfirm.id) });
     } else if (deleteConfirm.type === 'case') {
       try {
-        const allCases = getCases();
+        const { cases: allCases } = await loadCases();
         await deleteCaseAsync(allCases, caseData.id);
         onClose();
       } catch (error) {
@@ -469,6 +478,7 @@ const CaseWorkspace = ({ caseId, onClose }) => {
   };
 
   return (
+    <>
     <div className="flex h-full flex-col md:flex-row overflow-hidden bg-brand-black text-brand-ivory">
       
       {/* LEFT COLUMN: Case Details */}
@@ -508,6 +518,13 @@ const CaseWorkspace = ({ caseId, onClose }) => {
               title="Exportar PDF"
             >
               <FileText className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setShowDocumentWriter(true)}
+              className="rounded-lg border border-white/[0.08] px-3 py-2 text-xs font-bold text-brand-gold hover:border-brand-gold/40 hover:bg-brand-gold/10 transition-colors"
+              title="Redactar escrito"
+            >
+              <PenLine className="h-4 w-4 inline mr-1" />Redactar
             </button>
             <button
               onClick={handleDeleteCase}
@@ -983,6 +1000,19 @@ const CaseWorkspace = ({ caseId, onClose }) => {
         </div>
       )}
     </div>
+    {showDocumentWriter && (
+      <DocumentWriter
+        caseData={caseData}
+        onClose={() => setShowDocumentWriter(false)}
+        onSave={(doc) => {
+          const updatedDocs = [...documents, doc];
+          handleUpdate({ documents: updatedDocs });
+          toast.success(`"${doc.name}" guardado en el expediente`);
+          setShowDocumentWriter(false);
+        }}
+      />
+    )}
+  </>
   );
 };
 

@@ -22,7 +22,7 @@ const OnboardingTour = lazy(() => import('./components/OnboardingTour'));
 import { getCurrentSession, onAuthStateChange, signOut, hasCompletedOnboarding } from './services/authService';
 import { getStoredDriveToken, onDriveTokenChange, onDriveTokenMessage } from './services/googleDriveService';
 import { setPendingAiInput, setActiveAssistant } from './services/aiBridge';
-import { getCases } from './services/caseStore';
+import { loadCases } from './services/caseStore';
 import { loadAllPreferences } from './services/userPreferencesStore';
 import { checkDeadlinesAndNotify } from './services/notificationService';
 
@@ -212,11 +212,11 @@ function App() {
     if (!session?.user?.id) return undefined;
     const userId = session.user.id;
 
-    const runCheck = () => {
+    const runCheck = async () => {
       const prefs = loadAllPreferences(userId);
       const deadlineAlerts = prefs?.notifications?.deadlineAlerts !== false;
       if (!deadlineAlerts) return;
-      const cases = getCases();
+      const { cases } = await loadCases();
       checkDeadlinesAndNotify(cases, userId, { deadlineAlerts: true });
     };
 

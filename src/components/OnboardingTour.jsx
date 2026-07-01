@@ -6,35 +6,35 @@
 // =============================================================================
 
 import { useState } from 'react';
-import { Bot, Calendar, Check, ChevronRight, FileText, Sparkles, X } from 'lucide-react';
+import { Bot, Calendar, Check, ChevronRight, FileText, Sparkles, X, Lightbulb } from 'lucide-react';
 import { markOnboardingComplete } from '../services/authService';
 
 const STEPS = [
   {
     icon: Sparkles,
     title: 'Bienvenido a LUSTI',
-    body: 'Tu espacio legal con IA contextual. En 4 pasos te mostramos lo esencial para arrancar.',
-    accent: 'Listo para empezar',
+    body: 'Su centro de inteligencia legal. Aquí podrá gestionar sus expedientes, analizar documentos con IA y no perder ningún plazo. En 30 segundos estará listo.',
+    accent: 'Sin instalación, sin configuraciones. Solo usted y su asistente legal.',
   },
   {
     icon: FileText,
-    title: 'Crea tu primer expediente',
-    body: 'Desde el Inventario podes abrir un caso nuevo y cargarle documentos, notas y plazos. Todo lo que necesita la IA para ayudarte.',
-    accent: 'Ir al Inventario',
+    title: 'Gestione sus expedientes',
+    body: 'Cree casos, adjunte documentos (PDF, DOCX, TXT), agregue notas y fechas clave. Todo sincronizado con Google Drive.',
+    accent: 'Ejemplo: Cree un caso "Alimentos - Pérez" y adjunte la demanda en PDF. La IA lo leerá automáticamente.',
     actionTab: 'library',
   },
   {
     icon: Calendar,
-    title: 'Proba el calendario',
-    body: 'Todos los plazos de todos tus expedientes en una sola vista. Filtra por prioridad y nunca mas se te pasa un vencimiento.',
-    accent: 'Ver calendario',
+    title: 'Plazos y vencimientos',
+    body: 'Cada fecha importante que agregue a un caso se sincroniza automáticamente con Google Calendar. Nunca más se le pasará un plazo.',
+    accent: 'Ejemplo: Audiencia de conciliación agendada → aparece en su calendario sin hacer nada.',
     actionTab: 'calendar',
   },
   {
     icon: Bot,
-    title: 'Hablale a la IA',
-    body: 'Preguntale cosas como "que plazos tengo esta semana" o "resumime el caso de Garcia". Aprende con el uso.',
-    accent: 'Ir al chat',
+    title: 'Su asistente con IA',
+    body: 'Pregunte: "resuma este caso", "redacte una apelación", "qué plazos tengo esta semana". La IA lee sus documentos y responde con citas legales peruanas reales.',
+    accent: 'Ejemplo: "Analiza la demanda de alimentos y dime los riesgos" → obtiene un análisis en segundos.',
     actionTab: 'ai-chat',
   },
 ];
@@ -97,11 +97,12 @@ const OnboardingTour = ({ userId, onComplete, onNavigate }) => {
             {current.body}
           </p>
 
-          <div className="mt-6 rounded-lg border border-brand-gold/20 bg-brand-gold/[0.06] px-4 py-3 text-[11px] text-brand-ivory/90">
-            <p className="font-semibold uppercase tracking-wider text-brand-gold text-[10px]">
-              Tip
+          <div className="mt-6 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3">
+            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-amber-400">
+              <Lightbulb className="h-3.5 w-3.5" />
+              Ejemplo
             </p>
-            <p className="mt-1">{current.accent}</p>
+            <p className="mt-1 text-[11px] text-brand-accent/80">{current.accent}</p>
           </div>
 
           <div className="mt-8 flex items-center justify-between gap-3">
@@ -110,7 +111,7 @@ const OnboardingTour = ({ userId, onComplete, onNavigate }) => {
               onClick={handleSkip}
               className="text-[11px] text-brand-accent/55 transition-colors hover:text-brand-ivory"
             >
-              Saltar tour
+              Saltar
             </button>
             <div className="flex items-center gap-2">
               <div className="flex gap-1.5">
@@ -130,7 +131,7 @@ const OnboardingTour = ({ userId, onComplete, onNavigate }) => {
               >
                 {isLast ? (
                   <>
-                    <Check className="h-3.5 w-3.5" /> Empezar
+                    <Check className="h-3.5 w-3.5" /> Comenzar
                   </>
                 ) : (
                   <>

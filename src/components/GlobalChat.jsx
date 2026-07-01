@@ -44,6 +44,7 @@ import { uploadDocumentToBackend } from '../services/documentBackendService';
 import AiMessage from './AiMessage';
 import CitationPanel from './CitationPanel';
 import { collectCitations } from '../utils/citationParser';
+import { friendlyError } from '../utils/errors';
 
 const HISTORY_LIMIT = 4;
 const ACCEPTED_TYPES = '.pdf,.docx,.doc,.txt,.md,.rtf';
@@ -186,7 +187,7 @@ const GlobalChat = ({ onBack }) => {
         console.warn('No se pudo guardar la respuesta en Supabase.', err?.message);
       });
     } catch (err) {
-      const msg = err?.message || 'Error desconocido al llamar a la IA.';
+      const msg = friendlyError(err);
       setError(msg);
       // Reemplaza el placeholder con el mensaje de error
       setMessages((prev) =>
@@ -284,7 +285,7 @@ const GlobalChat = ({ onBack }) => {
         )
       );
     } catch (err) {
-      const msg = err?.message || 'Error desconocido.';
+      const msg = friendlyError(err);
       setMessages((prev) =>
         prev.map((m) =>
           m.pending && m.pendingId === pendingId

@@ -194,13 +194,72 @@ export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens =
   return data.text;
 };
 
-export const cleanAssistantText = (text = '') => text
-  .replace(/^###?\s+/gm, '')
-  .replace(/\*\*/g, '')
-  .replace(/^\s*\*\s+/gm, '')
-  .replace(/^\s*-\s+/gm, '')
-  .replace(/\n{3,}/g, '\n\n')
-  .trim();
+const GENERIC_PHRASES = [
+  /,\s*es importante considerar/gi,
+  /\.\s*es importante considerar/gi,
+  /es importante considerar\s*,/gi,
+  /es importante considerar/gi,
+  /,\s*es importante tener en cuenta/gi,
+  /\.\s*es importante tener en cuenta/gi,
+  /es importante tener en cuenta\s*,/gi,
+  /es importante tener en cuenta/gi,
+  /,\s*es fundamental/gi,
+  /\.\s*es fundamental/gi,
+  /es fundamental\s*,/gi,
+  /es fundamental/gi,
+  /,\s*es necesario tener en cuenta/gi,
+  /\.\s*es necesario tener en cuenta/gi,
+  /es necesario tener en cuenta/gi,
+  /,\s*de acuerdo con la normativa peruana vigente/gi,
+  /\.\s*de acuerdo con la normativa peruana vigente/gi,
+  /de acuerdo con la normativa peruana vigente/gi,
+  /,\s*segun el Sistema Peruano de Informacion Juridica/gi,
+  /\.\s*segun el Sistema Peruano de Informacion Juridica/gi,
+  /segun el Sistema Peruano de Informacion Juridica/gi,
+  /,\s*es importante analizar/gi,
+  /\.\s*es importante analizar/gi,
+  /es importante analizar/gi,
+  /,\s*como se establece en/gi,
+  /\.\s*como se establece en/gi,
+  /como se establece en/gi,
+  /,\s*es importante destacar/gi,
+  /\.\s*es importante destacar/gi,
+  /es importante destacar/gi,
+  /,\s*cabe senalar que/gi,
+  /\.\s*cabe senalar que/gi,
+  /cabe senalar que/gi,
+  /,\s*resulta relevante senalar/gi,
+  /\.\s*resulta relevante senalar/gi,
+  /resulta relevante senalar/gi,
+  /,\s*en ese sentido/gi,
+  /\.\s*en ese sentido/gi,
+  /en ese sentido/gi,
+  /,\s*al respecto/gi,
+  /\.\s*al respecto/gi,
+  /al respecto/gi,
+  /,\s*por otro lado/gi,
+  /\.\s*por otro lado/gi,
+  /por otro lado/gi,
+];
+
+export const cleanAssistantText = (text = '') => {
+  let cleaned = text
+    .replace(/^###?\s+/gm, '')
+    .replace(/\*\*/g, '')
+    .replace(/^\s*\*\s+/gm, '')
+    .replace(/^\s*-\s+/gm, '')
+    .replace(/\n{3,}/g, '\n\n');
+  GENERIC_PHRASES.forEach((re) => {
+    cleaned = cleaned.replace(re, '');
+  });
+  cleaned = cleaned
+    .replace(/  +/g, ' ')
+    .replace(/\.\s*\./g, '.')
+    .replace(/\n\s*\n\s*\n/g, '\n\n')
+    .replace(/,(\s*[\]\)\}])/g, '$1')
+    .trim();
+  return cleaned;
+};
 
 const buildCaseContext = ({ caseData, documents, notes, importantDates, officialReferences }) => ({
   expediente: {

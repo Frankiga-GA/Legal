@@ -49,6 +49,24 @@ export const saveCaseChat = async (caseId, role, content) => {
     .from(TABLE_NAME)
     .insert({ case_id: caseId, user_id: userId, role, content });
 
+  // Limitar a 50 mensajes por caso (borrar los mas antiguos)
+  if (!error) {
+    supabase
+      .from(TABLE_NAME)
+      .select('id')
+      .eq('case_id', caseId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .range(50, 999999)
+      .then(({ data }) => {
+        if (data?.length > 0) {
+          const ids = data.map((r) => r.id);
+          supabase.from(TABLE_NAME).delete().in('id', ids).then(() => {});
+        }
+      })
+      .catch(() => {});
+  }
+
   return { error, skipped: false };
 };
 
