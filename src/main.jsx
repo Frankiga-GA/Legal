@@ -1,3 +1,10 @@
+// Polyfill Buffer for browser (required by @react-pdf/renderer for image processing)
+import { Buffer } from 'buffer';
+if (typeof window !== 'undefined') {
+  window.Buffer = Buffer;
+  globalThis.Buffer = Buffer;
+}
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

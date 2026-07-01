@@ -19,6 +19,8 @@ const CreateCaseModal = ({ onClose, onSave }) => {
   const [type, setType] = useState('Laboral');
   const [counterparty, setCounterparty] = useState('');
   const [subject, setSubject] = useState('');
+  const [judge, setJudge] = useState('');
+  const [specialist, setSpecialist] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -30,6 +32,8 @@ const CreateCaseModal = ({ onClose, onSave }) => {
       dni: dni.trim(),
       type,
       counterparty: counterparty.trim(),
+      judge: judge.trim(),
+      specialist: specialist.trim(),
       status: 'Activo',
       summary: subject.trim(),
       lastUpdate: new Date().toISOString().split('T')[0],
@@ -130,6 +134,38 @@ const CreateCaseModal = ({ onClose, onSave }) => {
                 value={counterparty}
                 onChange={(e) => setCounterparty(e.target.value)}
                 placeholder="Demandado, denunciante, deudor, etc."
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3.5 pl-12 pr-5 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/30 focus:border-brand-gold/40"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/70">
+              Juez <span className="text-brand-accent/40">(opcional)</span>
+            </label>
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-accent/30" />
+              <input
+                type="text"
+                value={judge}
+                onChange={(e) => setJudge(e.target.value)}
+                placeholder="Nombre del Juez"
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3.5 pl-12 pr-5 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/30 focus:border-brand-gold/40"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/70">
+              Especialista Legal <span className="text-brand-accent/40">(opcional)</span>
+            </label>
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-accent/30" />
+              <input
+                type="text"
+                value={specialist}
+                onChange={(e) => setSpecialist(e.target.value)}
+                placeholder="Nombre del Especialista"
                 className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3.5 pl-12 pr-5 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/30 focus:border-brand-gold/40"
               />
             </div>

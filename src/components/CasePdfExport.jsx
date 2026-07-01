@@ -1,12 +1,30 @@
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
   page: {
-    padding: 50,
-    paddingTop: 35,
+    paddingTop: 150,
+    paddingBottom: 100,
+    paddingLeft: 50,
+    paddingRight: 50,
     fontSize: 10,
     color: '#1a1a1a',
     fontFamily: 'Helvetica',
+  },
+  headerImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    height: 130,
+  },
+  footerImage: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    height: 80,
   },
   headerCenter: {
     textAlign: 'center',
@@ -179,23 +197,19 @@ const fields = (caseData) => [
   { label: 'Última Actualización', value: caseData.lastUpdate, show: true },
 ];
 
-const CasePdfExport = ({ caseData }) => {
-  const now = new Date().toLocaleDateString('es-PE', {
-    year: 'numeric', month: 'long', day: 'numeric',
-  });
-
+const CasePdfExport = ({ caseData, firmProfile }) => {
   const visibleFields = fields(caseData).filter((f) => f.show);
+  const headerSrc = firmProfile?.headerBase64;
+  const footerSrc = firmProfile?.footerBase64;
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.headerCenter}>
-          <Text style={styles.lawFirm}>LUSTI</Text>
-          <Text style={styles.lawFirmSub}>SISTEMA DE INTELIGENCIA LEGAL</Text>
-        </View>
-
-        <View style={styles.dividerBold} />
-        <View style={styles.dividerThin} />
+        {/* Membrete J&N o Personalizado - Se repite en cada página */}
+        {headerSrc && <Image src={headerSrc} style={styles.headerImage} fixed />}
+        
+        {/* Footer de contacto o Personalizado - Se repite en cada página */}
+        {footerSrc && <Image src={footerSrc} style={styles.footerImage} fixed />}
 
         <Text style={[styles.sectionTitle, { textAlign: 'center', marginBottom: 14 }]}>
           REPORTE DE EXPEDIENTE
@@ -276,16 +290,6 @@ const CasePdfExport = ({ caseData }) => {
             ))}
           </View>
         )}
-
-        <View style={styles.closing}>
-          <Text>Reporte generado automáticamente por LUSTI Legal Intelligence el {now}.</Text>
-          <Text>La información contenida es confidencial y de uso exclusivo del destinatario.</Text>
-        </View>
-
-        <Text style={styles.footer}>
-          <Text>LUSTI Legal Intelligence</Text>
-          <Text>Página 1 de 1</Text>
-        </Text>
       </Page>
     </Document>
   );

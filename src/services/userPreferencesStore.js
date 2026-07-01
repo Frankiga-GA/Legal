@@ -1,9 +1,7 @@
 // src/services/userPreferencesStore.js
-// Preferencias por usuario. Persistidas en localStorage con namespace
-// por user_id para que cada cuenta tenga sus propios ajustes.
-const STORAGE_PREFIX = 'lusti-prefs';
+import { supabase } from '../utils/supabase';
 
-const defaultsFor = (userId) => ({
+const defaultsFor = () => ({
   firm: {
     firmName: '',
     lawyerName: '',
@@ -12,6 +10,8 @@ const defaultsFor = (userId) => ({
     phone: '',
     contactEmail: '',
     city: '',
+    headerBase64: null,
+    footerBase64: null,
   },
   ai: {
     tone: 'profesional',
@@ -25,43 +25,82 @@ const defaultsFor = (userId) => ({
     normAlerts: true,
     deadlineAlerts: true,
   },
-  meta: {
-    updatedAt: null,
-  },
 });
 
-const storageKey = (userId, area) => `${STORAGE_PREFIX}-${area}-${userId || 'anon'}`;
+export const loadAllPreferencesAsync = async (userId) => {
+  if (!userId) return defaultsFor();
 
-const readArea = (userId, area) => {
   try {
-    const raw = window.localStorage.getItem(storageKey(userId, area));
-    if (!raw) return defaultsFor(userId)[area];
-    const parsed = JSON.parse(raw);
-    return { ...defaultsFor(userId)[area], ...parsed };
-  } catch {
-    return defaultsFor(userId)[area];
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error loading preferences from Supabase:', error);
+      return defaultsFor();
+    }
+
+    if (!data) {
+      return defaultsFor();
+    }
+
+    const base = defaultsFor();
+    return {
+      firm: { ...base.firm, ...(data.firm || {}) },
+      ai: { ...base.ai, ...(data.ai || {}) },
+      notifications: { ...base.notifications, ...(data.notifications || {}) },
+    };
+  } catch (err) {
+    console.error('Error in loadAllPreferencesAsync:', err);
+    return defaultsFor();
   }
 };
 
-const writeArea = (userId, area, value) => {
+const writeAreaAsync = async (userId, area, value) => {
+  if (!userId) return false;
+
   try {
-    const payload = { ...value, meta: { updatedAt: new Date().toISOString() } };
-    window.localStorage.setItem(storageKey(userId, area), JSON.stringify(payload));
+    // Primero traemos las preferencias actuales para no sobreescribir las otras áreas
+    const { data: current, error: fetchError } = await supabase
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Error fetching current prefs for update:', fetchError);
+      return false;
+    }
+
+    const upsertData = {
+      user_id: userId,
+      firm: current?.firm || {},
+      ai: current?.ai || {},
+      notifications: current?.notifications || {},
+      updated_at: new Date().toISOString()
+    };
+
+    // Actualizamos el área específica
+    upsertData[area] = value;
+
+    const { error: upsertError } = await supabase
+      .from('user_preferences')
+      .upsert(upsertData, { onConflict: 'user_id' });
+
+    if (upsertError) {
+      console.error('Error upserting preferences:', upsertError);
+      return false;
+    }
+
     return true;
-  } catch {
+  } catch (err) {
+    console.error('Error in writeAreaAsync:', err);
     return false;
   }
 };
 
-export const loadAllPreferences = (userId) => {
-  const base = defaultsFor(userId);
-  return {
-    firm: readArea(userId, 'firm') || base.firm,
-    ai: readArea(userId, 'ai') || base.ai,
-    notifications: readArea(userId, 'notifications') || base.notifications,
-  };
-};
-
-export const saveFirmProfile = (userId, profile) => writeArea(userId, 'firm', profile);
-export const saveAiPreferences = (userId, prefs) => writeArea(userId, 'ai', prefs);
-export const saveNotificationPreferences = (userId, prefs) => writeArea(userId, 'notifications', prefs);
+export const saveFirmProfileAsync = (userId, profile) => writeAreaAsync(userId, 'firm', profile);
+export const saveAiPreferencesAsync = (userId, prefs) => writeAreaAsync(userId, 'ai', prefs);
+export const saveNotificationPreferencesAsync = (userId, prefs) => writeAreaAsync(userId, 'notifications', prefs);

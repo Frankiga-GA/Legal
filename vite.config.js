@@ -6,6 +6,16 @@ const documentBackendUrl = process.env.VITE_DOCUMENT_BACKEND_URL || 'http://127.
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  define: {
+    // Polyfill 'global' for packages that use Node.js globals (e.g. react-pdf)
+    global: 'globalThis',
+  },
+  resolve: {
+    alias: {
+      // Make sure 'buffer' resolves to the browser-compatible version
+      buffer: 'buffer',
+    },
+  },
   server: {
     proxy: {
       '/api': {

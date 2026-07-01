@@ -1,5 +1,6 @@
 // src/components/Settings.jsx
 import { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import {
   Building2,
   Bot,
@@ -13,6 +14,7 @@ import {
   AlertTriangle,
   Moon,
   Sun,
+  Loader2,
 } from 'lucide-react';
 import {
   clearStoredDriveToken,
@@ -26,10 +28,10 @@ import {
 import { isSupabaseConfigured, supabase } from '../utils/supabase';
 import { useTheme } from '../hooks/useTheme';
 import {
-  loadAllPreferences,
-  saveAiPreferences,
-  saveFirmProfile,
-  saveNotificationPreferences,
+  loadAllPreferencesAsync,
+  saveAiPreferencesAsync,
+  saveFirmProfileAsync,
+  saveNotificationPreferencesAsync,
 } from '../services/userPreferencesStore';
 
 const TONE_OPTIONS = [
@@ -92,15 +94,50 @@ const sections = [
   { id: 'integrations', label: 'Conexiones', icon: Plug },
 ];
 
-// ============================================================================
-// Perfil de Firma
-// ============================================================================
+// Helper for compressing images before converting to base64
+const compressImage = (file, maxWidth = 1200) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scaleSize = maxWidth / img.width;
+        let width = img.width;
+        let height = img.height;
+        
+        if (scaleSize < 1) {
+          width = maxWidth;
+          height = img.height * scaleSize;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Compress to 80% quality JPEG (much smaller than PNG base64)
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+    };
+  });
+};
+
 const FirmProfile = ({ userId, userEmail }) => {
-  const [profile, setProfile] = useState(() => loadAllPreferences(userId).firm);
+  const [profile, setProfile] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setProfile(loadAllPreferences(userId).firm);
+    const loadProfile = async () => {
+      setIsLoading(true);
+      const prefs = await loadAllPreferencesAsync(userId);
+      setProfile(prefs.firm);
+      setIsLoading(false);
+    };
+    loadProfile();
   }, [userId]);
 
   const update = (field, value) => {
@@ -108,10 +145,37 @@ const FirmProfile = ({ userId, userEmail }) => {
     setSaved(false);
   };
 
-  const handleSave = () => {
-    saveFirmProfile(userId, profile);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2500);
+  const handleSave = async () => {
+    const success = await saveFirmProfileAsync(userId, profile);
+    if (success) {
+      setSaved(true);
+      toast.success('Perfil guardado exitosamente en la nube');
+      window.setTimeout(() => setSaved(false), 2500);
+    } else {
+      toast.error('Error al guardar. Verifica tu conexión o sesión.');
+    }
+  };
+
+  if (isLoading || !profile) {
+    return <div className="p-10 flex justify-center text-brand-accent/50"><Loader2 className="animate-spin h-8 w-8" /></div>;
+  }
+
+  const handleImageUpload = async (field, e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Si la imagen es muy grande (más de 500kb), la comprimimos
+    if (file.size > 500 * 1024) {
+      toast('Comprimiendo imagen...', { icon: '🔄' });
+      const compressedBase64 = await compressImage(file);
+      update(field, compressedBase64);
+    } else {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        update(field, reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -131,6 +195,22 @@ const FirmProfile = ({ userId, userEmail }) => {
         <Field label="Direccion" value={profile.address} onChange={(v) => update('address', v)} placeholder="Av. Javier Prado 123, San Isidro" />
         <Field label="Telefono" value={profile.phone} onChange={(v) => update('phone', v)} placeholder="+51 999 888 777" />
         <Field label="Email de contacto" value={profile.contactEmail || userEmail} onChange={(v) => update('contactEmail', v)} placeholder="contacto@estudio.com" />
+      </div>
+
+      <div>
+        <h4 className="text-lg font-serif font-medium text-brand-ivory mb-4 border-t border-white/[0.05] pt-8">Identidad Visual (Membretes)</h4>
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-semibold tracking-wide text-brand-accent/80 uppercase">Membrete Superior (Header)</label>
+            <input type="file" accept="image/*" onChange={(e) => handleImageUpload('headerBase64', e)} className="block w-full text-sm text-brand-accent file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-gold file:text-brand-black hover:file:bg-brand-ivory cursor-pointer" />
+            {profile.headerBase64 && <img src={profile.headerBase64} alt="Header" className="mt-4 h-16 w-full object-contain bg-white rounded-lg p-2" />}
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold tracking-wide text-brand-accent/80 uppercase">Pie de Página (Footer)</label>
+            <input type="file" accept="image/*" onChange={(e) => handleImageUpload('footerBase64', e)} className="block w-full text-sm text-brand-accent file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-gold file:text-brand-black hover:file:bg-brand-ivory cursor-pointer" />
+            {profile.footerBase64 && <img src={profile.footerBase64} alt="Footer" className="mt-4 h-12 w-full object-contain bg-white rounded-lg p-2" />}
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
@@ -156,11 +236,18 @@ const FirmProfile = ({ userId, userEmail }) => {
 // Preferencias de IA
 // ============================================================================
 const AIPreferences = ({ userId }) => {
-  const [prefs, setPrefs] = useState(() => loadAllPreferences(userId).ai);
+  const [prefs, setPrefs] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setPrefs(loadAllPreferences(userId).ai);
+    const loadProfile = async () => {
+      setIsLoading(true);
+      const allPrefs = await loadAllPreferencesAsync(userId);
+      setPrefs(allPrefs.ai);
+      setIsLoading(false);
+    };
+    loadProfile();
   }, [userId]);
 
   const update = (field, value) => {
@@ -168,11 +255,20 @@ const AIPreferences = ({ userId }) => {
     setSaved(false);
   };
 
-  const handleSave = () => {
-    saveAiPreferences(userId, prefs);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2500);
+  const handleSave = async () => {
+    const success = await saveAiPreferencesAsync(userId, prefs);
+    if (success) {
+      setSaved(true);
+      toast.success('Preferencias de IA guardadas');
+      window.setTimeout(() => setSaved(false), 2500);
+    } else {
+      toast.error('Error al guardar. Verifica tu conexión.');
+    }
   };
+
+  if (isLoading || !prefs) {
+    return <div className="p-10 flex justify-center text-brand-accent/50"><Loader2 className="animate-spin h-8 w-8" /></div>;
+  }
 
   return (
     <div className="space-y-10">
@@ -260,24 +356,39 @@ const AIPreferences = ({ userId }) => {
 // Notificaciones
 // ============================================================================
 const NotificationPreferences = ({ userId }) => {
-  const [prefs, setPrefs] = useState(() => loadAllPreferences(userId).notifications);
+  const [prefs, setPrefs] = useState(null);
   const [permission, setPermission] = useState(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
   );
   const [saved, setSaved] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setPrefs(loadAllPreferences(userId).notifications);
+    const loadProfile = async () => {
+      setIsLoading(true);
+      const allPrefs = await loadAllPreferencesAsync(userId);
+      setPrefs(allPrefs.notifications);
+      setIsLoading(false);
+    };
+    loadProfile();
   }, [userId]);
 
-  const update = (field, value) => {
+  const update = async (field, value) => {
     const next = { ...prefs, [field]: value };
     setPrefs(next);
     setSaved(false);
-    saveNotificationPreferences(userId, next);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2000);
+    const success = await saveNotificationPreferencesAsync(userId, next);
+    if (success) {
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2000);
+    } else {
+      toast.error('Error al guardar notificaciones. Verifica tu conexión.');
+    }
   };
+
+  if (isLoading || !prefs) {
+    return <div className="p-10 flex justify-center text-brand-accent/50"><Loader2 className="animate-spin h-8 w-8" /></div>;
+  }
 
   const requestPermission = async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) return;

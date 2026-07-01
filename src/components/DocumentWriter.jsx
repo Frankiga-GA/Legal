@@ -1,15 +1,133 @@
 import { useState, useMemo, useEffect } from 'react';
 import { FileText, Gavel, Shield, Mail, Loader2, Check, X, PenLine } from 'lucide-react';
 import { askGeminiAboutCase } from '../services/geminiService';
+import DocumentPdfExport from './DocumentPdfExport';
+import { exportToDocx } from '../services/docxExportService';
+import { loadAllPreferencesAsync } from '../services/userPreferencesStore';
+import { supabase } from '../utils/supabase';
 
 // Inline templates para evitar dependencia de import
 const INLINE_TEMPLATES = [
+  {
+    id: 'demanda-alimentos',
+    title: 'Demanda de Alimentos',
+    description: 'Solicitud de pensión alimenticia para menores',
+    icon: 'Shield',
+    prompt: `Redacta una DEMANDA DE ALIMENTOS dirigida al JUZGADO DE PAZ LETRADO.
+
+DATOS DEL DEMANDANTE (Representante del menor):
+- Nombre: {{cliente}}
+- DNI: {{dni}}
+
+DATOS DEL DEMANDADO:
+- Nombre: {{demandado}}
+- Domicilio: {{domicilioDemandado}}
+
+DATOS ESPECÍFICOS:
+- Monto solicitado: {{montoSolicitado}}
+- Gastos del menor: {{gastosMenor}}
+- Ingresos del demandado: {{ingresosDemandado}}
+
+REGLAS DE FORMATO OBLIGATORIAS:
+1. SUMILLA EXACTA:
+EXPEDIENTE: {{expedienteNumero}}
+ESPECIALISTA: {{especialista}}
+CUADERNO: PRINCIPAL
+ESCRITO: 01
+SUMILLA: INTERPONGO DEMANDA DE ALIMENTOS
+
+2. AUTORIDAD: SEÑOR JUEZ DE PAZ LETRADO:
+
+3. APERSONAMIENTO: "{{cliente}}, identificado con DNI N° {{dni}}, con domicilio procesal en {{domicilioProcesal}}; a Usted respetuosamente digo:"
+
+4. ESTRUCTURA:
+I. PETITORIO
+II. FUNDAMENTOS DE HECHO (Incluir gastos e ingresos)
+III. FUNDAMENTOS DE DERECHO
+IV. MONTO DEL PETITORIO ({{montoSolicitado}})
+V. VÍA PROCEDIMENTAL
+VI. MEDIOS PROBATORIOS (Enumerar 1., 2.)
+VII. ANEXOS (Enumerar 1-A Copia de DNI, 1-B Partida de Nacimiento, etc.)
+
+POR TANTO:
+A Usted Señor Juez solicito admitir la demanda.`,
+  },
+  {
+    id: 'contradiccion-mandato',
+    title: 'Contradicción a Mandato Ejecutivo',
+    description: 'Defensa ante una ejecución (ej. Letra de Cambio, Pagaré)',
+    icon: 'Gavel',
+    prompt: `Redacta un escrito de CONTRADICCIÓN AL MANDATO EJECUTIVO dirigido al JUZGADO {{juzgado}}.
+
+DATOS DEL DEMANDADO (Cliente):
+- Nombre: {{cliente}}
+- DNI: {{dni}}
+- Demandante: {{demandado}}
+- Título valor: {{tituloValor}}
+- Fundamento: {{fundamentoContradiccion}}
+
+REGLAS DE FORMATO OBLIGATORIAS:
+1. SUMILLA EXACTA:
+EXPEDIENTE: {{expedienteNumero}}
+ESPECIALISTA: {{especialista}}
+CUADERNO: PRINCIPAL
+ESCRITO: [CONFIRMAR]
+SUMILLA: FORMULO CONTRADICCIÓN A MANDATO EJECUTIVO
+
+2. AUTORIDAD: "SEÑOR JUEZ DEL JUZGADO {{juzgado}}:"
+
+3. APERSONAMIENTO: "{{cliente}}, identificado con DNI N° {{dni}}, señalando domicilio procesal en {{domicilioProcesal}}, en el proceso seguido por {{demandado}}; a Usted respetuosamente digo:"
+
+4. ESTRUCTURA:
+I. PETITORIO (Solicito se declare fundada la contradicción por {{motivoContradiccion}})
+II. FUNDAMENTOS DE HECHO (Desarrollar detalladamente: {{fundamentoContradiccion}})
+III. FUNDAMENTOS JURÍDICOS
+IV. MEDIOS PROBATORIOS (Enumerar 1. El mérito de la Letra, etc.)
+V. ANEXOS (Enumerar 1-A Copia de DNI, 1-B Tasa judicial, etc.)
+
+POR TANTO:
+A Usted Señor Juez solicito admitir el presente escrito.`,
+  },
+  {
+    id: 'recurso-apelacion',
+    title: 'Recurso de Apelación',
+    description: 'Apelación contra sentencia o auto',
+    icon: 'FileText',
+    prompt: `Redacta un RECURSO DE APELACIÓN dirigido al JUZGADO {{juzgado}}.
+
+DATOS:
+- Apelante: {{cliente}}, DNI: {{dni}}
+- Resolución Apelada: {{numeroResolucion}} de fecha {{fechaResolucion}}
+- Agravio: {{agravioPrincipal}}
+
+REGLAS DE FORMATO OBLIGATORIAS:
+1. SUMILLA EXACTA:
+EXPEDIENTE: {{expedienteNumero}}
+ESPECIALISTA: {{especialista}}
+CUADERNO: PRINCIPAL
+ESCRITO: [CONFIRMAR]
+SUMILLA: INTERPONGO RECURSO DE APELACIÓN
+
+2. AUTORIDAD: "SEÑOR JUEZ DEL JUZGADO {{juzgado}}:"
+
+3. APERSONAMIENTO: "{{cliente}}, identificado con DNI N° {{dni}}, en los seguidos por el expediente de la referencia; a Usted respetuosamente digo:"
+
+4. ESTRUCTURA:
+I. PETITORIO (Revocar o anular la Resolución {{numeroResolucion}})
+II. EXPRESIÓN DE AGRAVIOS (Desarrollar: {{agravioPrincipal}})
+III. ERRORES DE HECHO Y DERECHO
+IV. FUNDAMENTACIÓN JURÍDICA
+V. ANEXOS (1-A Copia de DNI, 1-B Tasa judicial por apelación)
+
+POR TANTO:
+A Usted Señor Juez solicito conceder la apelación.`,
+  },
   {
     id: 'demanda-desalojo',
     title: 'Demanda de Desalojo',
     description: 'Desalojo por falta de pago u ocupación precaria',
     icon: 'Gavel',
-    prompt: `Redacta una DEMANDA DE DESAJO por {{tipoDemanda}} dirigida al JUZGADO {{juzgado}} de {{distritoJudicial}}.
+    prompt: `Redacta una DEMANDA DE DESALOJO por {{tipoDemanda}} dirigida al JUZGADO {{juzgado}} de {{distritoJudicial}}.
 
 DATOS DEL DEMANDANTE:
 - Nombre: {{cliente}}
@@ -32,21 +150,15 @@ RELACIÓN CONTRACTUAL:
 - {{detallesIncumplimiento}}
 
 Escribe la demanda en formato profesional con los siguientes títulos numerados en romanos:
-
 I. DEMANDANTE
 II. DEMANDADO
 III. PETITORIO
 IV. FUNDAMENTOS DE HECHO
-V. FUNDAMENTOS DE DERECHO (cita el Código Procesal Civil, Código Civil peruano)
+V. FUNDAMENTOS DE DERECHO
 VI. MONTO DEL PETITORIO
 VII. VÍA PROCEDIMENTAL
 VIII. MEDIOS PROBATORIOS
-IX. ANEXOS
-
-FIRMA:
-Abogado: {{abogado}}
-CAL: {{cal}}
-Estudio: {{estudio}}`,
+IX. ANEXOS`,
   },
   {
     id: 'carta-notarial',
@@ -64,34 +176,8 @@ Domicilio: {{domicilioCliente}}
 {{cuerpoCarta}}
 
 Plazo para cumplir: {{plazoDias}} días hábiles contados desde la recepción de la presente.
-
-La presente carta tiene carácter de {{tipoIntimacion}} y servirá como medio probatorio en caso de iniciar las acciones legales correspondientes.
-
-Atentamente,
-{{abogado}}
-CAL: {{cal}}
-Estudio: {{estudio}}`,
-  },
-  {
-    id: 'escrito-simple',
-    title: 'Escrito Simple',
-    description: 'Apersonamiento, solicitud de copias, señalamiento de domicilio',
-    icon: 'FileText',
-    prompt: `Redacta un ESCRITO SIMPLE dirigido al {{juzgado}} de {{distritoJudicial}}.
-
-Expediente: {{expedienteNumero}}
-Materia: {{materia}}
-Solicitante: {{cliente}}
-Abogado: {{abogado}}
-CAL: {{cal}}
-
-{{contenidoEscrito}}
-
-FIRMA:
-{{cliente}}
-{{abogado}}
-CAL: {{cal}}`,
-  },
+La presente carta tiene carácter de {{tipoIntimacion}} y servirá como medio probatorio en caso de iniciar las acciones legales correspondientes.`,
+  }
 ];
 
 const getInlineTemplate = (id) => INLINE_TEMPLATES.find((t) => t.id === id);
@@ -115,14 +201,15 @@ const buildAutoValues = (caseData) => ({
   abogado: '',
   cal: '',
   estudio: '',
-  juzgado: '',
-  distritoJudicial: 'Lima',
-  domicilioProcesal: '[]',
+  juzgado: caseData?.judge || '',
+  especialista: caseData?.specialist || '',
+  distritoJudicial: 'Ica',
+  domicilioProcesal: 'Casilla Electrónica 32856',
   demandado: caseData?.counterparty || '',
   ...(caseData?._templateValues || {}),
 });
 
-const DocumentWriter = ({ caseData, onClose, onSave }) => {
+const DocumentWriter = ({ caseData, onClose, onSave, firmProfile }) => {
   const [step, setStep] = useState('select');
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [customValues, setCustomValues] = useState({});
@@ -130,10 +217,62 @@ const DocumentWriter = ({ caseData, onClose, onSave }) => {
   const [editedText, setEditedText] = useState('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Nuevas funciones
+  const [includeJurisprudence, setIncludeJurisprudence] = useState(false);
+  const [tone, setTone] = useState('Técnico y Persuasivo');
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const template = selectedTemplateId ? getInlineTemplate(selectedTemplateId) : null;
   const autoValues = buildAutoValues(caseData);
   const allValues = { ...autoValues, ...customValues };
+
+  const handleDownloadPdf = async () => {
+    try {
+      setIsExportingPdf(true);
+
+      // Siempre buscar el perfil fresco desde Supabase en el momento de generar
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData?.session?.user?.id;
+      let freshProfile = firmProfile; // fallback al prop si falla
+
+      if (userId) {
+        const prefs = await loadAllPreferencesAsync(userId);
+        freshProfile = prefs.firm;
+        console.log('[PDF DEBUG] Fresh profile cargado:', {
+          hasHeader: !!freshProfile?.headerBase64,
+          headerLength: freshProfile?.headerBase64?.length,
+        });
+      } else {
+        console.log('[PDF DEBUG] No hay sesión activa, usando firmProfile del prop');
+      }
+
+      const { pdf } = await import('@react-pdf/renderer');
+      const blob = await pdf(
+        <DocumentPdfExport
+          caseData={caseData}
+          documentText={editedText}
+          title={template?.title}
+          firmProfile={freshProfile}
+        />
+      ).toBlob();
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${template?.title?.replace(/\s+/g, '_') || 'Escrito'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      // Delay revocation to ensure download starts reliably on all browsers
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (err) {
+      console.error('Error al exportar PDF:', err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const VARIABLE_LABELS = {
     cliente: 'Nombre del cliente',
@@ -164,6 +303,15 @@ const DocumentWriter = ({ caseData, onClose, onSave }) => {
     detallesIncumplimiento: 'Detalles del incumplimiento',
     contenidoEscrito: 'Contenido del escrito',
     tipoDemanda: 'Tipo de demanda',
+    montoSolicitado: 'Monto solicitado (Ej. S/ 1500)',
+    gastosMenor: 'Gastos del menor (Colegio, salud, etc.)',
+    ingresosDemandado: 'Ingresos del demandado',
+    tituloValor: 'Título valor cuestionado (Ej. Letra de Cambio)',
+    motivoContradiccion: 'Motivo (Ej. Inexigibilidad de la obligación)',
+    fundamentoContradiccion: 'Fundamento (Ej. Llenado abusivo, no se entregó dinero)',
+    numeroResolucion: 'Número de la resolución apelada',
+    fechaResolucion: 'Fecha de la resolución',
+    agravioPrincipal: 'Agravio principal',
   };
 
   const variables = useMemo(() => {
@@ -190,13 +338,28 @@ const DocumentWriter = ({ caseData, onClose, onSave }) => {
     setError(null);
     try {
       const filledPrompt = template.prompt.replace(VARIABLE_RE, (_, key) => allValues[key] || '[___]');
+      
+      let finalQuestion = `Genera un documento legal profesional en español peruano basado en esta plantilla. 
+Tono del escrito: ${tone}.
+Rellena los datos faltantes de manera jurídicamente correcta.`;
+
+      if (includeJurisprudence) {
+        finalQuestion += `\n\nMUY IMPORTANTE: Incluye al menos 2 citas de Jurisprudencia Peruana relevante (Casaciones de la Corte Suprema) o doctrina en la sección de Fundamentos de Derecho. Pon los títulos de las casaciones en **negrita** para que resalten.`;
+      }
+
+      finalQuestion += `\n\nIMPORTANTE: Puedes usar **negritas** para resaltar nombres y títulos. NO uses frases genéricas como "es importante considerar" ni "de acuerdo a la normativa vigente". Devuelve SOLO el texto del documento.\n\nPlantilla a seguir:\n${filledPrompt}`;
+
       const result = await askGeminiAboutCase({
         caseData,
-        question: `Genera un documento legal profesional en español peruano basado en esta plantilla. Rellena los datos faltantes de manera jurídicamente correcta. NO uses frases genéricas como "es importante considerar" ni "de acuerdo a la normativa vigente". Devuelve SOLO el texto del documento, sin introducciones ni explicaciones.\n\nPlantilla:\n${filledPrompt}`
+        documents: Array.isArray(caseData?.documents) ? caseData.documents : [],
+        notes: Array.isArray(caseData?.notes) ? caseData.notes : [],
+        importantDates: Array.isArray(caseData?.importantDates) ? caseData.importantDates : [],
+        officialReferences: Array.isArray(caseData?.officialReferences) ? caseData.officialReferences : [],
+        question: finalQuestion,
       });
       const text = typeof result === 'string' ? result : result?.text || 'Error al generar';
+      // Mantener las negritas (**), limpiar otros marcadores de markdown
       const cleaned = text
-        .replace(/\*\*/g, '')
         .replace(/^###?\s+/gm, '')
         .replace(/^\s*[-*]\s+/gm, '')
         .trim();
@@ -267,6 +430,33 @@ const DocumentWriter = ({ caseData, onClose, onSave }) => {
           {step === 'review' && template && (
             <>
               <p className="text-sm text-brand-accent">Revisa los datos antes de generar el documento:</p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white/[0.02] p-4 rounded-xl border border-white/[0.06] mb-4">
+                <div>
+                  <label className="block text-xs font-semibold text-brand-accent mb-2 uppercase tracking-wider">Tono del escrito</label>
+                  <select 
+                    value={tone}
+                    onChange={(e) => setTone(e.target.value)}
+                    className="w-full rounded-lg border border-white/[0.08] bg-brand-dark px-3 py-2 text-sm text-brand-ivory focus:border-brand-gold/40 focus:outline-none"
+                  >
+                    <option value="Técnico y Persuasivo">Técnico y Persuasivo</option>
+                    <option value="Estricto e Intimidatorio">Estricto e Intimidatorio</option>
+                    <option value="Conciliador y Formal">Conciliador y Formal</option>
+                  </select>
+                </div>
+                <div className="flex items-center pt-6">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={includeJurisprudence}
+                      onChange={(e) => setIncludeJurisprudence(e.target.checked)}
+                      className="h-4 w-4 rounded border-white/[0.1] bg-brand-dark text-brand-gold focus:ring-brand-gold/20 focus:ring-offset-0"
+                    />
+                    <span className="text-sm font-medium text-brand-ivory">Incluir Jurisprudencia (Citas)</span>
+                  </label>
+                </div>
+              </div>
+
               <div className="space-y-3">
                 {variables.map((v) => (
                   <div key={v.name}>
@@ -326,6 +516,21 @@ const DocumentWriter = ({ caseData, onClose, onSave }) => {
                 >
                   <FileText className="h-4 w-4" />
                   Guardar en el expediente
+                </button>
+                <button
+                  onClick={handleDownloadPdf}
+                  disabled={isExportingPdf}
+                  className="flex items-center gap-2 rounded-lg bg-brand-accent/20 px-6 py-2.5 text-sm font-bold text-brand-ivory transition-colors hover:bg-brand-accent/30 disabled:opacity-50"
+                >
+                  <FileText className="h-4 w-4" />
+                  {isExportingPdf ? 'Generando PDF...' : 'Descargar PDF'}
+                </button>
+                <button
+                  onClick={() => exportToDocx(editedText, `${template?.title?.replace(/\s+/g, '_') || 'Escrito'}.docx`)}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600/20 px-6 py-2.5 text-sm font-bold text-blue-400 transition-colors hover:bg-blue-600/30 border border-blue-500/30"
+                >
+                  <FileText className="h-4 w-4" />
+                  Descargar Word
                 </button>
               </div>
             </>

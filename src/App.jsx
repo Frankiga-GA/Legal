@@ -23,7 +23,7 @@ import { getCurrentSession, onAuthStateChange, signOut, hasCompletedOnboarding }
 import { getStoredDriveToken, onDriveTokenChange, onDriveTokenMessage } from './services/googleDriveService';
 import { setPendingAiInput, setActiveAssistant } from './services/aiBridge';
 import { loadCases } from './services/caseStore';
-import { loadAllPreferences } from './services/userPreferencesStore';
+import { loadAllPreferencesAsync } from './services/userPreferencesStore';
 import { checkDeadlinesAndNotify } from './services/notificationService';
 
 // Simple Error Boundary to catch render errors
@@ -213,7 +213,7 @@ function App() {
     const userId = session.user.id;
 
     const runCheck = async () => {
-      const prefs = loadAllPreferences(userId);
+      const prefs = await loadAllPreferencesAsync(userId);
       const deadlineAlerts = prefs?.notifications?.deadlineAlerts !== false;
       if (!deadlineAlerts) return;
       const { cases } = await loadCases();

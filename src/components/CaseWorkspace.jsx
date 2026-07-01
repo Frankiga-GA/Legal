@@ -38,9 +38,19 @@ import DriveFilePicker from './DriveFilePicker';
 import { collectCitations } from '../utils/citationParser';
 import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
 import { getStoredDriveToken } from '../services/googleDriveService';
+import { loadAllPreferencesAsync } from '../services/userPreferencesStore';
 
-const CaseWorkspace = ({ caseId, onClose }) => {
+const CaseWorkspace = ({ caseId, onClose, session }) => {
   const [caseData, setCaseData] = useState(null);
+  const [firmProfile, setFirmProfile] = useState(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const prefs = await loadAllPreferencesAsync(session?.user?.id || null);
+      setFirmProfile(prefs.firm);
+    };
+    fetchProfile();
+  }, [session?.user?.id]);
   
   // Left panel tabs (excluding AI since it's always on the right)
   const [activeTab, setActiveTab] = useState('summary');
@@ -238,11 +248,9 @@ const CaseWorkspace = ({ caseId, onClose }) => {
 
   const handleExportPdf = async () => {
     try {
-      const [{ pdf }, { default: CasePdfExport }] = await Promise.all([
-        import('@react-pdf/renderer'),
-        import('./CasePdfExport'),
-      ]);
-      const blob = await pdf(<CasePdfExport caseData={caseData} />).toBlob();
+      const { pdf } = await import('@react-pdf/renderer');
+      const { default: CasePdfExport } = await import('./CasePdfExport');
+      const blob = await pdf(<CasePdfExport caseData={caseData} firmProfile={firmProfile} />).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -1002,6 +1010,7 @@ const CaseWorkspace = ({ caseId, onClose }) => {
     </div>
     {showDocumentWriter && (
       <DocumentWriter
+        firmProfile={firmProfile}
         caseData={caseData}
         onClose={() => setShowDocumentWriter(false)}
         onSave={(doc) => {
