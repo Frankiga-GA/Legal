@@ -40,7 +40,9 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
   const [loading, setLoading] = useState(true);
 
   // Spreadsheet and Simplified UX states
-  const [viewMode, setViewMode] = useState('excel'); // 'cards' | 'excel' (default) | 'standard'
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem('lusti-inventory-view') || 'cards'; } catch { return 'cards'; }
+  }); // 'cards' | 'excel' | 'standard' - persists in localStorage
   const [editingCell, setEditingCell] = useState(null); // { caseId, field }
   const [editValue, setEditValue] = useState('');
   const [uploadingCaseId, setUploadingCaseId] = useState(null);
@@ -330,7 +332,7 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
             {/* View Mode Toggle */}
             <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.02] p-1 shrink-0">
               <button
-                onClick={() => setViewMode('cards')}
+                onClick={() => { setViewMode('cards'); try { localStorage.setItem('lusti-inventory-view', 'cards'); } catch {} }}
                 className={`flex items-center gap-1.5 rounded-md px-3.5 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
                   viewMode === 'cards'
                     ? 'bg-brand-gold text-brand-black shadow-md'
@@ -341,7 +343,7 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
                 Tarjetas
               </button>
               <button
-                onClick={() => setViewMode('excel')}
+                onClick={() => { setViewMode('excel'); try { localStorage.setItem('lusti-inventory-view', 'excel'); } catch {} }}
                 className={`flex items-center gap-1.5 rounded-md px-3.5 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
                   viewMode === 'excel'
                     ? 'bg-brand-gold text-brand-black shadow-md'
@@ -352,7 +354,7 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
                 Planilla
               </button>
               <button
-                onClick={() => setViewMode('standard')}
+                onClick={() => { setViewMode('standard'); try { localStorage.setItem('lusti-inventory-view', 'standard'); } catch {} }}
                 className={`flex items-center gap-1.5 rounded-md px-3.5 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
                   viewMode === 'standard'
                     ? 'bg-brand-gold text-brand-black shadow-md'
