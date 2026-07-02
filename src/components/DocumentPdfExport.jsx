@@ -225,6 +225,8 @@ const DocumentPdfExport = ({ caseData, documentText, title, firmProfile }) => {
   const materia = caseData?.type || '_________________';
   const juez = caseData?.judge || '_________________';
   const especialista = caseData?.specialist || '_________________';
+  const cuaderno = caseData?.cuaderno || 'PRINCIPAL';
+  const escritoNro = caseData?.escritoNro || '_________________';
   const demandado = caseData?.counterparty || '_________________';
   const demandante = caseData?.clientName || '_________________';
   
@@ -257,6 +259,14 @@ const DocumentPdfExport = ({ caseData, documentText, title, firmProfile }) => {
           <View style={styles.sumillaRow}>
             <Text style={styles.sumillaLabel}>ESPECIALISTA:</Text>
             <Text style={styles.sumillaValue}>{especialista}</Text>
+          </View>
+          <View style={styles.sumillaRow}>
+            <Text style={styles.sumillaLabel}>CUADERNO:</Text>
+            <Text style={styles.sumillaValue}>{cuaderno}</Text>
+          </View>
+          <View style={styles.sumillaRow}>
+            <Text style={styles.sumillaLabel}>ESCRITO:</Text>
+            <Text style={styles.sumillaValue}>{escritoNro}</Text>
           </View>
           <View style={styles.sumillaRow}>
             <Text style={styles.sumillaLabel}>DEMANDADO:</Text>

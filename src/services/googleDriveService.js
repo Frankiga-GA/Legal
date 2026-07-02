@@ -75,13 +75,24 @@ const waitForDriveToken = (redirectUri, popup) =>
   new Promise((resolve, reject) => {
     const timer = window.setInterval(() => {
       try {
-        if (popup.closed) {
+        let closed = false;
+        try {
+          closed = popup.closed;
+        } catch {
+          closed = false;
+        }
+        if (closed) {
           window.clearInterval(timer);
           reject(new Error('La conexion con Google Drive se cerro antes de completarse.'));
           return;
         }
 
-        const popupUrl = popup.location.href;
+        let popupUrl;
+        try {
+          popupUrl = popup.location.href;
+        } catch {
+          return;
+        }
         if (!popupUrl.startsWith(redirectUri)) return;
 
         const token = parseTokenFromHash(new URL(popupUrl).hash);

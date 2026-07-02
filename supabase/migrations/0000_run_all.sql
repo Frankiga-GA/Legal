@@ -107,6 +107,10 @@ create table if not exists public.cases (
   latest_progress text default '',
   hearing_link text default '',
   urgency text not null default 'Media',
+  judge text default '',
+  specialist text default '',
+  cuaderno text default '',
+  escrito_nro text default '',
   last_update date not null default current_date,
   documents jsonb not null default '[]'::jsonb,
   notes jsonb not null default '[]'::jsonb,
@@ -126,6 +130,11 @@ create index if not exists cases_status_idx on public.cases(status);
 create index if not exists cases_urgency_idx on public.cases(urgency);
 create index if not exists cases_last_update_idx on public.cases(last_update desc);
 create index if not exists cases_id_user_id_idx on public.cases(id, user_id);
+
+alter table public.cases add column if not exists judge text default '';
+alter table public.cases add column if not exists specialist text default '';
+alter table public.cases add column if not exists cuaderno text default '';
+alter table public.cases add column if not exists escrito_nro text default '';
 
 drop trigger if exists trg_cases_updated_at on public.cases;
 create trigger trg_cases_updated_at

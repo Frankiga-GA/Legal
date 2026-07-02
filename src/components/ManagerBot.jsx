@@ -2,6 +2,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bot,
+  Briefcase,
+  ShieldAlert,
+  Scale,
+  Heart,
+  Calculator,
+  FileSignature,
+  Building,
+  BookOpen,
   Check,
   ChevronDown,
   ClipboardCopy,
@@ -44,6 +52,19 @@ const SPECIALTY_OPTIONS = [
   'Constitucional',
   'General',
 ];
+
+const SPECIALTY_UI = {
+  Laboral: { icon: Briefcase, color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'hover:border-blue-500/50', gradient: 'from-blue-500/10 to-transparent' },
+  Penal: { icon: ShieldAlert, color: 'text-red-400', bg: 'bg-red-400/10', border: 'hover:border-red-500/50', gradient: 'from-red-500/10 to-transparent' },
+  Civil: { icon: Scale, color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'hover:border-emerald-500/50', gradient: 'from-emerald-500/10 to-transparent' },
+  Familia: { icon: Heart, color: 'text-pink-400', bg: 'bg-pink-400/10', border: 'hover:border-pink-500/50', gradient: 'from-pink-500/10 to-transparent' },
+  Comercial: { icon: Briefcase, color: 'text-orange-400', bg: 'bg-orange-400/10', border: 'hover:border-orange-500/50', gradient: 'from-orange-500/10 to-transparent' },
+  Tributario: { icon: Calculator, color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'hover:border-purple-500/50', gradient: 'from-purple-500/10 to-transparent' },
+  Notarial: { icon: FileSignature, color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'hover:border-yellow-500/50', gradient: 'from-yellow-500/10 to-transparent' },
+  Administrativo: { icon: Building, color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'hover:border-cyan-500/50', gradient: 'from-cyan-500/10 to-transparent' },
+  Constitucional: { icon: BookOpen, color: 'text-indigo-400', bg: 'bg-indigo-400/10', border: 'hover:border-indigo-500/50', gradient: 'from-indigo-500/10 to-transparent' },
+  General: { icon: Bot, color: 'text-brand-accent', bg: 'bg-white/[0.05]', border: 'hover:border-brand-gold/50', gradient: 'from-white/[0.03] to-transparent' },
+};
 
 const TABS = [
   { id: 'assistants', label: 'Asistentes', icon: Bot },
@@ -672,52 +693,60 @@ const AssistantsList = ({ items, onEdit, onDelete, onCreate, onUse }) => {
   }
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {items.map((item) => (
-        <article
-          key={item.id}
-          className="group flex flex-col rounded-2xl border border-white/[0.05] bg-white/[0.015] p-5 transition-colors hover:border-brand-gold/30"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-gold/10">
-                <Bot className="h-4 w-4 text-brand-gold" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-brand-ivory">{item.name}</h3>
-                {item.specialty ? (
-                  <span className="inline-block rounded-md bg-white/[0.05] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-brand-accent">
-                    {item.specialty}
+      {items.map((item) => {
+        const specUi = SPECIALTY_UI[item.specialty] || SPECIALTY_UI.General;
+        const Icon = specUi.icon;
+        
+        return (
+          <article
+            key={item.id}
+            className={`group relative flex flex-col overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.015] p-5 transition-all duration-300 ${specUi.border} hover:shadow-lg hover:-translate-y-0.5`}
+          >
+            {/* Fondo gradiente sutil basado en la especialidad */}
+            <div className={`absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-300 group-hover:opacity-100 ${specUi.gradient}`} />
+            
+            <div className="relative flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${specUi.bg} transition-transform duration-300 group-hover:scale-110`}>
+                  <Icon className={`h-5 w-5 ${specUi.color}`} />
+                </div>
+                <div>
+                  <h3 className="truncate text-sm font-semibold text-brand-ivory transition-colors group-hover:text-white">
+                    {item.name}
+                  </h3>
+                  <span className={`mt-1 inline-block rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${specUi.bg} ${specUi.color}`}>
+                    {item.specialty || 'General'}
                   </span>
-                ) : null}
+                </div>
               </div>
             </div>
-          </div>
-          {item.description ? (
-            <p className="mt-3 line-clamp-2 text-xs font-light leading-relaxed text-brand-accent/80">
-              {item.description}
+            
+            <p className="relative mt-4 line-clamp-2 text-xs font-light leading-relaxed text-brand-accent/80">
+              {item.description || 'Sin descripcion'}
             </p>
-          ) : null}
-          {item.systemPrompt ? (
-            <details className="mt-3 text-[11px] font-light text-brand-accent/70">
-              <summary className="cursor-pointer text-brand-accent hover:text-brand-ivory">
-                Ver prompt de sistema
-              </summary>
-              <pre className="mt-2 max-h-32 overflow-y-auto rounded-lg border border-white/[0.05] bg-brand-black/50 p-3 whitespace-pre-wrap text-[11px] text-brand-accent/80">
-                {item.systemPrompt}
-              </pre>
-            </details>
-          ) : null}
-          <div className="mt-4 flex items-center justify-end gap-2 border-t border-white/[0.05] pt-3">
-            {onUse ? (
-              <button
-                type="button"
-                onClick={() => onUse(item)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-brand-gold/30 bg-brand-gold/10 px-2.5 py-1.5 text-xs font-semibold text-brand-gold transition-colors hover:bg-brand-gold/20"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                Usar
-              </button>
+            
+            {item.systemPrompt ? (
+              <details className="relative mt-3 text-[11px] font-light text-brand-accent/70 z-10">
+                <summary className="cursor-pointer text-brand-accent hover:text-brand-ivory transition-colors">
+                  Ver prompt de sistema
+                </summary>
+                <pre className="mt-2 max-h-32 overflow-y-auto rounded-lg border border-white/[0.05] bg-brand-black/80 p-3 whitespace-pre-wrap text-[11px] text-brand-accent/80 shadow-inner">
+                  {item.systemPrompt}
+                </pre>
+              </details>
             ) : null}
+            
+            <div className="relative mt-auto flex items-center justify-end gap-2 border-t border-white/[0.05] pt-4 mt-4 z-10">
+              {onUse ? (
+                <button
+                  type="button"
+                  onClick={() => onUse(item)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-brand-gold/30 bg-brand-gold/10 px-2.5 py-1.5 text-xs font-semibold text-brand-gold transition-colors hover:bg-brand-gold/20"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Usar
+                </button>
+              ) : null}
             <button
               type="button"
               onClick={() => onEdit(item)}
@@ -736,7 +765,8 @@ const AssistantsList = ({ items, onEdit, onDelete, onCreate, onUse }) => {
             </button>
           </div>
         </article>
-      ))}
+      );
+    })}
     </div>
   );
 };

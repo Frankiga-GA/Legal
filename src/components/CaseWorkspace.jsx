@@ -6,10 +6,12 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  ChevronDown,
   FileText,
   Gavel,
   Globe,
   HardDrive,
+  Hash,
   Library,
   Loader2,
   MessageSquare,
@@ -39,17 +41,27 @@ import { collectCitations } from '../utils/citationParser';
 import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
 import { getStoredDriveToken } from '../services/googleDriveService';
 import { loadAllPreferencesAsync } from '../services/userPreferencesStore';
+import { listAssistants } from '../services/personalizationStore';
 
 const CaseWorkspace = ({ caseId, onClose, session }) => {
   const [caseData, setCaseData] = useState(null);
   const [firmProfile, setFirmProfile] = useState(null);
+  const [assistants, setAssistants] = useState([]);
+  const [activeAssistant, setActiveAssistant] = useState(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchProfileAndAssistants = async () => {
       const prefs = await loadAllPreferencesAsync(session?.user?.id || null);
       setFirmProfile(prefs.firm);
+      
+      try {
+        const loadedAssistants = await listAssistants();
+        setAssistants(loadedAssistants || []);
+      } catch (err) {
+        console.warn('Error loading assistants:', err);
+      }
     };
-    fetchProfile();
+    fetchProfileAndAssistants();
   }, [session?.user?.id]);
   
   // Left panel tabs (excluding AI since it's always on the right)
@@ -64,6 +76,8 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [aiMessages, setAiMessages] = useState([]);
   const [citationPanelOpen, setCitationPanelOpen] = useState(false);
+  const [showAssistantMenu, setShowAssistantMenu] = useState(false);
+  const assistantMenuRef = useRef(null);
   const caseCitations = collectCitations(aiMessages);
   const messagesEndRef = useRef(null);
 
@@ -362,6 +376,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
         notes,
         importantDates,
         officialReferences,
+        systemPrompt: activeAssistant ? activeAssistant.systemPrompt : null,
         history,
       });
       setAiMessages(prev => prev.map((m) =>
@@ -426,6 +441,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
         notes,
         importantDates,
         officialReferences,
+        systemPrompt: activeAssistant ? activeAssistant.systemPrompt : null,
         history,
       });
       setAiMessages((prev) =>
@@ -572,6 +588,10 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
               <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <InfoCard icon={User} label="Titular / cliente" value={caseData.clientName} />
                 <InfoCard icon={Calendar} label="Última actualización" value={caseData.lastUpdate} />
+                {caseData.judge && <InfoCard icon={Gavel} label="Juez" value={caseData.judge} />}
+                {caseData.specialist && <InfoCard icon={User} label="Especialista" value={caseData.specialist} />}
+                {caseData.cuaderno && <InfoCard icon={FileText} label="Cuaderno" value={caseData.cuaderno} />}
+                {caseData.escritoNro && <InfoCard icon={Hash} label="Escrito N°" value={caseData.escritoNro} />}
               </section>
 
               <section className="rounded-xl border border-white/[0.08] bg-brand-black p-5">
@@ -930,17 +950,89 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
         </div>
 
         <div className="border-t border-white/[0.08] bg-brand-dark p-4 shrink-0">
-          <div className="mb-3 flex flex-wrap gap-2">
-            {['Redactar escrito', 'Resumir caso', '¿Qué plazos hay?'].map(prompt => (
-              <button 
-                key={prompt}
-                onClick={() => submitAiQuestion(prompt)}
-                disabled={isAiThinking}
-                className="rounded-full border border-white/[0.08] bg-brand-black px-3 py-1.5 text-[10px] font-bold text-brand-accent hover:bg-white/[0.05] transition-colors"
-              >
-                {prompt}
-              </button>
-            ))}
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {['Redactar escrito', 'Resumir caso', '¿Qué plazos hay?'].map(prompt => (
+                <button 
+                  key={prompt}
+                  onClick={() => submitAiQuestion(prompt)}
+                  disabled={isAiThinking}
+                  className="rounded-full border border-white/[0.08] bg-brand-black px-3 py-1.5 text-[10px] font-bold text-brand-accent hover:bg-white/[0.05] transition-colors"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+
+            {assistants.length > 0 && (
+              <div className="relative" ref={assistantMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowAssistantMenu(!showAssistantMenu)}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition-all duration-200 ${
+                    activeAssistant
+                      ? 'border-brand-gold/40 bg-brand-gold/10 text-brand-gold shadow-sm shadow-brand-gold/5'
+                      : 'border-white/[0.08] bg-brand-black text-brand-accent hover:border-white/[0.15] hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <Bot className="h-3.5 w-3.5" />
+                  <span className="max-w-[100px] truncate">{activeAssistant ? activeAssistant.name : 'General'}</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showAssistantMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showAssistantMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowAssistantMenu(false)} />
+                    <div className="absolute bottom-full right-0 z-50 mb-2 w-56 overflow-hidden rounded-xl border border-white/[0.08] bg-brand-dark shadow-2xl shadow-black/40 backdrop-blur-xl">
+                      <div className="px-3 py-2 border-b border-white/[0.06]">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-brand-accent/60">Cambiar asistente</p>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
+                        <button
+                          type="button"
+                          onClick={() => { setActiveAssistant(null); setShowAssistantMenu(false); }}
+                          className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs transition-colors ${
+                            !activeAssistant ? 'bg-brand-gold/10 text-brand-gold' : 'text-brand-ivory hover:bg-white/[0.04]'
+                          }`}
+                        >
+                          <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                            !activeAssistant ? 'bg-brand-gold/20' : 'bg-white/[0.05]'
+                          }`}>
+                            <Bot className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold truncate">Abogado General</p>
+                            <p className="text-[9px] text-brand-accent/60">IA por defecto</p>
+                          </div>
+                          {!activeAssistant && <Check className="h-3.5 w-3.5 text-brand-gold shrink-0" />}
+                        </button>
+                        {assistants.map((a) => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => { setActiveAssistant(a); setShowAssistantMenu(false); }}
+                            className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs transition-colors ${
+                              activeAssistant?.id === a.id ? 'bg-brand-gold/10 text-brand-gold' : 'text-brand-ivory hover:bg-white/[0.04]'
+                            }`}
+                          >
+                            <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                              activeAssistant?.id === a.id ? 'bg-brand-gold/20' : 'bg-white/[0.05]'
+                            }`}>
+                              <Bot className="h-3.5 w-3.5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold truncate">{a.name}</p>
+                              {a.specialty && <p className="text-[9px] text-brand-accent/60">{a.specialty}</p>}
+                            </div>
+                            {activeAssistant?.id === a.id && <Check className="h-3.5 w-3.5 text-brand-gold shrink-0" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           <form onSubmit={handleAskAi} className="flex gap-2">
             <input

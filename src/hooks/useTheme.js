@@ -12,14 +12,14 @@ const STORAGE_KEY = 'lusti-theme';
 const LIGHT_CLASS = 'theme-light';
 
 const readInitialTheme = () => {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof window === 'undefined') return 'light';
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored === 'light' || stored === 'dark') return stored;
   } catch {
     /* noop */
   }
-  return 'dark';
+  return 'light';
 };
 
 const applyThemeClass = (theme) => {

@@ -40,13 +40,12 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
   const [loading, setLoading] = useState(true);
 
   // Spreadsheet and Simplified UX states
-  const [viewMode, setViewMode] = useState('cards'); // 'cards' (default) | 'excel' | 'standard'
+  const [viewMode, setViewMode] = useState('excel'); // 'cards' | 'excel' (default) | 'standard'
   const [editingCell, setEditingCell] = useState(null); // { caseId, field }
   const [editValue, setEditValue] = useState('');
   const [uploadingCaseId, setUploadingCaseId] = useState(null);
   const [uploadStatus, setUploadStatus] = useState('');
-  const [aiAnalysisResult, setAiAnalysisResult] = useState(null); // { caseId, latestProgress, hearingLink, urgency, newDeadlines }
-
+  const [aiAnalysisResult, setAiAnalysisResult] = useState(null);
   // Focus tab: HOY (default) / Todos / Activos / Pendientes / Cerrados
   const [focusTab, setFocusTabInternal] = useState(defaultFocusTab);
   const setFocusTab = (tab) => { setFocusTabInternal(tab); onFocusTabChange?.(tab); };

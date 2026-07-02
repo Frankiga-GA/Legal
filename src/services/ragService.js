@@ -19,7 +19,7 @@ export const searchLegalContext = async (question) => {
       `${i + 1}. ${item.title} (${item.type || 'Norma'}, ${item.date || 'fecha no disponible'})`
     ).join('\n');
 
-    return `NORMATIVA PERUANA VIGENTE ENCONTRADA:\n${context}\n\nUsa esta normativa como fuente principal para responder. Si es relevante, citala con su titulo exacto y numero.`;
+    return `CONTEXTO NORMATIVO ENCONTRADO (puede ser irrelevante):\n${context}\n\nSOLO uses esta normativa si ES EXACTAMENTE DE LA MISMA MATERIA del caso (laboral, civil, penal, etc.). Si es de otra materia, IGNORALA COMPLETAMENTE. No la menciones ni la cites.`;
   } catch {
     return null;
   }

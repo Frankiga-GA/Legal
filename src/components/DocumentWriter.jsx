@@ -202,10 +202,12 @@ const buildAutoValues = (caseData) => ({
   cal: '',
   estudio: '',
   juzgado: caseData?.judge || '',
-  especialista: caseData?.specialist || '',
-  distritoJudicial: 'Ica',
-  domicilioProcesal: 'Casilla Electrónica 32856',
+  distritoJudicial: 'Lima',
+  domicilioProcesal: '[]',
   demandado: caseData?.counterparty || '',
+  especialista: caseData?.specialist || '',
+  cuaderno: caseData?.cuaderno || 'PRINCIPAL',
+  escritoNro: caseData?.escritoNro || '',
   ...(caseData?._templateValues || {}),
 });
 
@@ -312,6 +314,9 @@ const DocumentWriter = ({ caseData, onClose, onSave, firmProfile }) => {
     numeroResolucion: 'Número de la resolución apelada',
     fechaResolucion: 'Fecha de la resolución',
     agravioPrincipal: 'Agravio principal',
+    especialista: 'Especialista Legal',
+    cuaderno: 'Cuaderno',
+    escritoNro: 'Escrito N°',
   };
 
   const variables = useMemo(() => {
