@@ -47,7 +47,7 @@ import { collectCitations } from '../utils/citationParser';
 import { friendlyError } from '../utils/errors';
 
 const HISTORY_LIMIT = 4;
-const ACCEPTED_TYPES = '.pdf,.docx,.doc,.txt,.md,.rtf';
+const ACCEPTED_TYPES = '.pdf,.docx,.doc,.txt,.md,.rtf,.jpg,.jpeg,.png,.webp';
 
 const QUICK_ACTIONS = [
   {
@@ -330,7 +330,7 @@ const GlobalChat = ({ onBack }) => {
           <div>
             <h1 className="flex items-center gap-2 text-lg font-serif font-medium text-brand-ivory">
               <MessageSquare className="h-5 w-5 text-brand-gold" />
-              Chat IA
+              Consultar
             </h1>
             <p className="text-[11px] font-light text-brand-accent/70">
               Conversacion libre, no asociada a ningun expediente.

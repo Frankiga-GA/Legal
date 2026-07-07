@@ -6,8 +6,8 @@
 // =============================================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock, Filter, X, RefreshCw } from 'lucide-react';
-import { loadCases } from '../services/caseStore';
+import { ChevronLeft, ChevronRight, Clock, Filter, X, RefreshCw, Plus } from 'lucide-react';
+import { loadCases, addCaseAsync, updateCaseAsync } from '../services/caseStore';
 import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
 import { getStoredDriveToken, onDriveTokenChange } from '../services/googleDriveService';
 import toast from 'react-hot-toast';
@@ -108,6 +108,58 @@ const CalendarView = ({ onOpenCase }) => {
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [isCalendarConnected, setIsCalendarConnected] = useState(Boolean(getStoredDriveToken()?.access_token));
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newDateForm, setNewDateForm] = useState({ date: '', title: '', priority: 'Media' });
+
+  const handleAddManualDate = async (e) => {
+    e.preventDefault();
+    if (!newDateForm.title || !newDateForm.date) return;
+    
+    setLoading(true);
+    try {
+      const manualCaseId = 'EXP-MANUAL-001';
+      let manualCase = cases.find(c => c.id === manualCaseId);
+      
+      const newEvent = {
+        id: crypto.randomUUID(),
+        date: newDateForm.date,
+        title: newDateForm.title,
+        priority: newDateForm.priority,
+        status: 'Pendiente',
+      };
+
+      let newCasesList = cases;
+      if (manualCase) {
+        const result = await updateCaseAsync(cases, manualCaseId, {
+          importantDates: [...manualCase.importantDates, newEvent]
+        });
+        newCasesList = result.cases;
+      } else {
+        const newCase = {
+          id: manualCaseId,
+          clientName: 'Agenda Manual',
+          type: 'Otros',
+          status: 'Activo',
+          summary: 'Eventos agregados manualmente al calendario',
+          importantDates: [newEvent],
+        };
+        const result = await addCaseAsync(cases, newCase);
+        newCasesList = result.cases;
+      }
+      
+      setCases(newCasesList);
+      setIsAddModalOpen(false);
+      setNewDateForm({ date: '', title: '', priority: 'Media' });
+      toast.success('Fecha agregada manualmente');
+      if (isCalendarConnected) {
+         handleSync(true);
+      }
+    } catch (err) {
+      toast.error('Error al guardar la fecha manual');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => onDriveTokenChange((token) => {
     setIsCalendarConnected(Boolean(token?.access_token));
@@ -240,6 +292,13 @@ const CalendarView = ({ onOpenCase }) => {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-gold px-4 py-2 text-xs font-bold text-brand-black transition-all hover:bg-brand-ivory"
+            >
+              <Plus className="h-4 w-4" />
+              Nueva Fecha
+            </button>
             <div className="inline-flex rounded-lg border border-white/[0.08] bg-white/[0.02] p-1">
               <button
                 type="button"
@@ -558,6 +617,74 @@ const CalendarView = ({ onOpenCase }) => {
           </aside>
         </div>
       </div>
+
+      {/* Modal para agregar fecha manual */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl border border-white/[0.08] bg-brand-dark p-6 shadow-2xl animate-fade-in-up">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-serif font-medium text-brand-ivory">Agregar Fecha Manual</h2>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="rounded-lg p-2 text-brand-accent hover:bg-white/[0.05] hover:text-brand-ivory"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form onSubmit={handleAddManualDate} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-brand-accent">Título</label>
+                <input
+                  type="text"
+                  required
+                  value={newDateForm.title}
+                  onChange={(e) => setNewDateForm({ ...newDateForm, title: e.target.value })}
+                  className="w-full rounded-lg border border-white/[0.08] bg-brand-black px-3 py-2 text-sm text-brand-ivory focus:border-brand-gold focus:outline-none"
+                  placeholder="Ej. Audiencia, Vencimiento, Reunión"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-brand-accent">Fecha</label>
+                <input
+                  type="date"
+                  required
+                  value={newDateForm.date}
+                  onChange={(e) => setNewDateForm({ ...newDateForm, date: e.target.value })}
+                  className="w-full rounded-lg border border-white/[0.08] bg-brand-black px-3 py-2 text-sm text-brand-ivory [color-scheme:dark] focus:border-brand-gold focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-brand-accent">Prioridad</label>
+                <select
+                  value={newDateForm.priority}
+                  onChange={(e) => setNewDateForm({ ...newDateForm, priority: e.target.value })}
+                  className="w-full rounded-lg border border-white/[0.08] bg-brand-black px-3 py-2 text-sm text-brand-ivory focus:border-brand-gold focus:outline-none"
+                >
+                  <option value="Alta">Alta</option>
+                  <option value="Media">Media</option>
+                  <option value="Baja">Baja</option>
+                </select>
+              </div>
+              <div className="mt-6 flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold text-brand-accent hover:text-brand-ivory"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="rounded-lg bg-brand-gold px-4 py-2 text-sm font-bold text-brand-black hover:bg-brand-ivory disabled:opacity-50"
+                >
+                  {loading ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

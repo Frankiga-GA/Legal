@@ -68,7 +68,7 @@ const SPECIALTY_UI = {
 
 const TABS = [
   { id: 'assistants', label: 'Asistentes', icon: Bot },
-  { id: 'prompts', label: 'Prompts guardados', icon: MessageSquare },
+  { id: 'prompts', label: 'Consultas frecuentes', icon: MessageSquare },
 ];
 
 const emptyAssistant = {
@@ -504,7 +504,7 @@ const ManagerBot = ({ onUseInChat }) => {
                   className="inline-flex items-center gap-2 rounded-lg border border-brand-gold/30 bg-brand-gold/10 px-4 py-2.5 text-sm font-semibold text-brand-gold transition-colors hover:bg-brand-gold/20"
                 >
                   <Plus className="h-4 w-4" />
-                  Nuevo prompt
+                  Nueva consulta
                 </button>
               </div>
             )}
@@ -678,7 +678,7 @@ const AssistantsList = ({ items, onEdit, onDelete, onCreate, onUse }) => {
       <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] p-12 text-center">
         <Sparkles className="mx-auto mb-3 h-8 w-8 text-brand-gold/60" />
         <p className="text-sm font-light text-brand-accent">
-          Aun no tienes asistentes personalizados.
+          Aún no tienes asistentes personalizados. Crea uno para que te ayude con especialidades legales específicas.
         </p>
         <button
           type="button"
@@ -728,7 +728,7 @@ const AssistantsList = ({ items, onEdit, onDelete, onCreate, onUse }) => {
             {item.systemPrompt ? (
               <details className="relative mt-3 text-[11px] font-light text-brand-accent/70 z-10">
                 <summary className="cursor-pointer text-brand-accent hover:text-brand-ivory transition-colors">
-                  Ver prompt de sistema
+                  Ver instrucciones
                 </summary>
                 <pre className="mt-2 max-h-32 overflow-y-auto rounded-lg border border-white/[0.05] bg-brand-black/80 p-3 whitespace-pre-wrap text-[11px] text-brand-accent/80 shadow-inner">
                   {item.systemPrompt}
@@ -777,7 +777,7 @@ const PromptsList = ({ items, onEdit, onDelete, onCopy, onCreate, onUse }) => {
       <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] p-12 text-center">
         <FileText className="mx-auto mb-3 h-8 w-8 text-brand-gold/60" />
         <p className="text-sm font-light text-brand-accent">
-          Aun no tienes prompts guardados. Guarda tus consultas recurrentes para reutilizarlas.
+          Aún no tienes consultas frecuentes guardadas. Guarda los textos largos que usas siempre para reutilizarlos con un clic.
         </p>
         <button
           type="button"
@@ -901,7 +901,7 @@ const AssistantForm = ({ initial, editingId, onClose, onSave, prompts }) => {
             className={inputClass}
           />
         </FormField>
-        <FormField label="Prompt de sistema" hint="Define el tono, las reglas y el enfoque del asistente.">
+        <FormField label="Instrucciones del asistente" hint="Define el tono, las leyes que debe aplicar y el enfoque que debe tener.">
           <div className="space-y-2">
             <textarea
               value={form.systemPrompt}
@@ -1002,7 +1002,7 @@ const PromptForm = ({ initial, editingId, onClose, onSave }) => {
   };
 
   return (
-    <Modal title={editingId ? 'Editar prompt' : 'Nuevo prompt guardado'} icon={MessageSquare} onClose={onClose}>
+    <Modal title={editingId ? 'Editar consulta' : 'Nueva consulta frecuente'} icon={MessageSquare} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-5">
         <FormField label="Nombre">
           <input

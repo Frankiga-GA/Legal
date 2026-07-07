@@ -12,8 +12,8 @@ Font.register({
 
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 150,   // Espacio para la imagen del header
-    paddingBottom: 100, // Espacio para la imagen del footer
+    paddingTop: 110,   // Espacio para la imagen del header
+    paddingBottom: 90, // Espacio para la imagen del footer
     paddingLeft: 60,
     paddingRight: 60,
     fontFamily: 'Times-Roman',
@@ -27,7 +27,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     width: '100%',
-    height: 130,
+    height: 90,
+    objectFit: 'contain',
+    objectPosition: 'center top',
   },
   footerImage: {
     position: 'absolute',
@@ -35,7 +37,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     width: '100%',
-    height: 80,
+    height: 70,
+    objectFit: 'contain',
+    objectPosition: 'center bottom',
   },
   
   // --- BLOQUE DE SUMILLA (Lado derecho) ---
@@ -81,7 +85,6 @@ const styles = StyleSheet.create({
   },
   apersonamiento: {
     fontSize: 12,
-    marginLeft: '35%', 
     marginBottom: 20,
     textAlign: 'justify',
     lineHeight: 1.5,
@@ -111,10 +114,16 @@ const styles = StyleSheet.create({
     textAlign: 'justify',
     lineHeight: 1.5,
   },
+  atentamente: {
+    fontSize: 12,
+    marginTop: 15,
+    marginBottom: 12, 
+    textAlign: 'left',
+  },
   
   // --- FIRMAS ---
   signatureContainer: {
-    marginTop: 60,
+    marginTop: 100,
     flexDirection: 'row',
     justifyContent: 'center', 
   },
@@ -138,7 +147,7 @@ const styles = StyleSheet.create({
 });
 
 // Función para parsear texto y detectar formatos
-const renderTextWithFormatting = (text) => {
+const renderTextWithFormatting = (text, isCartaNotarial) => {
   if (!text) return null;
   
   const paragraphs = text.split('\n').filter(p => p.trim() !== '');
@@ -160,7 +169,7 @@ const renderTextWithFormatting = (text) => {
     const pUpper = pTrim.toUpperCase();
     
     // 1. Título de Documento (Carta Notarial, etc) -> Centrado y Subrayado
-    const isDocTitle = pUpper === 'CARTA NOTARIAL' || pUpper === 'ESCRITO' || pUpper.includes('DEMANDA') || pUpper.includes('RECURSO DE APELACIÓN');
+    const isDocTitle = pTrim.length < 80 && (pUpper === 'CARTA NOTARIAL' || pUpper === 'ESCRITO' || pUpper.startsWith('DEMANDA') || pUpper.startsWith('RECURSO DE APELACIÓN'));
     if (isDocTitle) {
       return <Text key={i} style={styles.title}>{renderInline(pTrim)}</Text>;
     }
@@ -171,11 +180,12 @@ const renderTextWithFormatting = (text) => {
     }
     
     // 3. Bloque de Apersonamiento (Datos de identidad desplazados a la derecha)
-    const isApersonamiento = pUpper.includes('IDENTIFICADO CON DNI') || 
+    const isApersonamiento = !isCartaNotarial && (
+                             pUpper.includes('IDENTIFICADO CON DNI') || 
                              pUpper.includes('IDENTIFICADA CON DNI') || 
                              pUpper.includes('A USTED RESPETUOSAMENTE DIGO') || 
                              pUpper.includes('ANTE USTED DIGO') ||
-                             pUpper.includes('A UD. DIGO');
+                             pUpper.includes('A UD. DIGO'));
                              
     if (isApersonamiento) {
       return (
@@ -189,7 +199,9 @@ const renderTextWithFormatting = (text) => {
     const isMeta = pUpper.startsWith('A:') || 
                    pUpper.startsWith('DE:') || 
                    pUpper.startsWith('DOMICILIO:') || 
-                   pUpper.startsWith('DIRIGIDA A:') ||
+                   pUpper.startsWith('DIRIGIDA A') ||
+                   pUpper.startsWith('CON DOMICILIO EN') ||
+                   (isCartaNotarial && pUpper.startsWith('IDENTIFICADO')) ||
                    pUpper.startsWith('FECHA:');
     if (isMeta) {
       return <Text key={i} style={styles.metaText}>{renderInline(pTrim)}</Text>;
@@ -207,11 +219,16 @@ const renderTextWithFormatting = (text) => {
     }
     
     // 7. Saludo formal genérico
-    if (pUpper.startsWith('SEÑOR') || pUpper.startsWith('ESTIMADO') || pUpper.startsWith('ATENTAMENTE')) {
+    if (pUpper.startsWith('SEÑOR') || pUpper.startsWith('ESTIMADO')) {
       return <Text key={i} style={styles.greeting}>{renderInline(pTrim)}</Text>;
     }
     
-    // 8. Párrafo normal justificado (sin sangría inicial)
+    // 8. Despedida (con espacio para firma)
+    if (pUpper.startsWith('ATENTAMENTE')) {
+      return <Text key={i} style={styles.atentamente}>{renderInline(pTrim)}</Text>;
+    }
+    
+    // 9. Párrafo normal justificado (sin sangría inicial)
     return (
       <Text key={i} style={styles.paragraph}>
         {renderInline(pTrim)}
@@ -231,6 +248,7 @@ const DocumentPdfExport = ({ caseData, documentText, title, firmProfile }) => {
   const demandante = caseData?.clientName || '_________________';
   
   const sumilla = title || 'ESCRITO';
+  const isCartaNotarial = (sumilla).toUpperCase().includes('CARTA NOTARIAL');
 
   const headerSrc = firmProfile?.headerBase64;
   const footerSrc = firmProfile?.footerBase64;
@@ -242,49 +260,54 @@ const DocumentPdfExport = ({ caseData, documentText, title, firmProfile }) => {
         {/* IMAGEN DE ENCABEZADO */}
         {headerSrc && <Image src={headerSrc} style={styles.headerImage} fixed />}
 
-        {/* BLOQUE DE SUMILLA */}
-        <View style={styles.sumillaContainer}>
-          <View style={styles.sumillaRow}>
-            <Text style={styles.sumillaLabel}>EXPEDIENTE:</Text>
-            <Text style={styles.sumillaValue}>{expediente}</Text>
+        {/* IMAGEN DE PIE DE PÁGINA */}
+        {footerSrc && <Image src={footerSrc} style={styles.footerImage} fixed />}
+
+        {/* BLOQUE DE SUMILLA (Oculto para Carta Notarial) */}
+        {!isCartaNotarial && (
+          <View style={styles.sumillaContainer}>
+            <View style={styles.sumillaRow}>
+              <Text style={styles.sumillaLabel}>EXPEDIENTE:</Text>
+              <Text style={styles.sumillaValue}>{expediente}</Text>
+            </View>
+            <View style={styles.sumillaRow}>
+              <Text style={styles.sumillaLabel}>MATERIA:</Text>
+              <Text style={styles.sumillaValue}>{materia}</Text>
+            </View>
+            <View style={styles.sumillaRow}>
+              <Text style={styles.sumillaLabel}>JUEZ:</Text>
+              <Text style={styles.sumillaValue}>{juez}</Text>
+            </View>
+            <View style={styles.sumillaRow}>
+              <Text style={styles.sumillaLabel}>ESPECIALISTA:</Text>
+              <Text style={styles.sumillaValue}>{especialista}</Text>
+            </View>
+            <View style={styles.sumillaRow}>
+              <Text style={styles.sumillaLabel}>CUADERNO:</Text>
+              <Text style={styles.sumillaValue}>{cuaderno}</Text>
+            </View>
+            <View style={styles.sumillaRow}>
+              <Text style={styles.sumillaLabel}>ESCRITO:</Text>
+              <Text style={styles.sumillaValue}>{escritoNro}</Text>
+            </View>
+            <View style={styles.sumillaRow}>
+              <Text style={styles.sumillaLabel}>DEMANDADO:</Text>
+              <Text style={styles.sumillaValue}>{demandado}</Text>
+            </View>
+            <View style={styles.sumillaRow}>
+              <Text style={styles.sumillaLabel}>DEMANDANTE:</Text>
+              <Text style={styles.sumillaValue}>{demandante}</Text>
+            </View>
+            <View style={styles.sumillaRow}>
+              <Text style={styles.sumillaLabel}>SUMILLA:</Text>
+              <Text style={styles.sumillaValue}>{sumilla}</Text>
+            </View>
           </View>
-          <View style={styles.sumillaRow}>
-            <Text style={styles.sumillaLabel}>MATERIA:</Text>
-            <Text style={styles.sumillaValue}>{materia}</Text>
-          </View>
-          <View style={styles.sumillaRow}>
-            <Text style={styles.sumillaLabel}>JUEZ:</Text>
-            <Text style={styles.sumillaValue}>{juez}</Text>
-          </View>
-          <View style={styles.sumillaRow}>
-            <Text style={styles.sumillaLabel}>ESPECIALISTA:</Text>
-            <Text style={styles.sumillaValue}>{especialista}</Text>
-          </View>
-          <View style={styles.sumillaRow}>
-            <Text style={styles.sumillaLabel}>CUADERNO:</Text>
-            <Text style={styles.sumillaValue}>{cuaderno}</Text>
-          </View>
-          <View style={styles.sumillaRow}>
-            <Text style={styles.sumillaLabel}>ESCRITO:</Text>
-            <Text style={styles.sumillaValue}>{escritoNro}</Text>
-          </View>
-          <View style={styles.sumillaRow}>
-            <Text style={styles.sumillaLabel}>DEMANDADO:</Text>
-            <Text style={styles.sumillaValue}>{demandado}</Text>
-          </View>
-          <View style={styles.sumillaRow}>
-            <Text style={styles.sumillaLabel}>DEMANDANTE:</Text>
-            <Text style={styles.sumillaValue}>{demandante}</Text>
-          </View>
-          <View style={styles.sumillaRow}>
-            <Text style={styles.sumillaLabel}>SUMILLA:</Text>
-            <Text style={styles.sumillaValue}>{sumilla}</Text>
-          </View>
-        </View>
+        )}
 
         {/* CUERPO DEL DOCUMENTO */}
         <View style={styles.bodyContainer}>
-          {renderTextWithFormatting(documentText)}
+          {renderTextWithFormatting(documentText, isCartaNotarial)}
         </View>
 
         {/* FIRMA AL FINAL */}
@@ -294,9 +317,6 @@ const DocumentPdfExport = ({ caseData, documentText, title, firmProfile }) => {
             <Text style={styles.signatureSubText}>DNI N° _________________</Text>
           </View>
         </View>
-
-        {/* IMAGEN DE PIE DE PÁGINA */}
-        {footerSrc && <Image src={footerSrc} style={styles.footerImage} fixed />}
 
       </Page>
     </Document>

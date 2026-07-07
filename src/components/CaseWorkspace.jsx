@@ -22,6 +22,7 @@ import {
   Trash2,
   Upload,
   User,
+  Users,
   Video,
   X,
 } from 'lucide-react';
@@ -42,6 +43,7 @@ import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
 import { getStoredDriveToken } from '../services/googleDriveService';
 import { loadAllPreferencesAsync } from '../services/userPreferencesStore';
 import { listAssistants } from '../services/personalizationStore';
+import ShareCaseModal from './ShareCaseModal';
 
 const CaseWorkspace = ({ caseId, onClose, session }) => {
   const [caseData, setCaseData] = useState(null);
@@ -81,12 +83,17 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
   const caseCitations = collectCitations(aiMessages);
   const messagesEndRef = useRef(null);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [aiMessages]);
+
   // Audiencia (link de la audiencia virtual)
   const [editingHearing, setEditingHearing] = useState(false);
   const [hearingInput, setHearingInput] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showDrivePicker, setShowDrivePicker] = useState(false);
   const [showDocumentWriter, setShowDocumentWriter] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -536,6 +543,16 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
               <div className="flex flex-col items-center"><span className="text-lg font-bold text-brand-ivory">{documents.length}</span> Docs</div>
               <div className="flex flex-col items-center"><span className="text-lg font-bold text-brand-ivory">{importantDates.length}</span> Plazos</div>
             </div>
+            {caseData.isOwner && (
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="hidden md:flex items-center gap-2 rounded-lg border border-brand-gold/20 bg-brand-gold/[0.08] px-4 py-2 text-xs font-bold text-brand-gold hover:bg-brand-gold/[0.15] transition-colors"
+                title="Compartir Expediente"
+              >
+                <Users className="h-4 w-4" />
+                Compartir
+              </button>
+            )}
             <button
               onClick={handleExportPdf}
               className="rounded-lg border border-white/[0.08] p-2 text-brand-accent hover:border-brand-gold/40 hover:bg-brand-gold/10 hover:text-brand-gold transition-colors"
@@ -550,13 +567,15 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
             >
               <PenLine className="h-4 w-4 inline mr-1" />Redactar
             </button>
-            <button
-              onClick={handleDeleteCase}
-              className="rounded-lg border border-white/[0.08] p-2 text-brand-accent hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 transition-colors"
-              title="Eliminar expediente completo"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            {caseData.isOwner && (
+              <button
+                onClick={handleDeleteCase}
+                className="rounded-lg border border-white/[0.08] p-2 text-brand-accent hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                title="Eliminar expediente completo"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -634,7 +653,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
                   {isUploading ? 'Subiendo...' : 'Subir Documento'}
                   <input
                     type="file"
-                    accept=".pdf,.doc,.docx,.jpg,.png"
+                    accept=".pdf,.doc,.docx,.txt,.csv,.jpg,.jpeg,.png,.webp"
                     onChange={handleFileUpload}
                     disabled={isUploading}
                     className="hidden"
@@ -914,7 +933,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
             <Bot className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-bold text-brand-ivory">Asistente Legal del Caso</h3>
+            <h3 className="text-sm font-bold text-brand-ivory">Consultar Expediente</h3>
             <p className="text-[10px] uppercase tracking-wider text-brand-accent font-semibold">Contexto: {caseData.id}</p>
           </div>
           {caseCitations.length > 0 && (
@@ -1001,7 +1020,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
                             <Bot className="h-3.5 w-3.5" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-semibold truncate">Abogado General</p>
+                            <p className="font-semibold truncate">Asistente General</p>
                             <p className="text-[9px] text-brand-accent/60">IA por defecto</p>
                           </div>
                           {!activeAssistant && <Check className="h-3.5 w-3.5 text-brand-gold shrink-0" />}
@@ -1064,6 +1083,10 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
         onClose={() => setCitationPanelOpen(false)}
         citations={caseCitations}
       />
+
+      {showShareModal && (
+        <ShareCaseModal caseId={caseData.id} onClose={() => setShowShareModal(false)} />
+      )}
 
       {showDrivePicker && (
         <DriveFilePicker

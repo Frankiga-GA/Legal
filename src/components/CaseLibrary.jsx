@@ -243,6 +243,9 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
         }
         // Mapeo del tab de foco al filtro de status clásico
         if (focusTab === 'todos') return true;
+        if (focusTab === 'propios') return caso.isOwner !== false;
+        if (focusTab === 'compartidos') return caso.isShared === true;
+        
         const statusMap = { activos: 'Activo', pendientes: 'Pendiente', cerrados: 'Cerrado' };
         return caso.status === statusMap[focusTab];
       })
@@ -1082,6 +1085,8 @@ const formatGreeting = (urgentCount) => {
 const TABS = [
   { id: 'hoy', label: 'Hoy', shortLabel: 'Hoy' },
   { id: 'todos', label: 'Todos' },
+  { id: 'propios', label: 'Mis Expedientes' },
+  { id: 'compartidos', label: 'Compartidos 👥' },
   { id: 'activos', label: 'Activos' },
   { id: 'pendientes', label: 'Pendientes' },
   { id: 'cerrados', label: 'Cerrados' },

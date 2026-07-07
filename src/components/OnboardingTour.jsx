@@ -6,36 +6,29 @@
 // =============================================================================
 
 import { useState } from 'react';
-import { Bot, Calendar, Check, ChevronRight, FileText, Sparkles, X, Lightbulb } from 'lucide-react';
+import { Bot, Calendar, Check, ChevronRight, FileText, Sparkles, X, Lightbulb, Settings } from 'lucide-react';
 import { markOnboardingComplete } from '../services/authService';
 
 const STEPS = [
   {
     icon: Sparkles,
     title: 'Bienvenido a LUSTI',
-    body: 'Su centro de inteligencia legal. Aquí podrá gestionar sus expedientes, analizar documentos con IA y no perder ningún plazo. En 30 segundos estará listo.',
-    accent: 'Sin instalación, sin configuraciones. Solo usted y su asistente legal.',
+    body: 'Tu escritorio legal digital. Aquí gestionas tus casos, consultas normas y redactas escritos con ayuda de inteligencia artificial.',
+    accent: 'Sin instalación, sin configuraciones. Todo listo para trabajar.',
   },
   {
     icon: FileText,
-    title: 'Gestione sus expedientes',
-    body: 'Cree casos, adjunte documentos (PDF, DOCX, TXT), agregue notas y fechas clave. Todo sincronizado con Google Drive.',
-    accent: 'Ejemplo: Cree un caso "Alimentos - Pérez" y adjunte la demanda en PDF. La IA lo leerá automáticamente.',
+    title: 'Crea tu primer expediente',
+    body: 'Empieza agregando tu primer caso real o de prueba. Podrás adjuntar documentos y el asistente los leerá por ti.',
+    accent: 'Ve a "Mis Expedientes" y haz clic en "Crear expediente".',
     actionTab: 'library',
   },
   {
-    icon: Calendar,
-    title: 'Plazos y vencimientos',
-    body: 'Cada fecha importante que agregue a un caso se sincroniza automáticamente con Google Calendar. Nunca más se le pasará un plazo.',
-    accent: 'Ejemplo: Audiencia de conciliación agendada → aparece en su calendario sin hacer nada.',
-    actionTab: 'calendar',
-  },
-  {
-    icon: Bot,
-    title: 'Su asistente con IA',
-    body: 'Pregunte: "resuma este caso", "redacte una apelación", "qué plazos tengo esta semana". La IA lee sus documentos y responde con citas legales peruanas reales.',
-    accent: 'Ejemplo: "Analiza la demanda de alimentos y dime los riesgos" → obtiene un análisis en segundos.',
-    actionTab: 'ai-chat',
+    icon: Settings,
+    title: 'Configura tu estudio',
+    body: 'Sube tu logo y tu membrete para que los escritos y documentos generados por el asistente salgan listos para firmar.',
+    accent: 'Ve a "Ajustes" para personalizar tu perfil.',
+    actionTab: 'settings',
   },
 ];
 

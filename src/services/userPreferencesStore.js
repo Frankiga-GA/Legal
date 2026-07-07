@@ -35,7 +35,7 @@ export const loadAllPreferencesAsync = async (userId) => {
       .from('user_preferences')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error loading preferences from Supabase:', error);
@@ -43,7 +43,16 @@ export const loadAllPreferencesAsync = async (userId) => {
     }
 
     if (!data) {
-      return defaultsFor();
+      // Si el usuario no tiene preferencias en la base de datos (ej. cuenta nueva), 
+      // insertamos la fila por defecto automáticamente para inicializar su cuenta.
+      const defaults = defaultsFor();
+      await supabase.from('user_preferences').insert({
+        user_id: userId,
+        firm: defaults.firm,
+        ai: defaults.ai,
+        notifications: defaults.notifications,
+      });
+      return defaults;
     }
 
     const base = defaultsFor();

@@ -2,8 +2,6 @@
 import {
   CalendarDays,
   FileText,
-  FileSearch,
-  HardDrive,
   LayoutDashboard,
   LogOut,
   MessageSquare,
@@ -15,17 +13,14 @@ import ThemeToggle from './ThemeToggle';
 
 const Sidebar = ({ activeTab, setActiveTab, onHome, onLogout, userEmail, collapsed = false, onToggleCollapse, showDrive = false }) => {
   const primaryItems = [
-    { id: 'library', label: 'Inventario', icon: FileText },
-    { id: 'dashboard', label: 'Resumen', icon: LayoutDashboard },
-    ...(showDrive ? [{ id: 'drive', label: 'Documentos', icon: HardDrive }] : []),
-    { id: 'ai-chat', label: 'Consultar IA', icon: MessageSquare },
+    { id: 'library', label: 'Mis Expedientes', icon: FileText },
+    { id: 'ai-chat', label: 'Consultar', icon: MessageSquare },
+    { id: 'calendar', label: 'Agenda', icon: CalendarDays },
   ];
 
   const secondaryItems = [
-    { id: 'monitor', label: 'Seguimiento', icon: FileSearch },
     { id: 'elperuano', label: 'Normas', icon: Newspaper },
-    { id: 'calendar', label: 'Calendario', icon: CalendarDays },
-    { id: 'settings', label: 'Configuracion', icon: Settings },
+    { id: 'settings', label: 'Ajustes', icon: Settings },
   ];
 
   return (

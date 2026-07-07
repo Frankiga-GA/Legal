@@ -146,7 +146,7 @@ def check_rate_limit(user_id: str, limit: int = 15, period: int = 60) -> None:
 def _validate_file(file: UploadFile, max_size_mb: int = 15) -> None:
     """Valida la extensión del archivo (whitelist) y su tamaño (máx 15MB)."""
     # 1. Validar extensión
-    allowed_extensions = {".pdf", ".docx", ".txt", ".md", ".json", ".csv"}
+    allowed_extensions = {".pdf", ".docx", ".txt", ".md", ".json", ".csv", ".jpg", ".jpeg", ".png", ".webp"}
     filename = (file.filename or "").lower()
     suffix = Path(filename).suffix
     if suffix not in allowed_extensions:
@@ -224,6 +224,61 @@ class RawAskResponse(BaseModel):
     text: str
 
 
+def _extract_text_from_image(content_bytes: bytes, mime_type: str) -> str:
+    import base64
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY no esta configurada en el backend.")
+    
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    base64_image = base64.b64encode(content_bytes).decode("utf-8")
+    
+    prompt = (
+        "Por favor, transcribe de forma precisa todo el texto visible en esta imagen. "
+        "Si es una conversación, mantén el formato de diálogo. Si es un documento formal, "
+        "mantén la estructura de párrafos. Responde SOLAMENTE con el texto extraído, sin comentarios adicionales."
+    )
+    
+    payload = {
+        "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{base64_image}"
+                        }
+                    }
+                ]
+            }
+        ],
+        "temperature": 0.1,
+        "max_tokens": 4096,
+        "top_p": 1,
+    }
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    
+    with httpx.Client(timeout=90) as client:
+        response = client.post(url, json=payload, headers=headers)
+        
+    if response.status_code >= 400:
+        raise RuntimeError(f"Groq Vision {response.status_code}: {response.text}")
+        
+    data = response.json()
+    choices = data.get("choices") or []
+    if not choices:
+        raise RuntimeError("Groq Vision devolvio respuesta vacia")
+    extracted = (choices[0].get("message") or {}).get("content") or ""
+    return extracted.strip()
+
+
 def _read_text_from_upload(upload: UploadFile) -> str:
     content = upload.file.read()
     if not content:
@@ -234,6 +289,14 @@ def _read_text_from_upload(upload: UploadFile) -> str:
 
     if filename.endswith((".txt", ".md", ".csv", ".json")) or content_type.startswith("text/"):
         return content.decode("utf-8", errors="ignore").strip()
+
+    if filename.endswith((".jpg", ".jpeg", ".png", ".webp")) or content_type.startswith("image/"):
+        try:
+            mime = content_type if content_type.startswith("image/") else "image/jpeg"
+            return _extract_text_from_image(content, mime)
+        except Exception as e:
+            print(f"Error OCR Vision: {e}")
+            raise RuntimeError(f"No se pudo extraer texto de la imagen: {e}")
 
     if filename.endswith(".pdf") or content_type == "application/pdf":
         try:

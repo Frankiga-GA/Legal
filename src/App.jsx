@@ -288,14 +288,10 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'case-workspace': return <CaseWorkspace caseId={activeCaseId} onClose={() => setActiveTab('library')} />;
-      case 'dashboard': return <Dashboard setActiveTab={setActiveTab} isDriveConnected={isDriveConnected} />;
       case 'library': return <CaseLibrary setActiveTab={setActiveTab} onOpenCase={(id) => { setActiveCaseId(id); setActiveTab('case-workspace'); }} userId={session?.user?.id} focusTab={libraryFocusTab} onFocusTabChange={setLibraryFocusTab} />;
-      case 'monitor': return <LegalMonitor setActiveTab={setActiveTab} />;
-      case 'drive': return <DriveVault />;
       case 'ai-chat': return <ManagerBot onUseInChat={openGlobalChat} />;
       case 'global-chat': return <GlobalChat onBack={() => setActiveTab('ai-chat')} />;
       case 'elperuano': return <ElPeruano />;
-      case 'deadlines': return <DeadlineCalculator />;
       case 'calendar': return (
         <CalendarView
           onOpenCase={(id) => { setActiveCaseId(id); setActiveTab('case-workspace'); }}

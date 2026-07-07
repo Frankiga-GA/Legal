@@ -13,7 +13,7 @@ const INLINE_TEMPLATES = [
     title: 'Demanda de Alimentos',
     description: 'Solicitud de pensión alimenticia para menores',
     icon: 'Shield',
-    prompt: `Redacta una DEMANDA DE ALIMENTOS dirigida al JUZGADO DE PAZ LETRADO.
+    prompt: `Redacta una DEMANDA DE ALIMENTOS muy extensa, formal y sumamente detallada, propia de un estudio jurídico especializado en Derecho de Familia en Perú.
 
 DATOS DEL DEMANDANTE (Representante del menor):
 - Nombre: {{cliente}}
@@ -23,34 +23,47 @@ DATOS DEL DEMANDADO:
 - Nombre: {{demandado}}
 - Domicilio: {{domicilioDemandado}}
 
-DATOS ESPECÍFICOS:
+DATOS ESPECÍFICOS A DESARROLLAR:
 - Monto solicitado: {{montoSolicitado}}
-- Gastos del menor: {{gastosMenor}}
-- Ingresos del demandado: {{ingresosDemandado}}
+- Gastos del menor (Estado de necesidad): {{gastosMenor}}
+- Ingresos del demandado (Capacidad económica): {{ingresosDemandado}}
+
+INSTRUCCIONES DE REDACCIÓN PARA LA IA (MUY IMPORTANTE):
+1. NO te limites a copiar y pegar los datos. Desarrolla y "llena" los fundamentos. Argumenta jurídicamente por qué es necesario el monto, hablando del estado de necesidad del menor y la capacidad del demandado (principio de proporcionalidad).
+2. Debes incluir y citar obligatoriamente artículos del Código Civil (ej. Art. 472 concepto de alimentos, Art. 481 proporcionalidad) y del Código de los Niños y Adolescentes (Art. 92).
+3. Escribe al menos 3 o 4 párrafos en "Fundamentos de Hecho", redactados con elocuencia y fuerza legal.
 
 REGLAS DE FORMATO OBLIGATORIAS:
-1. SUMILLA EXACTA:
-EXPEDIENTE: {{expedienteNumero}}
-ESPECIALISTA: {{especialista}}
-CUADERNO: PRINCIPAL
-ESCRITO: 01
-SUMILLA: INTERPONGO DEMANDA DE ALIMENTOS
+1. AUTORIDAD:
+SEÑOR JUEZ DE PAZ LETRADO:
 
-2. AUTORIDAD: SEÑOR JUEZ DE PAZ LETRADO:
+2. APERSONAMIENTO:
+{{cliente}}, identificado con DNI N° {{dni}}, con domicilio procesal en {{domicilioProcesal}}; a Usted respetuosamente digo:
 
-3. APERSONAMIENTO: "{{cliente}}, identificado con DNI N° {{dni}}, con domicilio procesal en {{domicilioProcesal}}; a Usted respetuosamente digo:"
-
-4. ESTRUCTURA:
+4. ESTRUCTURA (Debe contener estos apartados en Romanos y bien detallados):
 I. PETITORIO
-II. FUNDAMENTOS DE HECHO (Incluir gastos e ingresos)
-III. FUNDAMENTOS DE DERECHO
-IV. MONTO DEL PETITORIO ({{montoSolicitado}})
+[Redactar el petitorio claro y directo solicitando {{montoSolicitado}} a favor del menor...]
+
+II. FUNDAMENTOS DE HECHO
+[Desarrollar ampliamente la relación paterno-filial, el estado de necesidad del menor en base a {{gastosMenor}}, y la holgada o suficiente capacidad económica del demandado en base a {{ingresosDemandado}}...]
+
+III. FUNDAMENTOS JURÍDICOS
+[Desarrollar la base legal, citando los Códigos y la Constitución...]
+
+IV. MONTO DEL PETITORIO
+[Reiterar el monto: {{montoSolicitado}}]
+
 V. VÍA PROCEDIMENTAL
-VI. MEDIOS PROBATORIOS (Enumerar 1., 2.)
-VII. ANEXOS (Enumerar 1-A Copia de DNI, 1-B Partida de Nacimiento, etc.)
+[Indicar que corresponde a la vía del Proceso Único, Ley N° 27337 y modificatorias...]
+
+VI. MEDIOS PROBATORIOS
+[Listar enumeradamente la Partida de Nacimiento, boletas, etc.]
+
+VII. ANEXOS
+[Listar 1-A Copia de DNI, 1-B Partida de Nacimiento, etc.]
 
 POR TANTO:
-A Usted Señor Juez solicito admitir la demanda.`,
+A Usted Señor Juez solicito admitir a trámite la presente demanda, declararla fundada en su oportunidad, con expresa condena de costos y costas.`,
   },
   {
     id: 'contradiccion-mandato',
@@ -165,18 +178,61 @@ IX. ANEXOS`,
     title: 'Carta Notarial',
     description: 'Requiere pago, desalojo o cese de actividad',
     icon: 'Mail',
-    prompt: `Redacta una CARTA NOTARIAL dirigida a {{destinatario}} con domicilio en {{domicilioDestinatario}}.
+    prompt: `Redacta una CARTA NOTARIAL sumamente extensa, detallada y de muy alto nivel jurídico en Perú. Inspírate en el estilo de los mejores estudios de abogados corporativos.
 
-ASUNTO: {{asuntoCarta}}
+DATOS DEL DESTINATARIO:
+- Dirigida a: {{destinatario}}
+- Domicilio: {{domicilioDestinatario}}
 
-De: {{cliente}}
-Identificado con {{tipoDocumento}} N° {{dni}}
-Domicilio: {{domicilioCliente}}
+DATOS DEL REMITENTE (Cliente):
+- De: {{cliente}}
+- Identificado con {{tipoDocumento}} N° {{dni}}
+- Domicilio: {{domicilioCliente}}
 
+ASUNTO PRINCIPAL / MATERIA:
+{{asuntoCarta}}
+
+HECHOS Y FUNDAMENTOS A DESARROLLAR:
 {{cuerpoCarta}}
 
-Plazo para cumplir: {{plazoDias}} días hábiles contados desde la recepción de la presente.
-La presente carta tiene carácter de {{tipoIntimacion}} y servirá como medio probatorio en caso de iniciar las acciones legales correspondientes.`,
+PLAZO: {{plazoDias}} días hábiles.
+TIPO DE INTIMACIÓN: {{tipoIntimacion}}.
+
+INSTRUCCIONES DE REDACCIÓN PARA LA IA (MUY IMPORTANTE):
+El documento final debe ser largo, formal y contundente. Usa un lenguaje técnico-jurídico estricto. DEBES utilizar la siguiente estructura obligatoria, rellenando con argumentos sólidos, lógica jurídica y artículos de ley peruanos reales y pertinentes al caso:
+
+CARTA NOTARIAL
+[Añadir 2 o 3 líneas de título central describiendo el objetivo, ej: "REQUERIMIENTO DE PAGO Y RESOLUCIÓN DE CONTRATO / INVITACIÓN A CONCILIACIÓN"]
+
+[Nombre del Destinatario: {{destinatario}}]
+[Dirección: {{domicilioDestinatario}}]
+
+Estimados señores (o señor/a):
+
+I. ANTECEDENTES Y HECHOS RELEVANTES
+[Desarrollar los hechos en varios sub-puntos numerados, ej: 1.1., 1.2., 1.3., detallando cronológicamente el vínculo jurídico, las obligaciones, y el incumplimiento. Sé muy exhaustivo].
+
+II. MARCO NORMATIVO APLICABLE
+[Citar al menos 3 o 4 artículos específicos (Código Civil, Constitución, leyes especiales según el caso), numerados como 2.1., 2.2., explicando cómo se aplican al caso concreto y cómo el destinatario los está vulnerando].
+
+III. RESPONSABILIDAD JURÍDICA Y DAÑOS
+[Explicar los daños generados (daño emergente, lucro cesante, daño moral, etc.) y la responsabilidad civil, penal o administrativa que recae sobre el destinatario].
+
+IV. INTIMACIÓN FORMAL Y REQUERIMIENTO
+Por medio de la presente carta notarial, INTIMO FORMALMENTE a usted(es) a:
+[Listar las exigencias de forma imperativa y numerada, ej: 4.1. PAGAR DE INMEDIATO..., 4.2. ABSTENERSE DE..., 4.3. CUMPLIR CON...].
+
+V. PLAZO Y APERCIBIMIENTO
+Para ello, otorgo un plazo de {{plazoDias}} DÍAS HÁBILES contados desde la recepción de la presente.
+CUMPLIDO EL PLAZO y de no tener respuesta favorable, procederé de inmediato a:
+[Listar las acciones legales que se tomarán, ej: 5.1. Iniciar acción civil de indemnización por daños y perjuicios, 5.2. Formular denuncia penal, 5.3. Solicitar medidas cautelares y embargos, etc.].
+
+Vencido dicho plazo, asumirá(n) la plena responsabilidad por las consecuencias jurídicas, administrativas y patrimoniales que ello pudiera acarrear. La presente carta notarial servirá como medio probatorio en caso de iniciar las acciones legales correspondientes.
+
+Atentamente,
+
+DATOS DE CONTACTO:
+Domicilio: {{domicilioCliente}}`,
   }
 ];
 
@@ -241,12 +297,6 @@ const DocumentWriter = ({ caseData, onClose, onSave, firmProfile }) => {
       if (userId) {
         const prefs = await loadAllPreferencesAsync(userId);
         freshProfile = prefs.firm;
-        console.log('[PDF DEBUG] Fresh profile cargado:', {
-          hasHeader: !!freshProfile?.headerBase64,
-          headerLength: freshProfile?.headerBase64?.length,
-        });
-      } else {
-        console.log('[PDF DEBUG] No hay sesión activa, usando firmProfile del prop');
       }
 
       const { pdf } = await import('@react-pdf/renderer');

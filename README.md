@@ -60,3 +60,7 @@ Si Supabase no esta configurado, la app cae a almacenamiento local para mantener
 ## Produccion
 
 Revisa [PRODUCTION.md](./PRODUCTION.md) antes de vender o mostrar el sistema en un dominio real. Ahi esta la checklist para Google Cloud OAuth, Supabase, backend documental y variables de entorno.
+
+
+
+uvicorn main:app --reload --port 80^Z

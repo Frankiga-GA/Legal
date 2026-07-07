@@ -63,14 +63,25 @@ export const fetchSupabaseCases = async () => {
   const userId = await getCurrentUserId();
   if (!userId) return { cases: [], error: null, skipped: true };
 
+  // Al no filtrar por user_id, RLS devolverá los propios Y los compartidos
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .select('*')
-    .eq('user_id', userId)
     .order('last_update', { ascending: false });
 
   if (error) return { cases: [], error, skipped: false };
-  return { cases: (data || []).map(toAppCase), error: null, skipped: false };
+  
+  // Agregamos flags isOwner y isShared para la UI
+  const mappedCases = (data || []).map((row) => ({
+    ...toAppCase(row),
+    isOwner: row.user_id === userId,
+    isShared: row.user_id !== userId,
+  }));
+  
+  // Eliminar duplicados en caso de que existan en la DB por falta de constraints previos
+  const uniqueCases = Array.from(new Map(mappedCases.map(c => [c.id, c])).values());
+  
+  return { cases: uniqueCases, error: null, skipped: false };
 };
 
 export const upsertSupabaseCase = async (caseData) => {
@@ -86,7 +97,7 @@ export const upsertSupabaseCase = async (caseData) => {
 
   const { error } = await supabase
     .from(TABLE_NAME)
-    .upsert(payload, { onConflict: 'id,user_id' });
+    .upsert(payload, { onConflict: 'id' });
 
   return { error, skipped: false };
 };
