@@ -56,12 +56,19 @@ const CACHE_MAX = 60;
 const CACHE_TTL = 5 * 60 * 1000;
 
 const cacheKey = (params) => {
-  // La pregunta del usuario siempre está al final del prompt
   const promptText = params.prompt || '';
-  const last100 = promptText.slice(-100);
+  // Use length, start, middle, and end to avoid collisions in legal boilerplate
+  const length = promptText.length;
+  const start = promptText.slice(0, 50);
+  const mid = promptText.slice(Math.max(0, Math.floor(length / 2) - 25), Math.floor(length / 2) + 25);
+  const end = promptText.slice(-50);
+  
   return JSON.stringify({
-    p: last100,
-    s: params.systemPrompt?.slice(0, 100),
+    len: length,
+    st: start,
+    md: mid,
+    ed: end,
+    s: params.systemPrompt?.slice(0, 50),
     h: params.history?.length || 0,
     f: params.fileName || null,
     t: params.temperature ?? 0.25,
