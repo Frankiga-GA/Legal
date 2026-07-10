@@ -10,10 +10,6 @@ const ShareCaseModal = ({ caseId, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [inviting, setInviting] = useState(false);
 
-  useEffect(() => {
-    loadShares();
-  }, [caseId]);
-
   const loadShares = async () => {
     setLoading(true);
     const { shares, error } = await getCaseShares(caseId);
@@ -22,6 +18,10 @@ const ShareCaseModal = ({ caseId, onClose }) => {
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    loadShares();
+  }, [caseId]);
 
   const handleShare = async (e) => {
     e.preventDefault();

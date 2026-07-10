@@ -377,13 +377,22 @@ const buildRegistryContext = ({ item, cases }) => ({
 });
 
 const buildRegistryPrompt = (context) => `
-Analiza el registro oficial con prudencia: si no tienes texto completo, dilo claramente y trabaja solo con el titulo, resumen y metadatos entregados.
-No inventes articulos, plazos ni contenido no disponible.
+Analiza el registro oficial entregado y compáralo con los expedientes disponibles del abogado.
+Debes devolver tu respuesta EXCLUSIVAMENTE en el siguiente formato JSON, sin texto adicional:
+
+{
+  "impact_level": "rojo", // "rojo", "amarillo" o "verde"
+  "affected_cases": [], // Arreglo con los IDs de los casos afectados
+  "summary": "Explicación directa de 1 o 2 oraciones."
+}
+
+Reglas para el nivel de impacto:
+- "rojo": Si la norma altera plazos, procedimientos o derechos que impactan DIRECTAMENTE a uno o mas de los expedientes activos en el contexto.
+- "amarillo": Si la norma es de la misma materia legal que los expedientes, pero no afecta directamente, o sirve para asesoria preventiva.
+- "verde": Si la norma es administrativa o irrelevante para los casos actuales.
 
 Contexto:
 ${JSON.stringify(context, null, 2)}
-
-${CITATION_RULES}
 `;
 
 export const analyzeOfficialRegistryItem = async ({ item, cases }) => {
@@ -393,11 +402,22 @@ export const analyzeOfficialRegistryItem = async ({ item, cases }) => {
   const context = buildRegistryContext({ item, cases });
   const text = await askBackend({
     prompt: buildRegistryPrompt(context),
-    temperature: 0.15,
+    temperature: 0.1,
     maxOutputTokens: 2000,
+    responseJson: true,
     systemPrompt: SYSTEM_PROMPT_LEGAL_PERU,
   });
-  return cleanAssistantText(text);
+  
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    const cleaned = text.replace(/\`\`\`json\n?|\n?\`\`\`/g, '').trim();
+    try {
+      return JSON.parse(cleaned);
+    } catch (e) {
+      return { impact_level: 'verde', affected_cases: [], summary: cleanAssistantText(text) };
+    }
+  }
 };
 
 const buildSpecializedAssistantPrompt = ({ bot, question, promptContext, attachmentContext }) => `

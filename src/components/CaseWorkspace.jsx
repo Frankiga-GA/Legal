@@ -227,7 +227,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
       }
 
       const newDoc = {
-        id: Date.now(),
+        id: crypto.randomUUID(),
         name: file.name,
         size: (file.size / 1024).toFixed(2) + ' KB',
         date: new Date().toISOString().split('T')[0],
@@ -335,7 +335,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
     e.preventDefault();
     if (!noteText.trim()) return;
     const newNote = {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       text: noteText.trim(),
       author: 'Equipo legal',
       date: new Date().toISOString().split('T')[0],
@@ -348,7 +348,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
     e.preventDefault();
     if (!deadlineForm.title.trim() || !deadlineForm.date) return;
     const newDeadline = {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       title: deadlineForm.title.trim(),
       date: deadlineForm.date,
       priority: deadlineForm.priority,
@@ -361,7 +361,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
   const submitAiQuestion = async (question) => {
     if (!question.trim() || isAiThinking) return;
 
-    const pendingId = Date.now();
+    const pendingId = crypto.randomUUID();
     setAiMessages(prev => [...prev,
       { role: 'user', content: question },
       { role: 'ai', content: '', pending: true, pendingId },
@@ -425,7 +425,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
   const handleEditAiMessage = async (index, newText) => {
     if (!newText.trim() || isAiThinking) return;
 
-    const pendingId = Date.now();
+    const pendingId = crypto.randomUUID();
     const msgsToDelete = aiMessages.slice(index).map((m) => m.id).filter(Boolean);
 
     setAiMessages((prev) => [

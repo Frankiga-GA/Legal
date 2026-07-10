@@ -148,7 +148,7 @@ const GlobalChat = ({ onBack }) => {
       .slice(-6);
 
     // Agrega el mensaje del usuario + placeholder de la IA al instante
-    const pendingId = Date.now();
+    const pendingId = crypto.randomUUID();
     setMessages((prev) => [
       ...prev,
       { role: 'user', content: fileContext ? `${question}\n\n📎 ${fileContext.fileName}` : question },
@@ -245,7 +245,7 @@ const GlobalChat = ({ onBack }) => {
   const handleEditMessage = async (index, newText) => {
     if (!newText.trim() || isThinking) return;
 
-    const pendingId = Date.now();
+    const pendingId = crypto.randomUUID();
     const msgsToDelete = messages.slice(index).map((m) => m.id).filter(Boolean);
 
     // Preservar adjunto si el mensaje original lo tenía

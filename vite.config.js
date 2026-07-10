@@ -25,4 +25,15 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('@react-pdf/renderer')) {
+            return 'react-pdf';
+          }
+        }
+      }
+    }
+  }
 })

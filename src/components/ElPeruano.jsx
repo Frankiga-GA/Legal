@@ -30,6 +30,7 @@ const ElPeruano = () => {
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Todas');
   const [sourceFilter, setSourceFilter] = useState('Todas');
+  const [impactFilter, setImpactFilter] = useState('Todas');
   const [statusMessage, setStatusMessage] = useState('');
   const [feedSource, setFeedSource] = useState('curated-official-links');
   const [feedQuery, setFeedQuery] = useState('');
@@ -173,6 +174,14 @@ const ElPeruano = () => {
       .filter((item) => categoryFilter === 'Todas' || item.category === categoryFilter)
       .filter((item) => sourceFilter === 'Todas' || item.source === sourceFilter)
       .filter((item) => {
+        if (impactFilter === 'Todas') return true;
+        const analysis = autoAnalyses[item.id]?.analysis;
+        if (!analysis || typeof analysis !== 'object') return false;
+        if (impactFilter === 'Rojas') return analysis.impact_level === 'rojo';
+        if (impactFilter === 'Amarillas') return analysis.impact_level === 'amarillo';
+        return true;
+      })
+      .filter((item) => {
         if (!normalizedQuery) return true;
 
         return [
@@ -184,7 +193,7 @@ const ElPeruano = () => {
           item.type,
         ].some((value) => String(value).toLowerCase().includes(normalizedQuery));
       });
-  }, [items, categoryFilter, sourceFilter, query]);
+  }, [items, categoryFilter, sourceFilter, query, impactFilter, autoAnalyses]);
 
   const stats = useMemo(() => {
     const highUrgency = items.filter((item) => item.urgency === 'Alta').length;
@@ -316,6 +325,12 @@ const ElPeruano = () => {
           <FilterSelect label="Fuente" value={sourceFilter} onChange={setSourceFilter} options={sources} />
         </section>
 
+        <section className="flex flex-wrap gap-2">
+          <button onClick={() => setImpactFilter('Todas')} className={`rounded-lg px-5 py-2 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${impactFilter === 'Todas' ? 'bg-white text-brand-black' : 'bg-white/[0.05] text-brand-ivory/60 hover:bg-white/[0.1]'}`}>Todas</button>
+          <button onClick={() => setImpactFilter('Rojas')} className={`rounded-lg px-5 py-2 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${impactFilter === 'Rojas' ? 'bg-red-500 text-white' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'}`}>🔴 Rojas (Mis Casos)</button>
+          <button onClick={() => setImpactFilter('Amarillas')} className={`rounded-lg px-5 py-2 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${impactFilter === 'Amarillas' ? 'bg-amber-500 text-white' : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'}`}>🟡 Amarillas (Mi Rubro)</button>
+        </section>
+
         <div className="flex flex-col gap-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-accent/40 md:flex-row md:items-center md:justify-between">
           <span>
             Mostrando <span className="text-brand-ivory">{filteredItems.length}</span> de <span className="text-brand-ivory">{items.length}</span> registros
@@ -443,16 +458,21 @@ const RegistryCard = ({ item, cases, onSave, onLink, isSaved, autoAnalysis }) =>
     }
   };
 
-  const effectiveAnalysis = aiAnalysis || (autoAnalysis?.status === 'done' ? autoAnalysis.analysis : '');
+  const effectiveAnalysis = aiAnalysis || (autoAnalysis?.status === 'done' ? autoAnalysis.analysis : null);
   const autoBadge = autoAnalysis?.status === 'analyzing' ? (
     <span className="inline-flex items-center gap-1 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-brand-gold">
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-gold" />
       Analizando IA
     </span>
-  ) : autoAnalysis?.status === 'done' ? (
-    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-300">
-      Analizado por IA
-      {autoAnalysis.relatedCount > 0 ? ` · ${autoAnalysis.relatedCount} caso${autoAnalysis.relatedCount > 1 ? 's' : ''}` : ''}
+  ) : autoAnalysis?.status === 'done' && autoAnalysis.analysis ? (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${
+      autoAnalysis.analysis.impact_level === 'rojo' ? 'border-red-400/25 bg-red-500/10 text-red-300' :
+      autoAnalysis.analysis.impact_level === 'amarillo' ? 'border-amber-400/25 bg-amber-500/10 text-amber-300' :
+      'border-emerald-400/25 bg-emerald-500/10 text-emerald-300'
+    }`}>
+      {autoAnalysis.analysis.impact_level === 'rojo' ? '🔴 Impacto Directo' :
+       autoAnalysis.analysis.impact_level === 'amarillo' ? '🟡 Relevante' :
+       '🟢 Analizado'}
     </span>
   ) : autoAnalysis?.status === 'error' ? (
     <span className="inline-flex items-center gap-1 rounded-full border border-red-400/20 bg-red-500/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-red-300">
@@ -506,15 +526,24 @@ const RegistryCard = ({ item, cases, onSave, onLink, isSaved, autoAnalysis }) =>
       </div>
 
       {effectiveAnalysis && (
-        <div className="mt-5 rounded-lg border border-brand-gold/15 bg-brand-gold/[0.04] p-4">
-          <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-gold">
+        <div className={`mt-5 rounded-lg border p-4 ${
+          effectiveAnalysis.impact_level === 'rojo' ? 'border-red-500/20 bg-red-500/[0.04]' :
+          effectiveAnalysis.impact_level === 'amarillo' ? 'border-amber-500/20 bg-amber-500/[0.04]' :
+          'border-emerald-500/20 bg-emerald-500/[0.04]'
+        }`}>
+          <div className={`mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] ${
+            effectiveAnalysis.impact_level === 'rojo' ? 'text-red-400' :
+            effectiveAnalysis.impact_level === 'amarillo' ? 'text-amber-400' :
+            'text-emerald-400'
+          }`}>
             <Bot className="h-4 w-4" />
-            {aiAnalysis ? 'Analisis IA' : 'Lectura automatica IA'}
+            {aiAnalysis ? 'Analisis IA (Manual)' : 'Lectura automatica IA'}
           </div>
-          <div className="space-y-2 text-sm font-light leading-6 text-brand-ivory/75">
-            {effectiveAnalysis.split('\n').filter(Boolean).map((line, index) => (
-              <p key={index}>{line}</p>
-            ))}
+          <div className="space-y-2 text-sm font-light leading-6 text-brand-ivory/80">
+            {effectiveAnalysis.affected_cases?.length > 0 && (
+              <p className="font-bold text-brand-ivory">Casos afectados: {effectiveAnalysis.affected_cases.join(', ')}</p>
+            )}
+            <p>{effectiveAnalysis.summary || String(effectiveAnalysis.summary || effectiveAnalysis)}</p>
           </div>
         </div>
       )}

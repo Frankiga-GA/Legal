@@ -14,6 +14,7 @@ const CASE_TYPES = [
 ];
 
 const CreateCaseModal = ({ onClose, onSave }) => {
+  const [caseId, setCaseId] = useState('');
   const [clientName, setClientName] = useState('');
   const [dni, setDni] = useState('');
   const [type, setType] = useState('Laboral');
@@ -26,10 +27,10 @@ const CreateCaseModal = ({ onClose, onSave }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!clientName.trim()) return;
+    if (!clientName.trim() || !caseId.trim()) return;
 
     const newCase = {
-      id: '',
+      id: caseId.trim(),
       clientName: clientName.trim(),
       dni: dni.trim(),
       type,
@@ -74,6 +75,24 @@ const CreateCaseModal = ({ onClose, onSave }) => {
         <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto p-8 custom-scrollbar">
           <div className="space-y-2">
             <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/70">
+              Nro. de Expediente
+            </label>
+            <div className="relative">
+              <FileText className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-accent/30" />
+              <input
+                type="text"
+                value={caseId}
+                onChange={(e) => setCaseId(e.target.value)}
+                placeholder="Ej. EXP-001-2026"
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3.5 pl-12 pr-5 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/30 focus:border-brand-gold/40"
+                autoFocus
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/70">
               Cliente
             </label>
             <div className="relative">
@@ -84,7 +103,6 @@ const CreateCaseModal = ({ onClose, onSave }) => {
                 onChange={(e) => setClientName(e.target.value)}
                 placeholder="Nombre y apellido o razon social"
                 className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3.5 pl-12 pr-5 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/30 focus:border-brand-gold/40"
-                autoFocus
                 required
               />
             </div>

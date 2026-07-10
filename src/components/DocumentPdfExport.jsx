@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
 });
 
 // Función para parsear texto y detectar formatos
-const renderTextWithFormatting = (text, isCartaNotarial) => {
+const renderTextWithFormatting = (text, isCartaNotarial, demandante) => {
   if (!text) return null;
   
   const paragraphs = text.split('\n').filter(p => p.trim() !== '');
@@ -168,72 +168,97 @@ const renderTextWithFormatting = (text, isCartaNotarial) => {
     const pTrim = para.replace(/^\s+/, '').trim();
     const pUpper = pTrim.toUpperCase();
     
-    // 1. Título de Documento (Carta Notarial, etc) -> Centrado y Subrayado
-    const isDocTitle = pTrim.length < 80 && (pUpper === 'CARTA NOTARIAL' || pUpper === 'ESCRITO' || pUpper.startsWith('DEMANDA') || pUpper.startsWith('RECURSO DE APELACIÓN'));
-    if (isDocTitle) {
-      return <Text key={i} style={styles.title}>{renderInline(pTrim)}</Text>;
-    }
+    const isLast = i === paragraphs.length - 1;
 
-    // 2. Título Principal (Dirigido a la autoridad) -> Izquierda y Negrita
-    if (pUpper.startsWith('SEÑOR JUEZ') || pUpper.startsWith('SEÑOR FISCAL') || pUpper.startsWith('SEÑORA JUEZA')) {
-      return <Text key={i} style={styles.senorJuez}>{renderInline(pTrim)}</Text>;
-    }
-    
-    // 3. Bloque de Apersonamiento (Datos de identidad desplazados a la derecha)
-    const isApersonamiento = !isCartaNotarial && (
-                             pUpper.includes('IDENTIFICADO CON DNI') || 
-                             pUpper.includes('IDENTIFICADA CON DNI') || 
-                             pUpper.includes('A USTED RESPETUOSAMENTE DIGO') || 
-                             pUpper.includes('ANTE USTED DIGO') ||
-                             pUpper.includes('A UD. DIGO'));
-                             
-    if (isApersonamiento) {
+    const getElement = () => {
+      // 1. Título de Documento (Carta Notarial, etc) -> Centrado y Subrayado
+      const isDocTitle = pTrim.length < 80 && (pUpper === 'CARTA NOTARIAL' || pUpper === 'ESCRITO' || pUpper.startsWith('DEMANDA') || pUpper.startsWith('RECURSO DE APELACIÓN'));
+      if (isDocTitle) {
+        return <Text style={styles.title}>{renderInline(pTrim)}</Text>;
+      }
+
+      // 2. Título Principal (Dirigido a la autoridad) -> Izquierda y Negrita
+      if (pUpper.startsWith('SEÑOR JUEZ') || pUpper.startsWith('SEÑOR FISCAL') || pUpper.startsWith('SEÑORA JUEZA')) {
+        return <Text style={styles.senorJuez}>{renderInline(pTrim)}</Text>;
+      }
+      
+      // 3. Bloque de Apersonamiento (Datos de identidad desplazados a la derecha)
+      const isApersonamiento = !isCartaNotarial && (
+                               pUpper.includes('IDENTIFICADO CON DNI') || 
+                               pUpper.includes('IDENTIFICADA CON DNI') || 
+                               pUpper.includes('A USTED RESPETUOSAMENTE DIGO') || 
+                               pUpper.includes('ANTE USTED DIGO') ||
+                               pUpper.includes('A UD. DIGO'));
+                               
+      if (isApersonamiento) {
+        return (
+          <Text style={styles.apersonamiento}>
+            {renderInline(pTrim)}
+          </Text>
+        );
+      }
+      
+      // 4. Metadatos tipo Carta Notarial (A:, De:, Domicilio, etc.) -> Agrupados y sin espacios gigantes
+      const isMeta = pUpper.startsWith('A:') || 
+                     pUpper.startsWith('DE:') || 
+                     pUpper.startsWith('DOMICILIO:') || 
+                     pUpper.startsWith('DIRIGIDA A') ||
+                     pUpper.startsWith('CON DOMICILIO EN') ||
+                     (isCartaNotarial && pUpper.startsWith('IDENTIFICADO')) ||
+                     pUpper.startsWith('FECHA:');
+      if (isMeta) {
+        return <Text style={styles.metaText}>{renderInline(pTrim)}</Text>;
+      }
+
+      // 5. Asunto (Destacado)
+      if (pUpper.startsWith('ASUNTO:')) {
+        return <Text style={styles.asuntoText}>{renderInline(pTrim)}</Text>;
+      }
+      
+      // 6. Subtítulos (Todo en mayúsculas, cortos)
+      const isHeading = pUpper === pTrim && pTrim.length < 100 && pTrim.length > 3 && !pUpper.startsWith('A:') && !pUpper.startsWith('DE:');
+      if (isHeading) {
+        return <Text style={styles.subtitle}>{renderInline(pTrim)}</Text>;
+      }
+      
+      // 7. Saludo formal genérico
+      if (pUpper.startsWith('SEÑOR') || pUpper.startsWith('ESTIMADO')) {
+        return <Text style={styles.greeting}>{renderInline(pTrim)}</Text>;
+      }
+      
+      // 8. Despedida (con espacio para firma)
+      if (pUpper.startsWith('ATENTAMENTE')) {
+        return <Text style={styles.atentamente}>{renderInline(pTrim)}</Text>;
+      }
+      
+      // 9. Párrafo normal justificado (sin sangría inicial)
       return (
-        <Text key={i} style={styles.apersonamiento}>
+        <Text style={styles.paragraph}>
           {renderInline(pTrim)}
         </Text>
       );
-    }
-    
-    // 4. Metadatos tipo Carta Notarial (A:, De:, Domicilio, etc.) -> Agrupados y sin espacios gigantes
-    const isMeta = pUpper.startsWith('A:') || 
-                   pUpper.startsWith('DE:') || 
-                   pUpper.startsWith('DOMICILIO:') || 
-                   pUpper.startsWith('DIRIGIDA A') ||
-                   pUpper.startsWith('CON DOMICILIO EN') ||
-                   (isCartaNotarial && pUpper.startsWith('IDENTIFICADO')) ||
-                   pUpper.startsWith('FECHA:');
-    if (isMeta) {
-      return <Text key={i} style={styles.metaText}>{renderInline(pTrim)}</Text>;
-    }
+    };
 
-    // 5. Asunto (Destacado)
-    if (pUpper.startsWith('ASUNTO:')) {
-      return <Text key={i} style={styles.asuntoText}>{renderInline(pTrim)}</Text>;
+    const element = getElement();
+
+    // Si es el último párrafo de todo el documento, lo agrupamos con la firma usando wrap={false}
+    // Así evitamos que la firma quede "huérfana" en una página en blanco.
+    if (isLast) {
+      return (
+        <View key={i} wrap={false}>
+          {element}
+          <View style={styles.signatureContainer}>
+            <View style={styles.signatureBox}>
+              <Text style={styles.signatureText}>{demandante !== '_________________' ? demandante : 'FIRMA DEL SOLICITANTE'}</Text>
+              <Text style={styles.signatureSubText}>DNI N° _________________</Text>
+            </View>
+          </View>
+        </View>
+      );
     }
     
-    // 6. Subtítulos (Todo en mayúsculas, cortos)
-    const isHeading = pUpper === pTrim && pTrim.length < 100 && pTrim.length > 3 && !pUpper.startsWith('A:') && !pUpper.startsWith('DE:');
-    if (isHeading) {
-      return <Text key={i} style={styles.subtitle}>{renderInline(pTrim)}</Text>;
-    }
-    
-    // 7. Saludo formal genérico
-    if (pUpper.startsWith('SEÑOR') || pUpper.startsWith('ESTIMADO')) {
-      return <Text key={i} style={styles.greeting}>{renderInline(pTrim)}</Text>;
-    }
-    
-    // 8. Despedida (con espacio para firma)
-    if (pUpper.startsWith('ATENTAMENTE')) {
-      return <Text key={i} style={styles.atentamente}>{renderInline(pTrim)}</Text>;
-    }
-    
-    // 9. Párrafo normal justificado (sin sangría inicial)
-    return (
-      <Text key={i} style={styles.paragraph}>
-        {renderInline(pTrim)}
-      </Text>
-    );
+    // Clonamos para inyectar la key en los elementos normales
+    return React.cloneElement(element, { key: i });
   });
 };
 
@@ -307,15 +332,7 @@ const DocumentPdfExport = ({ caseData, documentText, title, firmProfile }) => {
 
         {/* CUERPO DEL DOCUMENTO */}
         <View style={styles.bodyContainer}>
-          {renderTextWithFormatting(documentText, isCartaNotarial)}
-        </View>
-
-        {/* FIRMA AL FINAL */}
-        <View style={styles.signatureContainer} wrap={false}>
-          <View style={styles.signatureBox}>
-            <Text style={styles.signatureText}>{demandante !== '_________________' ? demandante : 'FIRMA DEL SOLICITANTE'}</Text>
-            <Text style={styles.signatureSubText}>DNI N° _________________</Text>
-          </View>
+          {renderTextWithFormatting(documentText, isCartaNotarial, demandante)}
         </View>
 
       </Page>

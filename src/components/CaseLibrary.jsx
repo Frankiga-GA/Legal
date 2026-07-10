@@ -146,7 +146,7 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
       const aiDetails = await extractResolutionDetails(extractedText);
       
       const newDoc = {
-        id: Date.now(),
+        id: crypto.randomUUID(),
         name: file.name,
         size: (file.size / 1024).toFixed(2) + ' KB',
         date: new Date().toISOString().split('T')[0],
