@@ -97,7 +97,7 @@ export const upsertSupabaseCase = async (caseData) => {
 
   const { error } = await supabase
     .from(TABLE_NAME)
-    .upsert(payload, { onConflict: 'id' });
+    .upsert(payload);
 
   return { error, skipped: false };
 };
