@@ -552,12 +552,17 @@ const extractFirstJsonObject = (text) => {
   throw new Error('No se encontro un JSON valido en la respuesta.');
 };
 
-const MAX_RESOLUTION_CHARS = 18000;
+// Ampliado a 120,000 caracteres (~40-50 páginas) para aprovechar el contexto de llama-3.3-70b
+const MAX_RESOLUTION_CHARS = 120000;
 
 const truncateForAi = (text = '') => {
   if (!text || text.length <= MAX_RESOLUTION_CHARS) return text;
-  const head = text.slice(0, MAX_RESOLUTION_CHARS);
-  return `${head}\n\n[... texto truncado para analisis ...]`;
+  // Si es muy largo, guardamos el principio y el final, cortando el medio (donde suele haber menos valor legal)
+  const headSize = Math.floor(MAX_RESOLUTION_CHARS * 0.6); // 60% inicial
+  const tailSize = Math.floor(MAX_RESOLUTION_CHARS * 0.4); // 40% final
+  const head = text.slice(0, headSize);
+  const tail = text.slice(-tailSize);
+  return `${head}\n\n[... TEXTO TRUNCADO POR EXCESO DE LONGITUD ...]\n\n${tail}`;
 };
 
 export const extractResolutionDetails = async (documentText) => {
