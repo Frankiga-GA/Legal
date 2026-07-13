@@ -35,6 +35,7 @@ import { searchLegalContext } from '../services/ragService';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
 import { uploadFileToStorage } from '../services/supabaseStorageService';
 import { loadCases, updateCaseAsync, deleteCaseAsync } from '../services/caseStore';
+import { isSupabaseConfigured, supabase } from '../utils/supabase';
 import { loadCaseChats, saveCaseChat, clearCaseChats, deleteCaseChatMsg, deleteCaseChatMessages } from '../services/chatHistoryStore';
 import AiMessage from './AiMessage';
 import CitationPanel from './CitationPanel';
@@ -99,32 +100,56 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
 
   useEffect(() => {
     let cancelled = false;
-    loadCases().then(({ cases: allCases }) => {
-      if (cancelled) return;
-      const data = allCases.find(c => c.id === caseId);
-      if (data) {
-        setCaseData(data);
-        if (aiMessages.length === 0) {
-          setAiMessages([
+    let channel = null;
+
+    const fetchCase = () => {
+      loadCases().then(({ cases: allCases }) => {
+        if (cancelled) return;
+        const data = allCases.find(c => c.id === caseId);
+        if (data) {
+          setCaseData(data);
+          setAiMessages(prev => prev.length === 0 ? [
             {
               role: 'ai',
               content: `¡Hola! Soy tu asistente para el caso ${data.id}. Ya tengo el expediente a la vista. Contame en qué te ayudo: resúmenes, plazos críticos, redacción de escritos, análisis de riesgos o lo que se te ocurra.`,
             },
-          ]);
+          ] : prev);
         }
-        loadCaseChats(caseId).then(({ messages, error }) => {
-          if (cancelled) return;
-          if (error) {
-            console.warn('No se pudo cargar el historial de chat.', error.message);
-            return;
-          }
-          if (messages && messages.length > 0) {
-            setAiMessages(messages);
-          }
-        });
+      });
+    };
+
+    fetchCase();
+
+    loadCaseChats(caseId).then(({ messages, error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.warn('No se pudo cargar el historial de chat.', error.message);
+        return;
+      }
+      if (messages && messages.length > 0) {
+        setAiMessages(messages);
       }
     });
-    return () => { cancelled = true; abortActiveRequest(); };
+
+    if (isSupabaseConfigured) {
+      channel = supabase
+        .channel(`cases-sync-${caseId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'cases', filter: `id=eq.${caseId}` },
+          (payload) => {
+            console.log('⚡ Sincronización en tiempo real detectada:', payload);
+            fetchCase(); // Refrescar los datos para evitar colisiones
+          }
+        )
+        .subscribe();
+    }
+
+    return () => { 
+      cancelled = true; 
+      abortActiveRequest(); 
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [caseId]);
 
   if (!caseData) return (
