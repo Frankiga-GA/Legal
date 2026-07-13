@@ -1,6 +1,7 @@
 // src/components/CaseWorkspace.jsx
 import { useState, useEffect, useRef } from 'react';
 import {
+  ArrowDownToLine,
   ArrowLeft,
   Bot,
   Calendar,
@@ -32,6 +33,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { askGeminiAboutCase, isGeminiConfigured, extractResolutionDetails, abortActiveRequest } from '../services/geminiService';
 import { searchLegalContext } from '../services/ragService';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
+import { uploadFileToStorage } from '../services/supabaseStorageService';
 import { loadCases, updateCaseAsync, deleteCaseAsync } from '../services/caseStore';
 import { loadCaseChats, saveCaseChat, clearCaseChats, deleteCaseChatMsg, deleteCaseChatMessages } from '../services/chatHistoryStore';
 import AiMessage from './AiMessage';
@@ -175,10 +177,18 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
 
     // Notificación de toast (requiere react-hot-toast en el proyecto)
     // Si la dependencia no está instalada, se mostrará un fallback simple.
-    // eslint-disable-next-line no-undef
+     
     const showToast = typeof toast !== 'undefined' ? toast : null;
 
     try {
+      // 1. Subir a Supabase Storage primero
+      const { publicUrl, error: storageError } = await uploadFileToStorage(file, caseId);
+      if (storageError) {
+        console.warn('No se pudo guardar el archivo original en Storage:', storageError);
+        if (showToast) showToast.warn('Nota: No se pudo guardar el archivo original en la nube.');
+      }
+
+      // 2. Extraer texto con el backend
       const backendResponse = await uploadDocumentToBackend(file);
       const extractedText = String(backendResponse?.extracted_text || '').trim();
 
@@ -234,6 +244,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
         type: file.type,
         excerpt,
         content: extractedText,
+        fileUrl: publicUrl,
       };
 
       handleUpdate({
@@ -694,12 +705,25 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
                           <p className="mt-0.5 text-xs text-brand-accent">{doc.date} • {doc.size}</p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDeleteDoc(doc.id)}
-                        className="rounded p-2 text-brand-accent hover:bg-red-50 hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {doc.fileUrl && (
+                          <a
+                            href={doc.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded p-2 text-brand-accent hover:bg-brand-gold/10 hover:text-brand-gold transition-colors"
+                            title="Descargar Original"
+                          >
+                            <ArrowDownToLine className="h-4 w-4" />
+                          </a>
+                        )}
+                        <button
+                          onClick={() => handleDeleteDoc(doc.id)}
+                          className="rounded p-2 text-brand-accent hover:bg-red-50 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   ))
                 ) : (

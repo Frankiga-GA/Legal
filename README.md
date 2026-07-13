@@ -63,4 +63,3 @@ Revisa [PRODUCTION.md](./PRODUCTION.md) antes de vender o mostrar el sistema en 
 
 
 
-uvicorn main:app --reload --port 80^Z
