@@ -316,21 +316,24 @@ def _read_text_from_upload(upload: UploadFile) -> str:
                 if text:
                     return text
 
-                if pytesseract is not None:
-                    ocr_pages = []
-                    for page in document:
-                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
-                        image = pix.tobytes("png")
-                        try:
-                            ocr_text = pytesseract.image_to_string(io.BytesIO(image), lang="spa+eng")
-                        except Exception:
-                            ocr_text = ""
+                # Si el PDF no tiene texto nativo, iteramos sus páginas como imágenes (OCR con Groq Vision)
+                ocr_pages = []
+                for page in document:
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+                    image_bytes = pix.tobytes("png")
+                    try:
+                        # Pasamos la imagen de la página a nuestro OCR impulsado por Llama Vision
+                        ocr_text = _extract_text_from_image(image_bytes, "image/png")
                         if ocr_text.strip():
                             ocr_pages.append(ocr_text.strip())
-                    ocr_text = "\n\n".join(part for part in ocr_pages if part).strip()
-                    if ocr_text:
-                        return ocr_text
-            except Exception:
+                    except Exception as e:
+                        print(f"Error extrayendo OCR de pagina PDF: {e}")
+                
+                ocr_text = "\n\n".join(part for part in ocr_pages if part).strip()
+                if ocr_text:
+                    return ocr_text
+            except Exception as e:
+                print(f"Error procesando PDF escaneado con fitz: {e}")
                 return ""
 
         return ""
