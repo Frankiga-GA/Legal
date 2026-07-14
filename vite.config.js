@@ -7,6 +7,7 @@ const documentBackendUrl = process.env.VITE_DOCUMENT_BACKEND_URL || 'http://127.
 export default defineConfig({
   plugins: [react()],
   define: {
+    'process.env': {},
     // Polyfill 'global' for packages that use Node.js globals (e.g. react-pdf)
     global: 'globalThis',
   },

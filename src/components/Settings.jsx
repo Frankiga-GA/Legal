@@ -1,5 +1,5 @@
 // src/components/Settings.jsx
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   Building2,

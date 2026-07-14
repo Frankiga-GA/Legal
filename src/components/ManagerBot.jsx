@@ -609,7 +609,7 @@ const ManagerBot = ({ onUseInChat }) => {
             </div>
             <div className="flex items-center gap-1 border-b border-white/[0.05] px-4 py-2 text-xs text-brand-accent">
               <button onClick={() => { setDriveFolder(null); setDriveFolderPath([]); setSelectedDriveFile(null); loadDriveItems(); }} className="hover:text-brand-ivory">Drive</button>
-              {driveFolderPath.map((f, i) => (
+              {driveFolderPath.map((f) => (
                 <span key={f.id} className="flex items-center gap-1">
                   <span className="text-brand-accent/40">/</span>
                   <span className="text-brand-ivory truncate max-w-[120px]">{f.name}</span>

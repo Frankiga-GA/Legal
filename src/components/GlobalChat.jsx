@@ -6,7 +6,7 @@
 // Supabase (tabla global_chats) para sincronizar entre dispositivos.
 // =============================================================================
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Bot,

@@ -6,7 +6,7 @@
 // =============================================================================
 
 import { useState } from 'react';
-import { Bot, Calendar, Check, ChevronRight, FileText, Sparkles, X, Lightbulb, Settings } from 'lucide-react';
+import { Check, ChevronRight, FileText, Sparkles, X, Lightbulb, Settings } from 'lucide-react';
 import { markOnboardingComplete } from '../services/authService';
 
 const STEPS = [

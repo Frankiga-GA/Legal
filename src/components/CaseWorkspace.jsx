@@ -44,7 +44,7 @@ import DocumentPreviewModal from './DocumentPreviewModal';
 import DriveFilePicker from './DriveFilePicker';
 import { collectCitations } from '../utils/citationParser';
 import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
-import { getStoredDriveToken } from '../services/googleDriveService';
+import { getStoredDriveToken, isGoogleDriveConfigured, getOrCreateCaseFolder, uploadFileToDrive } from '../services/googleDriveService';
 import { loadAllPreferencesAsync } from '../services/userPreferencesStore';
 import { listAssistants } from '../services/personalizationStore';
 import ShareCaseModal from './ShareCaseModal';
@@ -222,7 +222,20 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
         if (showToast) showToast.warn('Nota: No se pudo guardar el archivo original en la nube.');
       }
 
-      // 2. Extraer texto con el backend
+      // 2. Backup automático a Google Drive
+      if (isGoogleDriveConfigured && getStoredDriveToken()) {
+        try {
+          const folderId = await getOrCreateCaseFolder(caseId, caseData.clientName || 'Sin Cliente');
+          if (folderId) {
+            await uploadFileToDrive(file, folderId);
+            if (showToast) showToast.success('Copia de seguridad guardada en Drive.');
+          }
+        } catch (err) {
+          console.warn('No se pudo respaldar en Drive:', err);
+        }
+      }
+
+      // 3. Extraer texto con el backend
       const backendResponse = await uploadDocumentToBackend(file);
       const extractedText = String(backendResponse?.extracted_text || '').trim();
 

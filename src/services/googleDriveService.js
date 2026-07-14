@@ -1,6 +1,6 @@
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
 const GOOGLE_SCOPES = [
-  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/drive.file', // Allows creating folders and uploading files created by the app
   'https://www.googleapis.com/auth/calendar.events',
 ];
 
@@ -248,4 +248,51 @@ export const downloadDriveFileAsFile = async (file, token = getStoredDriveToken(
   })();
 
   return new File([blob], file.name || `drive-file${extension}`, { type: resolvedMimeType });
+};
+
+export const getOrCreateCaseFolder = async (caseId, clientName) => {
+  const token = getStoredDriveToken();
+  if (!token) return null;
+  const folderName = `Expediente - ${caseId} - ${clientName}`;
+  const query = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  
+  try {
+    const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`;
+    const res = await fetch(searchUrl, { headers: { Authorization: `Bearer ${token.access_token}` } });
+    const data = await res.json();
+    if (data.files && data.files.length > 0) return data.files[0].id;
+    
+    const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder' }),
+    });
+    const createdData = await createRes.json();
+    return createdData.id;
+  } catch (error) {
+    console.error("Drive Folder Error:", error);
+    return null;
+  }
+};
+
+export const uploadFileToDrive = async (file, folderId) => {
+  const token = getStoredDriveToken();
+  if (!token) throw new Error('No hay sesión de Drive');
+
+  const metadata = { name: file.name, parents: [folderId] };
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  form.append('file', file);
+
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token.access_token}` },
+    body: form,
+  });
+
+  if (!res.ok) throw new Error('Error subiendo archivo a Drive');
+  return res.json();
 };
