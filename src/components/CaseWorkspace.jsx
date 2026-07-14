@@ -595,13 +595,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
                 Compartir
               </button>
             )}
-            <button
-              onClick={() => setShowEditModal(true)}
-              className="rounded-lg border border-white/[0.08] p-2 text-brand-accent hover:border-brand-gold/40 hover:bg-brand-gold/10 hover:text-brand-gold transition-colors"
-              title="Editar Datos del Expediente"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
+
             <button
               onClick={handleExportPdf}
               className="rounded-lg border border-white/[0.08] p-2 text-brand-accent hover:border-brand-gold/40 hover:bg-brand-gold/10 hover:text-brand-gold transition-colors"
@@ -661,6 +655,16 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
                 {caseData.cuaderno && <InfoCard icon={FileText} label="Cuaderno" value={caseData.cuaderno} />}
                 {caseData.escritoNro && <InfoCard icon={Hash} label="Escrito N°" value={caseData.escritoNro} />}
               </section>
+
+              <div className="flex justify-end mt-2">
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] px-4 py-2 text-xs font-semibold text-brand-accent hover:border-brand-gold/30 hover:bg-white/[0.05] hover:text-brand-ivory transition-all"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Editar datos del expediente
+                </button>
+              </div>
 
               <section className="rounded-xl border border-white/[0.08] bg-brand-black p-5">
                 <h4 className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-accent">
