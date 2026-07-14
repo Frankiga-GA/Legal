@@ -6,9 +6,9 @@ const TABLE_NAME = 'case_chats';
 
 const getCurrentUserId = async () => {
   if (!supabase) return null;
-  const { data, error } = await supabase.auth.getUser();
-  if (error) throw error;
-  return data.user?.id || null;
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session) return null;
+  return data.session.user.id;
 };
 
 export const canUseChatHistory = () => isSupabaseConfigured && Boolean(supabase);

@@ -23,9 +23,9 @@ const normalizeRegistryItem = (item) => ({
 const getCurrentUserId = async () => {
   if (!supabase) return null;
 
-  const { data, error } = await supabase.auth.getUser();
-  if (error) throw error;
-  return data.user?.id || null;
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session) return null;
+  return data.session.user.id;
 };
 
 const toAppItem = (row) => ({
