@@ -73,44 +73,29 @@ export const connectGoogleDrive = async () => {
 
 const waitForDriveToken = (redirectUri, popup) =>
   new Promise((resolve, reject) => {
-    const timer = window.setInterval(() => {
-      try {
-        let closed = false;
-        try {
-          closed = popup.closed;
-        } catch {
-          closed = false;
-        }
-        if (closed) {
-          window.clearInterval(timer);
-          reject(new Error('La conexion con Google Drive se cerro antes de completarse.'));
-          return;
-        }
+    // 5 minute timeout in case user closes popup and we can't detect it due to COOP
+    const timeout = setTimeout(() => {
+      window.removeEventListener('message', messageHandler);
+      reject(new Error('La conexión con Google Drive expiró o fue cerrada.'));
+    }, 5 * 60 * 1000);
 
-        let popupUrl;
-        try {
-          popupUrl = popup.location.href;
-        } catch {
-          return;
+    const messageHandler = (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'lusti-drive-connected' && event.data?.hash) {
+        window.removeEventListener('message', messageHandler);
+        clearTimeout(timeout);
+        
+        const token = parseTokenFromHash(new URL('http://localhost' + event.data.hash).hash);
+        if (token) {
+          saveStoredDriveToken(token);
+          resolve(token);
+        } else {
+          reject(new Error('No se pudo parsear el token de Drive.'));
         }
-        if (!popupUrl.startsWith(redirectUri)) return;
-
-        const token = parseTokenFromHash(new URL(popupUrl).hash);
-        if (!token) return;
-
-        saveStoredDriveToken(token);
-        try {
-          popup.opener?.postMessage({ type: 'lusti-drive-connected', token }, window.location.origin);
-        } catch {
-          // Ignore if opener is not reachable.
-        }
-        popup.close();
-        window.clearInterval(timer);
-        resolve(token);
-      } catch {
-        // Cross-origin while Google auth is open. Ignore until it redirects back.
       }
-    }, 500);
+    };
+
+    window.addEventListener('message', messageHandler);
   });
 
 export const onDriveTokenMessage = (callback) => {

@@ -1,5 +1,11 @@
 // Polyfill Buffer for browser (required by @react-pdf/renderer for image processing)
 import { Buffer } from 'buffer';
+
+// Handle Google OAuth Popup Redirect
+if (typeof window !== 'undefined' && window.opener && window.location.hash.includes('access_token')) {
+  window.opener.postMessage({ type: 'lusti-drive-connected', hash: window.location.hash }, window.location.origin);
+  window.close();
+}
 if (typeof window !== 'undefined') {
   window.Buffer = Buffer;
   globalThis.Buffer = Buffer;
