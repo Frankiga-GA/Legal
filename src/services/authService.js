@@ -40,7 +40,7 @@ export const signInWithGoogle = async () => {
   return data;
 };
 
-export const signUpWithEmail = async ({ email, password }) => {
+export const signUpWithEmail = async ({ email, password, fullName, dni, company }) => {
   if (!supabase) {
     throw new Error('Supabase no esta configurado.');
   }
@@ -48,6 +48,13 @@ export const signUpWithEmail = async ({ email, password }) => {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      data: {
+        full_name: fullName,
+        dni,
+        company,
+      }
+    }
   });
 
   if (error) throw error;

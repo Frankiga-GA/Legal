@@ -24,6 +24,9 @@ import {
   Scale,
   ShieldCheck,
   Sparkles,
+  User,
+  Hash,
+  Briefcase,
   UserPlus,
   X,
 } from 'lucide-react';
@@ -48,6 +51,9 @@ const LoginPage = ({ onLogin, onBack }) => {
   });
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [dni, setDni] = useState('');
+  const [company, setCompany] = useState('');
   const [rememberMe, setRememberMe] = useState(() => {
     try {
       return window.localStorage.getItem(REMEMBER_KEY) !== '0';
@@ -100,7 +106,13 @@ const LoginPage = ({ onLogin, onBack }) => {
       }
 
       if (isRegistering) {
-        const result = await signUpWithEmail({ email, password });
+        if (!fullName.trim() || !dni.trim()) {
+          setError('El nombre completo y el DNI son obligatorios.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const result = await signUpWithEmail({ email, password, fullName, dni, company });
         if (result.session) {
           persistSessionPrefs();
           onLogin(result.session);
@@ -233,15 +245,44 @@ const LoginPage = ({ onLogin, onBack }) => {
               )}
 
               {isRegistering && (
-                <Field
-                  icon={Lock}
-                  label="Confirmar clave"
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={setConfirmPassword}
-                  placeholder="********"
-                  autoComplete="new-password"
-                />
+                <>
+                  <Field
+                    icon={Lock}
+                    label="Confirmar clave"
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={setConfirmPassword}
+                    placeholder="********"
+                    autoComplete="new-password"
+                  />
+                  <Field
+                    icon={User}
+                    label="Nombre Completo"
+                    type="text"
+                    value={fullName}
+                    onChange={setFullName}
+                    placeholder="Ej. Maria Lopez"
+                    autoComplete="name"
+                  />
+                  <Field
+                    icon={Hash}
+                    label="DNI"
+                    type="text"
+                    value={dni}
+                    onChange={setDni}
+                    placeholder="Ej. 12345678"
+                    autoComplete="off"
+                  />
+                  <Field
+                    icon={Briefcase}
+                    label="Estudio / Empresa (Opcional)"
+                    type="text"
+                    value={company}
+                    onChange={setCompany}
+                    placeholder="Ej. Lopez & Asociados"
+                    autoComplete="organization"
+                  />
+                </>
               )}
 
               {!isRegistering && !isMagicLink && (

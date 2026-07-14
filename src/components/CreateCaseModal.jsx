@@ -13,24 +13,25 @@ const CASE_TYPES = [
   { value: 'Notarial',       label: 'Notarial' },
 ];
 
-const CreateCaseModal = ({ onClose, onSave }) => {
-  const [caseId, setCaseId] = useState('');
-  const [clientName, setClientName] = useState('');
-  const [dni, setDni] = useState('');
-  const [type, setType] = useState('Laboral');
-  const [counterparty, setCounterparty] = useState('');
-  const [subject, setSubject] = useState('');
-  const [judge, setJudge] = useState('');
-  const [specialist, setSpecialist] = useState('');
-  const [cuaderno, setCuaderno] = useState('');
-  const [escritoNro, setEscritoNro] = useState('');
+const CreateCaseModal = ({ onClose, onSave, initialData = null }) => {
+  const [caseId, setCaseId] = useState(initialData?.id || '');
+  const [clientName, setClientName] = useState(initialData?.clientName || '');
+  const [dni, setDni] = useState(initialData?.dni || '');
+  const [type, setType] = useState(initialData?.type || 'Laboral');
+  const [counterparty, setCounterparty] = useState(initialData?.counterparty || '');
+  const [subject, setSubject] = useState(initialData?.summary || '');
+  const [judge, setJudge] = useState(initialData?.judge || '');
+  const [specialist, setSpecialist] = useState(initialData?.specialist || '');
+  const [cuaderno, setCuaderno] = useState(initialData?.cuaderno || '');
+  const [escritoNro, setEscritoNro] = useState(initialData?.escritoNro || '');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!clientName.trim() || !caseId.trim()) return;
+    if (!clientName.trim()) return;
 
     const newCase = {
-      id: caseId.trim(),
+      ...(initialData || {}),
+      id: caseId.trim() || undefined,
       clientName: clientName.trim(),
       dni: dni.trim(),
       type,
@@ -39,13 +40,16 @@ const CreateCaseModal = ({ onClose, onSave }) => {
       specialist: specialist.trim(),
       cuaderno: cuaderno.trim(),
       escritoNro: escritoNro.trim(),
-      status: 'Activo',
       summary: subject.trim(),
       lastUpdate: new Date().toISOString().split('T')[0],
-      documents: [],
-      notes: [],
-      importantDates: [],
     };
+
+    if (!initialData) {
+      newCase.status = 'Activo';
+      newCase.documents = [];
+      newCase.notes = [];
+      newCase.importantDates = [];
+    }
 
     onSave(newCase);
     onClose();
@@ -57,10 +61,10 @@ const CreateCaseModal = ({ onClose, onSave }) => {
         <div className="flex items-center justify-between border-b border-white/[0.05] p-8">
           <div>
             <h3 className="font-serif text-2xl font-medium text-brand-ivory">
-              Nuevo expediente
+              {initialData ? 'Editar expediente' : 'Nuevo expediente'}
             </h3>
             <p className="mt-1 text-xs text-brand-accent/60">
-              5 datos basicos. La IA completara el resto al subir la primera resolucion.
+              {initialData ? 'Actualiza los datos basicos del caso.' : '5 datos basicos. La IA completara el resto al subir la primera resolucion.'}
             </p>
           </div>
           <button
@@ -83,10 +87,10 @@ const CreateCaseModal = ({ onClose, onSave }) => {
                 type="text"
                 value={caseId}
                 onChange={(e) => setCaseId(e.target.value)}
-                placeholder="Ej. EXP-001-2026"
-                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3.5 pl-12 pr-5 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/30 focus:border-brand-gold/40"
-                autoFocus
-                required
+                placeholder="Ej. EXP-001-2026 (Dejar en blanco para autogenerar)"
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3.5 pl-12 pr-5 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/30 focus:border-brand-gold/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                autoFocus={!initialData}
+                disabled={!!initialData}
               />
             </div>
           </div>

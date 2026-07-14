@@ -47,6 +47,7 @@ import { getStoredDriveToken } from '../services/googleDriveService';
 import { loadAllPreferencesAsync } from '../services/userPreferencesStore';
 import { listAssistants } from '../services/personalizationStore';
 import ShareCaseModal from './ShareCaseModal';
+import CreateCaseModal from './CreateCaseModal';
 
 const CaseWorkspace = ({ caseId, onClose, session }) => {
   const [caseData, setCaseData] = useState(null);
@@ -97,6 +98,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
   const [showDrivePicker, setShowDrivePicker] = useState(false);
   const [showDocumentWriter, setShowDocumentWriter] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -593,6 +595,13 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
                 Compartir
               </button>
             )}
+            <button
+              onClick={() => setShowEditModal(true)}
+              className="rounded-lg border border-white/[0.08] p-2 text-brand-accent hover:border-brand-gold/40 hover:bg-brand-gold/10 hover:text-brand-gold transition-colors"
+              title="Editar Datos del Expediente"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
             <button
               onClick={handleExportPdf}
               className="rounded-lg border border-white/[0.08] p-2 text-brand-accent hover:border-brand-gold/40 hover:bg-brand-gold/10 hover:text-brand-gold transition-colors"
@@ -1186,6 +1195,18 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
           handleUpdate({ documents: updatedDocs });
           toast.success(`"${doc.name}" guardado en el expediente`);
           setShowDocumentWriter(false);
+        }}
+      />
+    )}
+    {showEditModal && (
+      <CreateCaseModal
+        initialData={caseData}
+        onClose={() => setShowEditModal(false)}
+        onSave={async (updatedData) => {
+          // Remove auto-generated fields if any or just update everything
+          const { id, documents, notes, importantDates, status, lastUpdate, ...changes } = updatedData;
+          await handleUpdate(changes);
+          toast.success('Datos del expediente actualizados');
         }}
       />
     )}
