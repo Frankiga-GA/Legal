@@ -171,10 +171,14 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
   const officialReferences = Array.isArray(caseData.officialReferences) ? caseData.officialReferences : [];
 
   const handleUpdate = async (changes) => {
-    const { cases: allCases } = await loadCases();
-    const result = await updateCaseAsync(allCases, caseData.id, changes);
-    setCaseData(result.updatedCase);
-    syncCalendar(allCases);
+    try {
+      const { cases: allCases } = await loadCases();
+      const result = await updateCaseAsync(allCases, caseData.id, changes);
+      setCaseData(result.updatedCase);
+      syncCalendar(allCases).catch(e => console.warn('Error sincronizando calendario en background:', e));
+    } catch (err) {
+      console.error('Error al actualizar el expediente:', err);
+    }
   };
 
   const syncCalendar = async (allCases) => {

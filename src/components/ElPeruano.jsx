@@ -124,14 +124,14 @@ const ElPeruano = () => {
 
     loadCases().then((result) => {
       if (isMounted) setCases(result.cases);
-    });
+    }).catch(console.error);
 
     loadSavedRegistryItems().then((result) => {
       if (!isMounted) return;
       setSavedItems(result.items);
       setSavedItemsSource(result.source);
       if (result.error) setStatusMessage('Biblioteca normativa cargada localmente. Supabase no respondio.');
-    });
+    }).catch(console.error);
 
     return () => {
       isMounted = false;
@@ -143,7 +143,7 @@ const ElPeruano = () => {
     const handle = window.setTimeout(() => {
       fetchOfficialRegistryItems(query).then((result) => {
         if (isMounted) applyRegistryResult(result);
-      });
+      }).catch(console.error);
     }, 350);
     return () => {
       isMounted = false;
