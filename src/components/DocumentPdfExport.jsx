@@ -1,4 +1,5 @@
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
+import React from 'react';
 
 // Registrar fuentes estándar
 Font.register({
