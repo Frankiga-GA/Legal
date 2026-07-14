@@ -60,7 +60,7 @@ export const deleteCalendarEvent = async (eventId) => {
     method: 'DELETE',
     headers,
   });
-  if (!response.ok && response.status !== 404) {
+  if (!response.ok && response.status !== 404 && response.status !== 410) {
     await handleResponse(response);
   }
 };
