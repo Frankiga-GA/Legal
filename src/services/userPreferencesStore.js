@@ -71,41 +71,20 @@ const writeAreaAsync = async (userId, area, value) => {
   if (!userId) return false;
 
   try {
-    // Primero traemos las preferencias actuales para no sobreescribir las otras áreas
-    const { data: current, error: fetchError } = await supabase
+    // Actualización atómica directa a la base de datos para evitar colisiones
+    const { error: updateError } = await supabase
       .from('user_preferences')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+      .update({ [area]: value, updated_at: new Date().toISOString() })
+      .eq('user_id', userId);
 
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      console.error('Error fetching current prefs for update:', fetchError);
-      return false;
-    }
-
-    const upsertData = {
-      user_id: userId,
-      firm: current?.firm || {},
-      ai: current?.ai || {},
-      notifications: current?.notifications || {},
-      updated_at: new Date().toISOString()
-    };
-
-    // Actualizamos el área específica
-    upsertData[area] = value;
-
-    const { error: upsertError } = await supabase
-      .from('user_preferences')
-      .upsert(upsertData, { onConflict: 'user_id' });
-
-    if (upsertError) {
-      console.error('Error upserting preferences:', upsertError);
+    if (updateError) {
+      console.error(`Error updating preference area ${area}:`, updateError);
       return false;
     }
 
     return true;
   } catch (err) {
-    console.error('Error in writeAreaAsync:', err);
+    console.error(`Error in writeAreaAsync (${area}):`, err);
     return false;
   }
 };
