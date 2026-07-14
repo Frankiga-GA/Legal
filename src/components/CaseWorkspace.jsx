@@ -40,6 +40,7 @@ import { loadCaseChats, saveCaseChat, clearCaseChats, deleteCaseChatMsg, deleteC
 import AiMessage from './AiMessage';
 import CitationPanel from './CitationPanel';
 import DocumentWriter from './DocumentWriter';
+import DocumentPreviewModal from './DocumentPreviewModal';
 import DriveFilePicker from './DriveFilePicker';
 import { collectCitations } from '../utils/citationParser';
 import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
@@ -79,6 +80,8 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
 
   // Right panel AI State
   const [aiInput, setAiInput] = useState('');
+  const [aiError, setAiError] = useState(null);
+  const [previewDoc, setPreviewDoc] = useState(null);
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [aiMessages, setAiMessages] = useState([]);
   const [citationPanelOpen, setCitationPanelOpen] = useState(false);
@@ -737,7 +740,12 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="truncate text-sm font-bold text-brand-ivory">{doc.name}</p>
+                            <button 
+                              onClick={() => setPreviewDoc(doc)}
+                              className="truncate text-sm font-bold text-brand-ivory hover:text-brand-gold transition-colors text-left"
+                            >
+                              {doc.name}
+                            </button>
                             {doc.source === 'drive' && (
                               <a href={doc.webViewLink} target="_blank" rel="noopener noreferrer" className="shrink-0 text-brand-gold hover:text-brand-ivory" title="Abrir en Google Drive">
                                 <HardDrive className="h-3.5 w-3.5" />
@@ -1202,6 +1210,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
         }}
       />
     )}
+    <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />
     {showEditModal && (
       <CreateCaseModal
         initialData={caseData}
