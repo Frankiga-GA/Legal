@@ -187,6 +187,7 @@ const GlobalChat = ({ onBack }) => {
         console.warn('No se pudo guardar la respuesta en Supabase.', err?.message);
       });
     } catch (err) {
+      if (err.message === 'USER_ABORT') return;
       const msg = friendlyError(err);
       setError(msg);
       // Reemplaza el placeholder con el mensaje de error
@@ -285,6 +286,7 @@ const GlobalChat = ({ onBack }) => {
         )
       );
     } catch (err) {
+      if (err.message === 'USER_ABORT') return;
       const msg = friendlyError(err);
       setMessages((prev) =>
         prev.map((m) =>
