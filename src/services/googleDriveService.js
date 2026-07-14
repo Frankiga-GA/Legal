@@ -235,11 +235,13 @@ export const downloadDriveFileAsFile = async (file, token = getStoredDriveToken(
   return new File([blob], file.name || `drive-file${extension}`, { type: resolvedMimeType });
 };
 
-export const getOrCreateCaseFolder = async (caseId, clientName) => {
+export const getOrCreateCaseFolder = async (clientName) => {
   const token = getStoredDriveToken();
   if (!token) return null;
-  const folderName = `Expediente - ${caseId} - ${clientName}`;
-  const query = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const folderName = clientName || 'Sin Cliente';
+  // Use exact match but escape single quotes if any
+  const safeFolderName = folderName.replace(/'/g, "\\'");
+  const query = `name = '${safeFolderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
   
   try {
     const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`;

@@ -1,5 +1,6 @@
 import { fetchSupabaseCases, upsertSupabaseCase, insertSupabaseCase, deleteSupabaseCase } from './supabaseCaseStore';
 import { clearCaseChats } from './chatHistoryStore';
+import { getOrCreateCaseFolder, isGoogleDriveConfigured, getStoredDriveToken } from './googleDriveService';
 
 const normalizeCase = (caseData) => ({
   ...caseData,
@@ -30,6 +31,12 @@ export const addCaseAsync = async (cases, newCase) => {
   const { data: insertedCase, error } = await insertSupabaseCase(normalizedCase);
   
   if (error || !insertedCase) return { cases, error };
+  
+  if (isGoogleDriveConfigured && getStoredDriveToken()) {
+    getOrCreateCaseFolder(insertedCase.clientName).catch(err => {
+      console.warn("Fallo al crear carpeta en Drive durante creación de expediente", err);
+    });
+  }
   
   return { cases: [insertedCase, ...cases], error: null };
 };

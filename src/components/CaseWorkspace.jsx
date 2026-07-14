@@ -225,7 +225,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
       // 2. Backup automático a Google Drive
       if (isGoogleDriveConfigured && getStoredDriveToken()) {
         try {
-          const folderId = await getOrCreateCaseFolder(caseId, caseData.clientName || 'Sin Cliente');
+          const folderId = await getOrCreateCaseFolder(caseData.clientName);
           if (folderId) {
             await uploadFileToDrive(file, folderId);
             if (showToast) showToast.success('Copia de seguridad guardada en Drive.');
