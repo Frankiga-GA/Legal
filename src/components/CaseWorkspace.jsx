@@ -325,24 +325,6 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
     toast.success(`${newDocs.length} archivo(s) importado(s) desde Drive`);
   };
 
-  const handleExportPdf = async () => {
-    try {
-      const { pdf } = await import('@react-pdf/renderer');
-      const { default: CasePdfExport } = await import('./CasePdfExport');
-      const blob = await pdf(<CasePdfExport caseData={caseData} firmProfile={firmProfile} />).toBlob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const safeName = (caseData.name || 'expediente').replace(/[<>:"/\\|?*]/g, '_');
-      a.download = `${caseData.id} - ${safeName}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('PDF exportado correctamente');
-    } catch (e) {
-      console.error('PDF export error:', e);
-      toast.error('Error al exportar PDF: ' + (e.message || 'desconocido'));
-    }
-  };
 
   const handleDeleteDoc = (docId) => {
     setDeleteConfirm({ type: 'doc', id: docId });
@@ -612,13 +594,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
               </button>
             )}
 
-            <button
-              onClick={handleExportPdf}
-              className="rounded-lg border border-white/[0.08] p-2 text-brand-accent hover:border-brand-gold/40 hover:bg-brand-gold/10 hover:text-brand-gold transition-colors"
-              title="Exportar PDF"
-            >
-              <FileText className="h-4 w-4" />
-            </button>
+
             <button
               onClick={() => setShowDocumentWriter(true)}
               className="rounded-lg border border-white/[0.08] px-3 py-2 text-xs font-bold text-brand-gold hover:border-brand-gold/40 hover:bg-brand-gold/10 transition-colors"
