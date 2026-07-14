@@ -1,17 +1,5 @@
-import { fetchSupabaseCases, upsertSupabaseCase, deleteSupabaseCase } from './supabaseCaseStore';
+import { fetchSupabaseCases, upsertSupabaseCase, insertSupabaseCase, deleteSupabaseCase } from './supabaseCaseStore';
 import { clearCaseChats } from './chatHistoryStore';
-
-const generateCaseId = (cases) => {
-  const year = new Date().getFullYear();
-  const prefix = `EXP-${year}-`;
-  const maxNum = (Array.isArray(cases) ? cases : []).reduce((max, caseItem) => {
-    const match = /^EXP-\d{4}-(\d+)$/.exec(caseItem?.id || '');
-    if (!match) return max;
-    const num = parseInt(match[1], 10);
-    return Number.isFinite(num) && num > max ? num : max;
-  }, 0);
-  return `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
-};
 
 const normalizeCase = (caseData) => ({
   ...caseData,
@@ -38,11 +26,12 @@ export const loadCases = async () => {
 };
 
 export const addCaseAsync = async (cases, newCase) => {
-  const withId = newCase.id ? newCase : { ...newCase, id: generateCaseId(cases) };
-  const normalizedCase = normalizeCase(withId);
-  const { error } = await upsertSupabaseCase(normalizedCase);
-  if (error) return { cases, error };
-  return { cases: [normalizedCase, ...cases], error: null };
+  const normalizedCase = normalizeCase(newCase);
+  const { data: insertedCase, error } = await insertSupabaseCase(normalizedCase);
+  
+  if (error || !insertedCase) return { cases, error };
+  
+  return { cases: [insertedCase, ...cases], error: null };
 };
 
 export const updateCaseAsync = async (cases, caseId, changes) => {

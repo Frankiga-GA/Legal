@@ -102,6 +102,37 @@ export const upsertSupabaseCase = async (caseData) => {
   return { error, skipped: false };
 };
 
+export const insertSupabaseCase = async (caseData) => {
+  if (!canUseSupabaseCases()) {
+    // Modo local: simular un ID temporal
+    return { data: { ...caseData, id: `temp-${Date.now()}` }, error: null, skipped: true };
+  }
+
+  const userId = await getCurrentUserId();
+  if (!userId) return { data: null, error: null, skipped: true };
+
+  const payload = {
+    ...toDbCase(caseData),
+    user_id: userId,
+  };
+  
+  // Borramos el ID local o temporal para que el trigger SQL de Supabase lo genere
+  delete payload.id;
+
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error || !data) return { data: null, error, skipped: false };
+  
+  // Retornamos el objeto ya mapeado con el ID final (ej: EXP-2026-015)
+  const mapped = toAppCase(data);
+  mapped.isOwner = true;
+  return { data: mapped, error: null, skipped: false };
+};
+
 export const replaceSupabaseCases = async (cases) => {
   if (!canUseSupabaseCases()) return { error: null, skipped: true };
 
