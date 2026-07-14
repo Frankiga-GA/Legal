@@ -267,17 +267,30 @@ export const uploadFileToDrive = async (file, folderId) => {
   const token = getStoredDriveToken();
   if (!token) throw new Error('No hay sesión de Drive');
 
+  // Paso 1: Iniciar subida (resumable)
   const metadata = { name: file.name, parents: [folderId] };
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', file);
-
-  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+  const initRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token.access_token}` },
-    body: form,
+    headers: {
+      Authorization: `Bearer ${token.access_token}`,
+      'Content-Type': 'application/json',
+      'X-Upload-Content-Type': file.type || 'application/octet-stream',
+      'X-Upload-Content-Length': file.size.toString(),
+    },
+    body: JSON.stringify(metadata),
   });
 
-  if (!res.ok) throw new Error('Error subiendo archivo a Drive');
-  return res.json();
+  if (!initRes.ok) throw new Error('Error iniciando subida a Drive');
+  
+  const uploadUrl = initRes.headers.get('Location');
+  if (!uploadUrl) throw new Error('No se recibió URL de subida de Drive');
+
+  // Paso 2: Subir el contenido binario real
+  const uploadRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    body: file,
+  });
+
+  if (!uploadRes.ok) throw new Error('Error subiendo archivo a Drive');
+  return uploadRes.json();
 };
