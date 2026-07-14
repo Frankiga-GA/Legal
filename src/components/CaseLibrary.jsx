@@ -540,6 +540,8 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
                   onOpen={() => onOpenCase(caso.id)}
                   onUpload={(e) => handleQuickUpload(e, caso.id)}
                   onCycleStatus={handleCycleStatus}
+                  isSelected={selectedCases.has(caso.id)}
+                  onToggleSelection={(e) => toggleSelection(caso.id, e)}
                 />
               ))
             ) : (
@@ -1245,7 +1247,7 @@ const toneClass = {
   normal: 'text-brand-accent',
 };
 
-const CaseCard = ({ caso, isUploading, uploadStatus, onOpen, onUpload, onCycleStatus }) => {
+const CaseCard = ({ caso, isUploading, uploadStatus, onOpen, onUpload, onCycleStatus, isSelected, onToggleSelection }) => {
   const nextDate = getNextImportantDate(caso.importantDates);
   const countdown = nextDate ? formatCountdown(nextDate.date) : null;
   const hasDocs = Array.isArray(caso.documents) && caso.documents.length > 0;
@@ -1264,10 +1266,22 @@ const CaseCard = ({ caso, isUploading, uploadStatus, onOpen, onUpload, onCycleSt
   return (
     <article
       onClick={onOpen}
-      className={`group relative flex cursor-pointer flex-col gap-4 overflow-hidden rounded-xl border border-white/[0.08] border-l-4 ${urgencyBorder} bg-white/[0.015] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/[0.15] hover:bg-white/[0.03] hover:shadow-xl hover:shadow-black/40`}
+      className={`group relative flex cursor-pointer flex-col gap-4 overflow-hidden rounded-xl border border-white/[0.08] border-l-4 ${urgencyBorder} bg-white/[0.015] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/[0.15] hover:bg-white/[0.03] hover:shadow-xl hover:shadow-black/40 ${isSelected ? '!border-brand-gold/50 !bg-brand-gold/[0.05]' : ''}`}
     >
+      <div 
+        className="absolute top-4 right-4 z-10" 
+        onClick={(e) => e.stopPropagation()}
+      >
+        <input
+          type="checkbox"
+          checked={isSelected || false}
+          onChange={onToggleSelection}
+          className="h-4 w-4 rounded border-white/[0.2] bg-brand-dark text-brand-gold focus:ring-0 focus:ring-offset-0 cursor-pointer shadow-md"
+        />
+      </div>
+
       {/* Header: avatar + nombre + badge urgencia */}
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-3 pr-6">
         <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold tracking-wider ${getAvatarClass(caso.clientName)}`}>
           {getInitials(caso.clientName)}
         </div>
