@@ -259,7 +259,7 @@ const CreateCaseModal = ({ onClose, onSave, initialData = null }) => {
             onClick={handleSubmit}
             className="flex-1 rounded-lg bg-brand-ivory px-6 py-3 font-bold text-brand-black transition-colors hover:bg-white"
           >
-            Crear expediente
+            {initialData ? 'Guardar cambios' : 'Crear expediente'}
           </button>
         </div>
       </div>
