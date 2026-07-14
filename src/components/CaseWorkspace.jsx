@@ -222,8 +222,8 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
         if (showToast) showToast.warn('Nota: No se pudo guardar el archivo original en la nube.');
       }
 
-      // 2. Backup automático a Google Drive
-      if (isGoogleDriveConfigured && getStoredDriveToken()) {
+      // 2. Backup automático a Google Drive (SOLO si el usuario es el dueño del expediente)
+      if (isGoogleDriveConfigured && getStoredDriveToken() && caseData?.isOwner) {
         try {
           const folderId = await getOrCreateCaseFolder(caseData.clientName);
           if (folderId) {
