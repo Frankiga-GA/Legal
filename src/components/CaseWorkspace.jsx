@@ -115,7 +115,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
             },
           ] : prev);
         }
-      });
+      }).catch(console.error);
     };
 
     fetchCase();
@@ -129,7 +129,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
       if (messages && messages.length > 0) {
         setAiMessages(messages);
       }
-    });
+    }).catch(console.error);
 
     if (isSupabaseConfigured) {
       channel = supabase

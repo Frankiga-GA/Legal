@@ -837,7 +837,7 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
                       const urgencyRowClass = getUrgencyRowClass(getEffectiveUrgency(caso));
 
                       return (
-                        <tr key={caso.id} className={`group cursor-pointer transition-colors ${urgencyRowClass} hover:!bg-white/[0.05]`} onClick={() => onOpenCase(caso.id)}>
+                        <tr key={caso.id} className={`group cursor-pointer transition-colors ${urgencyRowClass} hover:!bg-white/[0.05]`} onClick={() => onOpenCase(caso.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCase(caso.id); } }}>
                           <td className="px-6 py-5">
                             <div className="flex items-center gap-4">
                               <div className="rounded-lg bg-white/[0.03] p-2.5 transition-colors group-hover:bg-brand-gold/10">

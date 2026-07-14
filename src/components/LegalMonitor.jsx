@@ -86,7 +86,7 @@ const LegalMonitor = ({ setActiveTab }) => {
 
     loadCases().then((result) => {
       if (isMounted) setCases(result.cases);
-    });
+    }).catch(console.error);
 
     return () => {
       isMounted = false;

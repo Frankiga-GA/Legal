@@ -28,7 +28,7 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
 
     loadCases().then((result) => {
       if (isMounted) setCases(result.cases);
-    });
+    }).catch(console.error);
 
     return () => {
       isMounted = false;

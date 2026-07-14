@@ -102,7 +102,7 @@ const ElPeruano = () => {
       return next;
     });
 
-    targets.forEach(async (item) => {
+    Promise.all(targets.map(async (item) => {
       const related = getRelatedCases(item, allCases);
       try {
         const analysis = await analyzeOfficialRegistryItem({ item, cases: allCases });
@@ -110,7 +110,7 @@ const ElPeruano = () => {
       } catch (error) {
         setAutoAnalyses((prev) => ({ ...prev, [item.id]: { status: 'error', relatedCount: related.length } }));
       }
-    });
+    })).catch(console.error);
   };
 
   const loadRegistry = async () => {
