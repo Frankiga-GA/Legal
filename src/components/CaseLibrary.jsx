@@ -24,6 +24,7 @@ import {
   Inbox,
 } from 'lucide-react';
 import CreateCaseModal from './CreateCaseModal';
+import MultiShareModal from './MultiShareModal';
 import { addCaseAsync, deleteCaseAsync, loadCases, updateCaseAsync } from '../services/caseStore';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
 import { extractResolutionDetails } from '../services/geminiService';
@@ -53,6 +54,7 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
   const setFocusTab = (tab) => { setFocusTabInternal(tab); onFocusTabChange?.(tab); };
 
   // Bulk share states
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedCases, setSelectedCases] = useState(new Set());
   const [showMultiShare, setShowMultiShare] = useState(false);
 
@@ -390,8 +392,22 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
             </div>
             
             <button
+              onClick={() => {
+                setIsSelectionMode(!isSelectionMode);
+                if (isSelectionMode) setSelectedCases(new Set());
+              }}
+              className={`inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-semibold transition-colors ${
+                isSelectionMode 
+                  ? 'border-brand-gold bg-brand-gold/10 text-brand-gold' 
+                  : 'border-white/[0.08] bg-white/[0.02] text-brand-accent hover:border-brand-gold/25 hover:text-brand-ivory'
+              }`}
+            >
+              <Check className="h-4 w-4" />
+              {isSelectionMode ? 'Cancelar' : 'Seleccionar'}
+            </button>
+            <button
               onClick={() => setActiveTab?.('ai-chat')}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] px-5 py-3 text-sm font-semibold text-brand-accent hover:border-brand-gold/25 hover:text-brand-ivory transition-colors"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-sm font-semibold text-brand-accent hover:border-brand-gold/25 hover:text-brand-ivory transition-colors"
             >
               <MessageSquare className="h-4 w-4" />
               Asistente IA
@@ -542,6 +558,7 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
                   onCycleStatus={handleCycleStatus}
                   isSelected={selectedCases.has(caso.id)}
                   onToggleSelection={(e) => toggleSelection(caso.id, e)}
+                  isSelectionMode={isSelectionMode}
                 />
               ))
             ) : (
@@ -843,19 +860,21 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="border-b border-white/[0.08] bg-white/[0.03]">
-                    <th className="px-6 py-4 w-12 text-center text-xs font-bold uppercase tracking-wider text-brand-accent">
-                      <input
-                        type="checkbox"
-                        checked={selectedCases.size > 0 && selectedCases.size === filteredCases.length}
-                        ref={input => {
-                          if (input) {
-                            input.indeterminate = selectedCases.size > 0 && selectedCases.size < filteredCases.length;
-                          }
-                        }}
-                        onChange={toggleAllSelection}
-                        className="h-4 w-4 rounded border-white/[0.2] bg-transparent text-brand-gold focus:ring-0 focus:ring-offset-0 cursor-pointer"
-                      />
-                    </th>
+                    {isSelectionMode && (
+                      <th className="px-6 py-4 w-12 text-center text-xs font-bold uppercase tracking-wider text-brand-accent">
+                        <input
+                          type="checkbox"
+                          checked={selectedCases.size > 0 && selectedCases.size === filteredCases.length}
+                          ref={input => {
+                            if (input) {
+                              input.indeterminate = selectedCases.size > 0 && selectedCases.size < filteredCases.length;
+                            }
+                          }}
+                          onChange={toggleAllSelection}
+                          className="h-4 w-4 rounded border-white/[0.2] bg-transparent text-brand-gold focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                        />
+                      </th>
+                    )}
                     <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-brand-accent">Identificador</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-brand-accent">Cliente</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-brand-accent">Materia</th>
@@ -873,15 +892,23 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
                       const isSelected = selectedCases.has(caso.id);
 
                       return (
-                        <tr key={caso.id} className={`group cursor-pointer transition-colors ${urgencyRowClass} hover:!bg-white/[0.05] ${isSelected ? '!bg-brand-gold/[0.05]' : ''}`} onClick={() => onOpenCase(caso.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCase(caso.id); } }}>
-                          <td className="px-6 py-5 text-center" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={(e) => toggleSelection(caso.id, e)}
-                              className="h-4 w-4 rounded border-white/[0.2] bg-transparent text-brand-gold focus:ring-0 focus:ring-offset-0 cursor-pointer"
-                            />
-                          </td>
+                        <tr key={caso.id} className={`group cursor-pointer transition-colors ${urgencyRowClass} hover:!bg-white/[0.05] ${isSelected && isSelectionMode ? '!bg-brand-gold/[0.05]' : ''}`} onClick={(e) => { 
+                          if (isSelectionMode) { 
+                            toggleSelection(caso.id, e);
+                          } else {
+                            onOpenCase(caso.id);
+                          }
+                        }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCase(caso.id); } }}>
+                          {isSelectionMode && (
+                            <td className="px-6 py-5 text-center" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => toggleSelection(caso.id, e)}
+                                className="h-4 w-4 rounded border-white/[0.2] bg-transparent text-brand-gold focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                              />
+                            </td>
+                          )}
                           <td className="px-6 py-5">
                             <div className="flex items-center gap-4">
                               <div className="rounded-lg bg-white/[0.03] p-2.5 transition-colors group-hover:bg-brand-gold/10">
@@ -1247,7 +1274,7 @@ const toneClass = {
   normal: 'text-brand-accent',
 };
 
-const CaseCard = ({ caso, isUploading, uploadStatus, onOpen, onUpload, onCycleStatus, isSelected, onToggleSelection }) => {
+const CaseCard = ({ caso, isUploading, uploadStatus, onOpen, onUpload, onCycleStatus, isSelected, onToggleSelection, isSelectionMode }) => {
   const nextDate = getNextImportantDate(caso.importantDates);
   const countdown = nextDate ? formatCountdown(nextDate.date) : null;
   const hasDocs = Array.isArray(caso.documents) && caso.documents.length > 0;
@@ -1265,23 +1292,31 @@ const CaseCard = ({ caso, isUploading, uploadStatus, onOpen, onUpload, onCycleSt
 
   return (
     <article
-      onClick={onOpen}
+      onClick={(e) => {
+        if (isSelectionMode) {
+          onToggleSelection(e);
+        } else {
+          onOpen();
+        }
+      }}
       className={`group relative flex cursor-pointer flex-col gap-4 overflow-hidden rounded-xl border border-white/[0.08] border-l-4 ${urgencyBorder} bg-white/[0.015] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/[0.15] hover:bg-white/[0.03] hover:shadow-xl hover:shadow-black/40 ${isSelected ? '!border-brand-gold/50 !bg-brand-gold/[0.05]' : ''}`}
     >
-      <div 
-        className="absolute top-4 right-4 z-10" 
-        onClick={(e) => e.stopPropagation()}
-      >
-        <input
-          type="checkbox"
-          checked={isSelected || false}
-          onChange={onToggleSelection}
-          className="h-4 w-4 rounded border-white/[0.2] bg-brand-dark text-brand-gold focus:ring-0 focus:ring-offset-0 cursor-pointer shadow-md"
-        />
-      </div>
+      {isSelectionMode && (
+        <div 
+          className="absolute top-4 right-4 z-10" 
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={isSelected || false}
+            onChange={onToggleSelection}
+            className="h-4 w-4 rounded border-white/[0.2] bg-brand-dark text-brand-gold focus:ring-0 focus:ring-offset-0 cursor-pointer shadow-md"
+          />
+        </div>
+      )}
 
       {/* Header: avatar + nombre + badge urgencia */}
-      <div className="flex items-start gap-3 pr-6">
+      <div className={`flex items-start gap-3 ${isSelectionMode ? 'pr-6' : ''}`}>
         <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold tracking-wider ${getAvatarClass(caso.clientName)}`}>
           {getInitials(caso.clientName)}
         </div>
