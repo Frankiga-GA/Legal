@@ -52,6 +52,10 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
   const [focusTab, setFocusTabInternal] = useState(defaultFocusTab);
   const setFocusTab = (tab) => { setFocusTabInternal(tab); onFocusTabChange?.(tab); };
 
+  // Bulk share states
+  const [selectedCases, setSelectedCases] = useState(new Set());
+  const [showMultiShare, setShowMultiShare] = useState(false);
+
   // Onboarding: muestra una vez por usuario (key separada por userId)
   const onboardingKey = userId ? `lusti-onboarding-dismissed-${userId}` : 'lusti-onboarding-dismissed-anon';
   const [onboardingDismissed, setOnboardingDismissed] = useState(() => {
@@ -284,6 +288,22 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
 
   const displayedCases = filteredCases.slice(0, visibleCount);
   const hasMore = visibleCount < filteredCases.length;
+
+  const toggleSelection = (caseId, e) => {
+    e.stopPropagation();
+    const newSet = new Set(selectedCases);
+    if (newSet.has(caseId)) newSet.delete(caseId);
+    else newSet.add(caseId);
+    setSelectedCases(newSet);
+  };
+
+  const toggleAllSelection = () => {
+    if (selectedCases.size === filteredCases.length && filteredCases.length > 0) {
+      setSelectedCases(new Set());
+    } else {
+      setSelectedCases(new Set(filteredCases.map(c => c.id)));
+    }
+  };
 
   useEffect(() => {
     setVisibleCount(24);
@@ -821,6 +841,19 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="border-b border-white/[0.08] bg-white/[0.03]">
+                    <th className="px-6 py-4 w-12 text-center text-xs font-bold uppercase tracking-wider text-brand-accent">
+                      <input
+                        type="checkbox"
+                        checked={selectedCases.size > 0 && selectedCases.size === filteredCases.length}
+                        ref={input => {
+                          if (input) {
+                            input.indeterminate = selectedCases.size > 0 && selectedCases.size < filteredCases.length;
+                          }
+                        }}
+                        onChange={toggleAllSelection}
+                        className="h-4 w-4 rounded border-white/[0.2] bg-transparent text-brand-gold focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                      />
+                    </th>
                     <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-brand-accent">Identificador</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-brand-accent">Cliente</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-brand-accent">Materia</th>
@@ -835,9 +868,18 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
                     displayedCases.map((caso) => {
                       const nextDate = getNextImportantDate(caso.importantDates);
                       const urgencyRowClass = getUrgencyRowClass(getEffectiveUrgency(caso));
+                      const isSelected = selectedCases.has(caso.id);
 
                       return (
-                        <tr key={caso.id} className={`group cursor-pointer transition-colors ${urgencyRowClass} hover:!bg-white/[0.05]`} onClick={() => onOpenCase(caso.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCase(caso.id); } }}>
+                        <tr key={caso.id} className={`group cursor-pointer transition-colors ${urgencyRowClass} hover:!bg-white/[0.05] ${isSelected ? '!bg-brand-gold/[0.05]' : ''}`} onClick={() => onOpenCase(caso.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCase(caso.id); } }}>
+                          <td className="px-6 py-5 text-center" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => toggleSelection(caso.id, e)}
+                              className="h-4 w-4 rounded border-white/[0.2] bg-transparent text-brand-gold focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                            />
+                          </td>
                           <td className="px-6 py-5">
                             <div className="flex items-center gap-4">
                               <div className="rounded-lg bg-white/[0.03] p-2.5 transition-colors group-hover:bg-brand-gold/10">
@@ -955,6 +997,32 @@ const CaseLibrary = ({ setActiveTab, onOpenCase, userId, focusTab: defaultFocusT
             dismissOnboarding();
             setActiveTab?.('ai-chat');
           }}
+        />
+      )}
+
+      {selectedCases.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-fade-in-up flex items-center gap-4 rounded-2xl bg-brand-black/90 p-3 pr-4 shadow-2xl backdrop-blur-md border border-white/[0.1]">
+          <div className="flex items-center gap-2 px-3">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-gold/20 text-[11px] font-bold text-brand-gold">
+              {selectedCases.size}
+            </span>
+            <span className="text-sm font-semibold text-brand-ivory">seleccionados</span>
+          </div>
+          <div className="h-6 w-px bg-white/[0.1]" />
+          <button
+            onClick={() => setShowMultiShare(true)}
+            className="flex items-center gap-2 rounded-xl bg-brand-gold px-5 py-2.5 text-sm font-bold text-brand-black transition-transform hover:scale-105 active:scale-95"
+          >
+            Compartir Lote
+          </button>
+        </div>
+      )}
+
+      {showMultiShare && (
+        <MultiShareModal
+          caseIds={Array.from(selectedCases)}
+          onClose={() => setShowMultiShare(false)}
+          onSuccess={() => setSelectedCases(new Set())}
         />
       )}
     </div>
