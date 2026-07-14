@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, FileText, Folder, Loader2, HardDrive } from 'lucide-react';
-import { getStoredDriveToken, listDriveChildren, listDriveFolders, listDriveFiles, DRIVE_TEXT_MIME_TYPES } from '../services/googleDriveService';
+import { getStoredDriveToken, listDriveChildren, listDriveFolders, listDriveFiles, DRIVE_TEXT_MIME_TYPES, connectGoogleDrive } from '../services/googleDriveService';
 
 const DriveFilePicker = ({ onSelect, onClose }) => {
   const [folders, setFolders] = useState([]);
@@ -98,7 +98,29 @@ const DriveFilePicker = ({ onSelect, onClose }) => {
           ))}
         </div>
 
-        {error && <p className="px-4 py-2 text-xs text-red-400">{error}</p>}
+        {error === 'ERROR_AUTH_EXPIRED' ? (
+          <div className="m-4 flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/10 p-4">
+            <div>
+              <p className="text-sm font-bold text-red-200">Sesión de Google Drive Caducada</p>
+              <p className="text-xs text-red-200/70 mt-1">Vuelve a conectar tu cuenta para seguir navegando.</p>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  await connectGoogleDrive();
+                  loadRoot();
+                } catch (e) {
+                  console.error(e);
+                }
+              }}
+              className="rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-bold text-red-200 hover:bg-red-500/30"
+            >
+              Reconectar
+            </button>
+          </div>
+        ) : error ? (
+          <p className="px-4 py-2 text-xs text-red-400">{error}</p>
+        ) : null}
 
         <div className="flex-1 overflow-y-auto p-2">
           {loading ? (

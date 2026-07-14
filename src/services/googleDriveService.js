@@ -192,23 +192,23 @@ const fetchDrive = async (token, query, pageSize) => {
 };
 
 export const listDriveFolders = async (token = getStoredDriveToken()) => {
-  if (!token?.access_token) return [];
+  if (!token?.access_token) throw new Error('ERROR_AUTH_EXPIRED');
   return fetchDrive(token, "mimeType = 'application/vnd.google-apps.folder' and trashed = false", '150');
 };
 
 export const listDriveFiles = async (token = getStoredDriveToken()) => {
-  if (!token?.access_token) return [];
+  if (!token?.access_token) throw new Error('ERROR_AUTH_EXPIRED');
   return fetchDrive(token, "trashed = false");
 };
 
 export const listDriveChildren = async (folderId = 'root', token = getStoredDriveToken()) => {
-  if (!token?.access_token) return [];
+  if (!token?.access_token) throw new Error('ERROR_AUTH_EXPIRED');
   const safeFolderId = String(folderId || 'root').replace(/'/g, "\\'");
   return fetchDrive(token, `'${safeFolderId}' in parents and trashed = false`, '100');
 };
 
 export const downloadDriveFileAsFile = async (file, token = getStoredDriveToken()) => {
-  if (!token?.access_token) throw new Error('No hay token valido de Google Drive.');
+  if (!token?.access_token) throw new Error('ERROR_AUTH_EXPIRED');
   if (!file?.id) throw new Error('No se encontro el identificador del archivo de Drive.');
 
   const mimeType = file.mimeType || '';

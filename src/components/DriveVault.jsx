@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ExternalLink, FileText, FolderOpen, HardDrive, RefreshCw, Search } from 'lucide-react';
-import { listDriveFiles, listDriveFolders } from '../services/googleDriveService';
+import { listDriveFiles, listDriveFolders, connectGoogleDrive } from '../services/googleDriveService';
 
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 
@@ -41,7 +41,6 @@ const DriveVault = () => {
     } catch (driveError) {
       console.warn('No se pudo cargar Drive.', driveError);
       setError(driveError?.message || 'No se pudo cargar Google Drive.');
-      setFolders([]);
       setFiles([]);
     } finally {
       setIsLoading(false);
@@ -114,6 +113,28 @@ const DriveVault = () => {
           <Metric label="Archivos" value={files.length} />
           <Metric label="Estado" value={isLoading ? 'Cargando' : error ? 'Error' : 'Listo'} />
         </section>
+
+        {error === 'ERROR_AUTH_EXPIRED' && (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-5 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-red-200">Sesión de Google Drive Caducada</h3>
+              <p className="text-xs text-red-200/70 mt-1">Por medidas de seguridad, Google cerró tu conexión de 1 hora. Vuelve a conectar para ver tus archivos.</p>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  await connectGoogleDrive();
+                  loadDrive();
+                } catch (e) {
+                  console.error(e);
+                }
+              }}
+              className="rounded-lg bg-red-500/20 px-4 py-2 text-xs font-bold text-red-200 hover:bg-red-500/30"
+            >
+              Reconectar Drive
+            </button>
+          </div>
+        )}
 
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-5">
