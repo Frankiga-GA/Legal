@@ -81,6 +81,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
   // Right panel AI State
   const [aiInput, setAiInput] = useState('');
   const [aiError, setAiError] = useState(null);
+  const [mobileAiOpen, setMobileAiOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [aiMessages, setAiMessages] = useState([]);
@@ -990,7 +991,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
       </div>
 
       {/* RIGHT COLUMN: AI Chat Contextual */}
-      <div className="flex h-full w-full flex-col bg-brand-black md:w-2/5 lg:w-[40%]">
+      <div className={`fixed inset-0 z-50 flex h-full w-full flex-col bg-brand-black transition-transform duration-300 md:static md:w-2/5 lg:w-[40%] md:translate-y-0 md:z-auto ${mobileAiOpen ? 'translate-y-0' : 'translate-y-full'}`}>
         <div className="flex items-center gap-3 border-b border-white/[0.08] bg-brand-dark px-6 py-4 shadow-sm shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-brand-ivory">
             <Bot className="h-5 w-5" />
@@ -999,6 +1000,9 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
             <h3 className="text-sm font-bold text-brand-ivory">Consultar Expediente</h3>
             <p className="text-[10px] uppercase tracking-wider text-brand-accent font-semibold">Contexto: {caseData.id}</p>
           </div>
+          <button onClick={() => setMobileAiOpen(false)} className="md:hidden flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] text-brand-accent hover:bg-white/[0.04]">
+            <X className="h-4 w-4" />
+          </button>
           {caseCitations.length > 0 && (
             <button
               type="button"
@@ -1211,6 +1215,14 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
           toast.success('Datos del expediente actualizados');
         }}
       />
+    )}
+    {!mobileAiOpen && (
+      <button 
+        onClick={() => setMobileAiOpen(true)} 
+        className="fixed bottom-6 right-6 z-40 md:hidden flex h-14 w-14 items-center justify-center rounded-full bg-brand-gold text-brand-black shadow-2xl shadow-brand-gold/20"
+      >
+        <Bot className="h-6 w-6" />
+      </button>
     )}
   </>
   );
