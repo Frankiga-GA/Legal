@@ -554,7 +554,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
     <div className="relative flex h-full flex-col md:flex-row overflow-hidden bg-brand-black text-brand-ivory">
       
       {/* LEFT COLUMN: Case Details */}
-      <div className="flex w-full flex-col border-r border-white/[0.08] bg-brand-dark md:w-3/5 lg:w-[60%]">
+      <div className="flex w-full min-h-0 flex-col border-r border-white/[0.08] bg-brand-dark md:w-3/5 lg:w-[60%]">
         
         {/* Header */}
         <div className="border-b border-white/[0.08] px-6 py-4 shrink-0 flex items-center justify-between">
@@ -637,7 +637,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
         </div>
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-brand-dark">
+        <div className="flex-1 overflow-y-auto min-h-0 p-6 custom-scrollbar bg-brand-dark">
           {activeTab === 'summary' && (
             <div className="space-y-6">
               <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
