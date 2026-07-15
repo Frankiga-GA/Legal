@@ -32,7 +32,7 @@ import toast, { Toaster } from 'react-hot-toast';
 
 import { askGeminiAboutCase, isGeminiConfigured, extractResolutionDetails, abortActiveRequest } from '../services/geminiService';
 import { searchLegalContext } from '../services/ragService';
-import { uploadDocumentToBackend } from '../services/documentBackendService';
+import { uploadDocumentToBackend, processDocumentFromUrl } from '../services/documentBackendService';
 import { uploadFileToStorage } from '../services/supabaseStorageService';
 import { loadCases, updateCaseAsync, deleteCaseAsync } from '../services/caseStore';
 import { isSupabaseConfigured, supabase } from '../utils/supabase';
@@ -241,7 +241,12 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
       }
 
       // 3. Extraer texto con el backend
-      const backendResponse = await uploadDocumentToBackend(file);
+      let backendResponse;
+      if (publicUrl) {
+        backendResponse = await processDocumentFromUrl(publicUrl, file.name, file.type);
+      } else {
+        backendResponse = await uploadDocumentToBackend(file);
+      }
       const extractedText = String(backendResponse?.extracted_text || '').trim();
 
       let excerpt = extractedText ? `Texto extraído (${extractedText.length} caracteres).` : 'Archivo subido. No se pudo extraer texto.';

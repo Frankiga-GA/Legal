@@ -16,6 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+import tempfile
+import google.generativeai as genai
 import httpx
 import pdfplumber
 from docx import Document
@@ -222,6 +224,12 @@ class RawAskRequest(BaseModel):
 
 class RawAskResponse(BaseModel):
     text: str
+
+
+class ProcessUrlRequest(BaseModel):
+    url: str
+    file_name: str
+    file_type: str | None = None
 
 
 def _extract_text_from_image(content_bytes: bytes, mime_type: str) -> str:
@@ -945,6 +953,65 @@ async def upload_file(
         "extracted_text": extracted_text,
     }
 
+
+
+@app.post("/process-url")
+async def process_url(
+    payload: ProcessUrlRequest,
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, str]:
+    check_rate_limit(user.user_id, limit=5, period=60)
+    
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY no configurada en el servidor.")
+        
+    genai.configure(api_key=api_key)
+    
+    # 1. Download file from Supabase URL to a temp file
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp_path = tmp.name
+            async with httpx.AsyncClient(timeout=60) as client:
+                async with client.stream('GET', payload.url) as response:
+                    if response.status_code != 200:
+                        raise HTTPException(status_code=400, detail="No se pudo descargar el archivo.")
+                    async for chunk in response.aiter_bytes():
+                        tmp.write(chunk)
+    except Exception as e:
+        print(f"Error downloading file: {e}")
+        raise HTTPException(status_code=500, detail="Error descargando el archivo interno.")
+        
+    # 2. Upload to Gemini File API and process
+    try:
+        uploaded_file = genai.upload_file(path=tmp_path, display_name=payload.file_name)
+        
+        # 3. Extract text
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        prompt = "Transcribe todo el texto visible de este documento de forma precisa. No añadas comentarios ni resúmenes, solo devuelve el texto extraído."
+        response = model.generate_content([uploaded_file, prompt])
+        
+        extracted_text = response.text
+        
+        # Limpieza manual
+        try:
+            os.remove(tmp_path)
+            genai.delete_file(uploaded_file.name)
+        except Exception:
+            pass
+            
+        return {
+            "file_name": payload.file_name,
+            "file_type": payload.file_type or "application/pdf",
+            "extracted_text": extracted_text,
+        }
+    except Exception as e:
+        print(f"Error con Gemini API: {e}")
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail="Error procesando el documento con Gemini.")
 
 
 @app.post("/ai/raw", response_model=RawAskResponse)

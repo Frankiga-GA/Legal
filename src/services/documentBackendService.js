@@ -84,6 +84,26 @@ export const uploadDocumentToBackend = async (file) => {
   }
 };
 
+export const processDocumentFromUrl = async (url, fileName, fileType = '') => {
+  const headers = await authHeaders({ 'Content-Type': 'application/json' });
+
+  try {
+    const response = await fetchWithTimeout(`${backendUrl}/process-url`, {
+      method: 'POST',
+      body: JSON.stringify({ url, file_name: fileName, file_type: fileType }),
+      headers,
+    }, 300000); // 5 minutes max (if Vercel doesn't kill it first)
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`URL Processing failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error processing document from URL:', error);
+    throw error;
+  }
+};
+
 export const requestDocumentChat = async ({ message, prompt = '', fileName = '', fileType = '', fileText = '' }) => {
   const headers = await authHeaders({ 'Content-Type': 'application/json' });
 
