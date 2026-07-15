@@ -92,8 +92,12 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [aiMessages]);
+    if (messagesEndRef.current) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 50);
+    }
+  }, [aiMessages, mobileAiOpen]);
 
   // Audiencia (link de la audiencia virtual)
   const [editingHearing, setEditingHearing] = useState(false);
