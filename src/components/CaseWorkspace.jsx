@@ -241,12 +241,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
       }
 
       // 3. Extraer texto con el backend
-      let backendResponse;
-      if (publicUrl) {
-        backendResponse = await processDocumentFromUrl(publicUrl, file.name, file.type);
-      } else {
-        backendResponse = await uploadDocumentToBackend(file);
-      }
+      const backendResponse = await uploadDocumentToBackend(file);
       const extractedText = String(backendResponse?.extracted_text || '').trim();
 
       let excerpt = extractedText ? `Texto extraído (${extractedText.length} caracteres).` : 'Archivo subido. No se pudo extraer texto.';
