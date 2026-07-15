@@ -143,8 +143,8 @@ def check_rate_limit(user_id: str, limit: int = 15, period: int = 60) -> None:
     _rate_limits[user_id].append(now)
 
 
-def _validate_file(file: UploadFile, max_size_mb: int = 15) -> None:
-    """Valida la extensión del archivo (whitelist) y su tamaño (máx 15MB)."""
+def _validate_file(file: UploadFile, max_size_mb: int = 300) -> None:
+    """Valida la extensión del archivo (whitelist) y su tamaño (máx 300MB)."""
     # 1. Validar extensión
     allowed_extensions = {".pdf", ".docx", ".txt", ".md", ".json", ".csv", ".jpg", ".jpeg", ".png", ".webp"}
     filename = (file.filename or "").lower()
