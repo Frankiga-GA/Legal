@@ -991,7 +991,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
       </div>
 
       {/* RIGHT COLUMN: AI Chat Contextual */}
-      <div className={`absolute inset-0 z-50 flex h-full w-full flex-col bg-brand-black transition-transform duration-300 md:static md:w-2/5 lg:w-[40%] md:translate-y-0 md:z-auto ${mobileAiOpen ? 'translate-y-0' : 'translate-y-full'}`}>
+      <div className={`absolute inset-0 z-50 h-full w-full flex-col bg-brand-black md:static md:w-2/5 lg:w-[40%] md:flex ${mobileAiOpen ? 'flex' : 'hidden'}`}>
         <div className="flex items-center gap-3 border-b border-white/[0.08] bg-brand-dark px-6 py-4 shadow-sm shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-brand-ivory">
             <Bot className="h-5 w-5" />
