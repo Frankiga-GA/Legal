@@ -224,7 +224,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
       const { publicUrl, error: storageError } = await uploadFileToStorage(file, caseId);
       if (storageError) {
         console.warn('No se pudo guardar el archivo original en Storage:', storageError);
-        if (showToast) showToast.warn('Nota: No se pudo guardar el archivo original en la nube.');
+        if (showToast) showToast('Nota: No se pudo guardar el archivo original en la nube.', { icon: '⚠️' });
       }
 
       // 2. Backup automático a Google Drive (SOLO si el usuario es el dueño del expediente)
@@ -285,7 +285,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
         }
       } else {
         setDocumentUploadStatus('Documento sin texto extraíble.');
-        if (showToast) showToast.warn('No se pudo extraer texto del documento');
+        if (showToast) showToast('No se pudo extraer texto del documento', { icon: '⚠️' });
       }
 
       const newDoc = {
