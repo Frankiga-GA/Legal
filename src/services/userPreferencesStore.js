@@ -12,6 +12,8 @@ const defaultsFor = () => ({
     city: '',
     headerBase64: null,
     footerBase64: null,
+    headerHeight: 90,
+    footerHeight: 70,
   },
   ai: {
     tone: 'profesional',

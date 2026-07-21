@@ -278,16 +278,18 @@ const DocumentPdfExport = ({ caseData, documentText, title, firmProfile }) => {
 
   const headerSrc = firmProfile?.headerBase64;
   const footerSrc = firmProfile?.footerBase64;
+  const headerHeight = firmProfile?.headerHeight || 90;
+  const footerHeight = firmProfile?.footerHeight || 70;
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" style={[styles.page, { paddingTop: headerHeight + 20, paddingBottom: footerHeight + 20 }]}>
         
         {/* IMAGEN DE ENCABEZADO */}
-        {headerSrc && <Image src={headerSrc} style={styles.headerImage} fixed />}
+        {headerSrc && <Image src={headerSrc} style={[styles.headerImage, { height: headerHeight }]} fixed />}
 
         {/* IMAGEN DE PIE DE PÁGINA */}
-        {footerSrc && <Image src={footerSrc} style={styles.footerImage} fixed />}
+        {footerSrc && <Image src={footerSrc} style={[styles.footerImage, { height: footerHeight }]} fixed />}
 
         {/* BLOQUE DE SUMILLA (Oculto para Carta Notarial) */}
         {!isCartaNotarial && (

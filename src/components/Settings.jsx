@@ -15,6 +15,8 @@ import {
   Moon,
   Sun,
   Loader2,
+  X,
+  Eye,
 } from 'lucide-react';
 import {
   clearStoredDriveToken,
@@ -129,6 +131,9 @@ const FirmProfile = ({ userId, userEmail }) => {
   const [profile, setProfile] = useState(null);
   const [saved, setSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showVisualEditor, setShowVisualEditor] = useState(false);
+  const [editorHeaderHeight, setEditorHeaderHeight] = useState(90);
+  const [editorFooterHeight, setEditorFooterHeight] = useState(70);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -143,6 +148,18 @@ const FirmProfile = ({ userId, userEmail }) => {
   const update = (field, value) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
     setSaved(false);
+  };
+
+  const handleOpenVisualEditor = () => {
+    setEditorHeaderHeight(profile.headerHeight || 90);
+    setEditorFooterHeight(profile.footerHeight || 70);
+    setShowVisualEditor(true);
+  };
+
+  const handleSaveVisualEditor = () => {
+    update('headerHeight', editorHeaderHeight);
+    update('footerHeight', editorFooterHeight);
+    setShowVisualEditor(false);
   };
 
   const handleSave = async () => {
@@ -198,7 +215,16 @@ const FirmProfile = ({ userId, userEmail }) => {
       </div>
 
       <div>
-        <h4 className="text-lg font-serif font-medium text-brand-ivory mb-4 border-t border-white/[0.05] pt-8">Identidad Visual (Membretes)</h4>
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 border-t border-white/[0.05] pt-8">
+          <h4 className="text-lg font-serif font-medium text-brand-ivory">Identidad Visual (Membretes)</h4>
+          <button
+            onClick={handleOpenVisualEditor}
+            className="mt-3 md:mt-0 inline-flex items-center gap-2 rounded-lg border border-brand-gold/30 bg-brand-gold/10 px-3 py-1.5 text-xs font-semibold text-brand-gold transition-colors hover:bg-brand-gold/20"
+          >
+            <Eye className="h-4 w-4" />
+            Ajustar Tamaño Visualmente
+          </button>
+        </div>
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           <div>
             <label className="mb-2 block text-sm font-semibold tracking-wide text-brand-accent/80 uppercase">Membrete Superior (Header)</label>
@@ -228,6 +254,73 @@ const FirmProfile = ({ userId, userEmail }) => {
           </span>
         )}
       </div>
+
+      {/* MODAL EDITOR VISUAL */}
+      {showVisualEditor && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-4xl rounded-2xl border border-white/[0.08] bg-brand-dark p-6 shadow-2xl flex flex-col md:flex-row gap-8 max-h-[90vh] overflow-hidden">
+            {/* Controles */}
+            <div className="flex-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+              <div className="flex items-center justify-between">
+                <h3 className="font-serif text-2xl font-medium text-brand-ivory">Editor Visual de Membretes</h3>
+                <button onClick={() => setShowVisualEditor(false)} className="rounded-full p-2 text-brand-accent/40 hover:bg-white/[0.05]">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="text-sm text-brand-accent">Ajusta la altura de los membretes. La vista previa representa una hoja A4 real y se aplicará a tus PDFs.</p>
+              
+              <div className="space-y-4 pt-4 border-t border-white/[0.05]">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-brand-accent mb-2 flex justify-between">
+                    <span>Altura Header</span>
+                    <span className="text-brand-gold">{editorHeaderHeight}px</span>
+                  </label>
+                  <input type="range" min="30" max="250" value={editorHeaderHeight} onChange={(e) => setEditorHeaderHeight(Number(e.target.value))} className="w-full accent-brand-gold" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-brand-accent mb-2 flex justify-between">
+                    <span>Altura Footer</span>
+                    <span className="text-brand-gold">{editorFooterHeight}px</span>
+                  </label>
+                  <input type="range" min="30" max="250" value={editorFooterHeight} onChange={(e) => setEditorFooterHeight(Number(e.target.value))} className="w-full accent-brand-gold" />
+                </div>
+              </div>
+              
+              <div className="pt-6">
+                <button onClick={handleSaveVisualEditor} className="w-full flex justify-center items-center gap-2 rounded-xl bg-brand-gold px-6 py-3 font-bold text-brand-black hover:bg-brand-ivory transition-colors">
+                  Aplicar y Cerrar
+                </button>
+              </div>
+            </div>
+
+            {/* Vista Previa A4 */}
+            <div className="flex-1 flex justify-center items-center bg-black/40 rounded-xl p-4 overflow-hidden">
+              <div className="relative bg-white shadow-2xl w-full max-w-[320px] aspect-[1/1.414] overflow-hidden">
+                {profile?.headerBase64 ? (
+                  <img src={profile.headerBase64} alt="Header Preview" style={{ height: `${editorHeaderHeight * 0.5}px` }} className="w-full object-contain object-top absolute top-0 left-0 right-0" />
+                ) : (
+                  <div style={{ height: `${editorHeaderHeight * 0.5}px` }} className="w-full absolute top-0 bg-gray-200 border-b border-dashed border-gray-400 flex items-center justify-center text-[10px] text-gray-500">Header</div>
+                )}
+                
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-8 opacity-20 pointer-events-none">
+                  <div className="w-full h-2 bg-gray-400 mb-2 rounded"></div>
+                  <div className="w-full h-2 bg-gray-400 mb-2 rounded"></div>
+                  <div className="w-3/4 h-2 bg-gray-400 mb-2 rounded self-start"></div>
+                  <div className="w-full h-2 bg-gray-400 mb-2 rounded mt-4"></div>
+                  <div className="w-full h-2 bg-gray-400 mb-2 rounded"></div>
+                  <div className="w-5/6 h-2 bg-gray-400 mb-2 rounded self-start"></div>
+                </div>
+
+                {profile?.footerBase64 ? (
+                  <img src={profile.footerBase64} alt="Footer Preview" style={{ height: `${editorFooterHeight * 0.5}px` }} className="w-full object-contain object-bottom absolute bottom-0 left-0 right-0" />
+                ) : (
+                  <div style={{ height: `${editorFooterHeight * 0.5}px` }} className="w-full absolute bottom-0 bg-gray-200 border-t border-dashed border-gray-400 flex items-center justify-center text-[10px] text-gray-500">Footer</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
