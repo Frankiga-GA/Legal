@@ -85,7 +85,7 @@ const LandingPage = ({ onGetStarted }) => {
   const proofPoints = [
     {
       icon: SearchCheck,
-      title: 'Demo guiada',
+      title: 'Asistencia guiada',
       text: 'Flujo claro para crear caso, cargar documentos y consultar la IA.',
     },
     {
@@ -158,7 +158,7 @@ const LandingPage = ({ onGetStarted }) => {
                     onClick={onGetStarted}
                     className="group inline-flex items-center justify-center gap-3 rounded-lg bg-brand-gold px-8 py-4 font-bold text-brand-black shadow-[0_0_30px_rgba(228,228,231,0.12)] transition-all hover:scale-[1.02] hover:bg-brand-ivory"
                   >
-                    Ver demo privada
+                    Acceder al sistema
                     <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
                   </button>
                   <a
@@ -264,7 +264,7 @@ const LandingPage = ({ onGetStarted }) => {
                 onClick={onGetStarted}
                 className="inline-flex items-center justify-center gap-3 rounded-lg bg-brand-gold px-6 py-3 text-sm font-bold text-brand-black transition-all hover:scale-[1.03] hover:bg-brand-ivory"
               >
-                Iniciar demo <ArrowRight className="h-4 w-4" />
+                Ingresar al sistema <ArrowRight className="h-4 w-4" />
               </button>
             </div>
             <div className="grid gap-4 md:grid-cols-4">
@@ -301,7 +301,7 @@ const LandingPage = ({ onGetStarted }) => {
             Muestra LUSTI como una plataforma seria desde el primer clic.
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-base font-light leading-7 text-brand-accent/65">
-            Entra a la plataforma, abre un expediente demo, carga un documento y deja que la IA muestre valor concreto.
+            Entra a la plataforma, abre un expediente, carga un documento y deja que la IA muestre valor concreto.
           </p>
           <button
             onClick={onGetStarted}

@@ -234,7 +234,7 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
                 <EmptyState
                   icon={FolderOpen}
                   title="Aun no hay expedientes"
-                  text="Crea el primer expediente demo para que el dashboard empiece a mostrar valor comercial."
+                  text="Crea tu primer expediente para que el dashboard empiece a mostrar información relevante."
                   action="Crear expediente"
                   onAction={() => setActiveTab('library')}
                 />

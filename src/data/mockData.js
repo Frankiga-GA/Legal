@@ -18,7 +18,7 @@ const buildDates = (items) => items.map((item, index) => ({
 
 const buildReferences = (items) => items.map((item, index) => ({
   id: `ref-${index + 1}`,
-  registryId: item.registryId || `demo-ref-${index + 1}`,
+  registryId: item.registryId || `exp-ref-${index + 1}`,
   title: item.title,
   date: item.date,
   type: item.type,
