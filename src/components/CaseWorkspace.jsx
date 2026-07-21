@@ -1222,8 +1222,8 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
         initialData={caseData}
         onClose={() => setShowEditModal(false)}
         onSave={async (updatedData) => {
-          // Remove auto-generated fields if any or just update everything
-          const { id, documents, notes, importantDates, status, lastUpdate, ...changes } = updatedData;
+          // Permite actualizar el ID si el usuario lo editó
+          const { documents, notes, importantDates, status, lastUpdate, ...changes } = updatedData;
           await handleUpdate(changes);
           toast.success('Datos del expediente actualizados');
         }}

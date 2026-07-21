@@ -88,9 +88,8 @@ const CreateCaseModal = ({ onClose, onSave, initialData = null }) => {
                 value={caseId}
                 onChange={(e) => setCaseId(e.target.value)}
                 placeholder="Ej. EXP-001-2026 (Dejar en blanco para autogenerar)"
-                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3.5 pl-12 pr-5 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/30 focus:border-brand-gold/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3.5 pl-12 pr-5 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/30 focus:border-brand-gold/40"
                 autoFocus={!initialData}
-                disabled={!!initialData}
               />
             </div>
           </div>
