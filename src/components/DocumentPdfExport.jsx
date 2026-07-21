@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
     right: 0,
     width: '100%',
     height: 90,
-    objectFit: 'contain',
+    objectFit: 'fill',
     objectPosition: 'center top',
   },
   footerImage: {
@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     right: 0,
     width: '100%',
     height: 70,
-    objectFit: 'contain',
+    objectFit: 'fill',
     objectPosition: 'center bottom',
   },
   

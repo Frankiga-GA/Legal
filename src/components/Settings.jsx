@@ -297,7 +297,7 @@ const FirmProfile = ({ userId, userEmail }) => {
             <div className="flex-1 flex justify-center items-center bg-black/40 rounded-xl p-4 overflow-hidden">
               <div className="relative bg-white shadow-2xl w-full max-w-[320px] aspect-[1/1.414] overflow-hidden">
                 {profile?.headerBase64 ? (
-                  <img src={profile.headerBase64} alt="Header Preview" style={{ height: `${editorHeaderHeight * 0.5}px` }} className="w-full object-contain object-top absolute top-0 left-0 right-0" />
+                  <img src={profile.headerBase64} alt="Header Preview" style={{ height: `${editorHeaderHeight * 0.5}px` }} className="w-full object-fill object-top absolute top-0 left-0 right-0 bg-black/5" />
                 ) : (
                   <div style={{ height: `${editorHeaderHeight * 0.5}px` }} className="w-full absolute top-0 bg-gray-200 border-b border-dashed border-gray-400 flex items-center justify-center text-[10px] text-gray-500">Header</div>
                 )}
@@ -312,7 +312,7 @@ const FirmProfile = ({ userId, userEmail }) => {
                 </div>
 
                 {profile?.footerBase64 ? (
-                  <img src={profile.footerBase64} alt="Footer Preview" style={{ height: `${editorFooterHeight * 0.5}px` }} className="w-full object-contain object-bottom absolute bottom-0 left-0 right-0" />
+                  <img src={profile.footerBase64} alt="Footer Preview" style={{ height: `${editorFooterHeight * 0.5}px` }} className="w-full object-fill object-bottom absolute bottom-0 left-0 right-0 bg-black/5" />
                 ) : (
                   <div style={{ height: `${editorFooterHeight * 0.5}px` }} className="w-full absolute bottom-0 bg-gray-200 border-t border-dashed border-gray-400 flex items-center justify-center text-[10px] text-gray-500">Footer</div>
                 )}
