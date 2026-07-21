@@ -233,12 +233,51 @@ Atentamente,
 
 DATOS DE CONTACTO:
 Domicilio: {{domicilioCliente}}`,
+  },
+  {
+    id: 'escrito-personalizado',
+    title: 'Escrito Libre / Personalizado',
+    description: 'Redacta cualquier tipo de escrito, contrato, absolución o medida cautelar',
+    icon: 'PenLine',
+    prompt: `Redacta un documento jurídico formal denominado {{tipoDocumentoLibre}} de alta calidad para el sistema judicial peruano.
+
+DATOS PRINCIPALES:
+- Título o Tipo de Escrito: {{tipoDocumentoLibre}}
+- Cliente / Solicitante: {{cliente}}
+- DNI: {{dni}}
+- Juzgado / Autoridad: {{juzgado}}
+- Expediente N°: {{expedienteNumero}}
+- Sumilla u Objetivo: {{sumillaLibre}}
+
+INSTRUCCIONES Y DETALLES DEL CASO:
+{{instruccionesDetalladas}}
+
+REGLAS DE FORMATO OBLIGATORIAS:
+1. SUMILLA EXACTA AL INICIO:
+EXPEDIENTE: {{expedienteNumero}}
+ESPECIALISTA: {{especialista}}
+CUADERNO: PRINCIPAL
+SUMILLA: {{sumillaLibre}}
+
+2. AUTORIDAD: "SEÑOR JUEZ DEL {{juzgado}}:" (o la autoridad competente según el tipo de documento).
+
+3. APERSONAMIENTO: "{{cliente}}, identificado con DNI N° {{dni}}, a Usted respetuosamente digo:"
+
+4. ESTRUCTURA COMPLETA:
+I. PETITORIO
+II. FUNDAMENTOS DE HECHO (Desarrollar amplia y elocuentemente en base a: {{instruccionesDetalladas}})
+III. FUNDAMENTOS JURÍDICOS (Citar normas del Código Procesal Civil, Código Civil o Constitución peruana aplicables)
+IV. MEDIOS PROBATORIOS
+V. ANEXOS
+
+POR TANTO:
+A Usted solicito proveer conforme a ley.`,
   }
 ];
 
 const getInlineTemplate = (id) => INLINE_TEMPLATES.find((t) => t.id === id);
 
-const ICON_MAP = { FileText, Gavel, Shield, Mail };
+const ICON_MAP = { FileText, Gavel, Shield, Mail, PenLine };
 
 const VARIABLE_RE = /\{\{(\w+)\}\}/g;
 
