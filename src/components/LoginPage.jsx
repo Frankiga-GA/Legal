@@ -174,7 +174,7 @@ const LoginPage = ({ onLogin, onBack }) => {
   return (
     <div className="min-h-screen overflow-hidden bg-brand-black font-sans text-brand-ivory">
       <div className="grid min-h-screen lg:grid-cols-[0.92fr_1.08fr]">
-        <section className="relative flex flex-col justify-center border-r border-white/[0.06] bg-brand-black px-6 py-8 sm:px-10 lg:px-16 xl:px-24">
+        <section className="relative flex flex-col justify-center border-r border-white/[0.06] bg-gradient-to-br from-brand-black via-brand-black to-slate-950 px-6 py-8 sm:px-10 lg:px-16 xl:px-24">
           <div className="mx-auto w-full max-w-md">
             <button
               onClick={onBack}
@@ -372,7 +372,7 @@ const LoginPage = ({ onLogin, onBack }) => {
             src="/Lega2.jpeg"
             alt="Firma legal usando LUSTI"
             loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover animate-image-zoom"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/65 to-slate-950/25"></div>
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/25"></div>
@@ -388,8 +388,8 @@ const LoginPage = ({ onLogin, onBack }) => {
               </span>
             </div>
 
-            <div className="max-w-2xl">
-              <h3 className="text-5xl font-serif font-medium leading-tight text-white">
+            <div className="max-w-2xl rounded-2xl border border-white/[0.08] bg-brand-black/20 p-8 shadow-2xl backdrop-blur-md">
+              <h3 className="text-5xl font-serif font-medium leading-tight text-white drop-shadow-lg">
                 Expedientes, documentos y plazos listos para decidir mejor.
               </h3>
               <p className="mt-5 max-w-xl text-base font-light leading-7 text-slate-300">
@@ -432,7 +432,7 @@ const Field = ({ icon: Icon, label, type, value, onChange, placeholder, autoComp
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.025] py-4 pl-14 pr-5 font-light text-brand-ivory transition-all placeholder:text-brand-accent/18 focus:border-brand-gold/40 focus:bg-white/[0.045] focus:outline-none"
+        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.025] py-4 pl-14 pr-5 font-light text-brand-ivory transition-all duration-300 placeholder:text-brand-accent/18 focus:border-brand-gold/40 focus:bg-white/[0.045] focus:outline-none focus:ring-1 focus:ring-brand-gold/30 focus:shadow-[0_0_15px_rgba(228,228,231,0.1)] hover:border-white/[0.12]"
         placeholder={placeholder}
         autoComplete={autoComplete}
         required
@@ -450,7 +450,7 @@ const PasswordField = ({ label, value, onChange, placeholder, show, onToggleShow
         type={show ? 'text' : 'password'}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.025] py-4 pl-14 pr-14 font-light text-brand-ivory transition-all placeholder:text-brand-accent/18 focus:border-brand-gold/40 focus:bg-white/[0.045] focus:outline-none"
+        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.025] py-4 pl-14 pr-14 font-light text-brand-ivory transition-all duration-300 placeholder:text-brand-accent/18 focus:border-brand-gold/40 focus:bg-white/[0.045] focus:outline-none focus:ring-1 focus:ring-brand-gold/30 focus:shadow-[0_0_15px_rgba(228,228,231,0.1)] hover:border-white/[0.12]"
         placeholder={placeholder}
         autoComplete={autoComplete}
         required
