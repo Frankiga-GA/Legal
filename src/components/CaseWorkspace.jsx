@@ -1226,6 +1226,10 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
           const { documents, notes, importantDates, status, lastUpdate, ...changes } = updatedData;
           await handleUpdate(changes);
           toast.success('Datos del expediente actualizados');
+          if (changes.id && changes.id !== caseId) {
+             toast.success('ID de expediente modificado. Reabriendo biblioteca para refrescar datos.');
+             onClose();
+          }
         }}
       />
     )}

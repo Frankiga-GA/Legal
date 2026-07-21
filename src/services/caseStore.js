@@ -47,7 +47,8 @@ export const updateCaseAsync = async (cases, caseId, changes) => {
       ? normalizeCase({ ...caseItem, ...changes, lastUpdate: new Date().toISOString().split('T')[0] })
       : caseItem
   ));
-  const updatedCase = nextCases.find((c) => c.id === caseId);
+  const newId = changes.id || caseId;
+  const updatedCase = nextCases.find((c) => c.id === newId);
   if (!updatedCase) return { cases: nextCases, updatedCase: null, error: null };
   const { error } = await upsertSupabaseCase(updatedCase);
   return { cases: nextCases, updatedCase, error };
