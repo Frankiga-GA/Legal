@@ -215,6 +215,20 @@ export const askBackend = async ({ prompt, temperature = 0.25, maxOutputTokens =
   return data.text;
 };
 
+export const generateMagicPrompt = async (goal) => {
+  const metaPrompt = `Eres un experto Prompt Engineer para Inteligencia Legal. 
+El usuario quiere crear un asistente legal que haga lo siguiente: "${goal}". 
+Escribe el System Prompt ideal para este asistente. 
+Usa tono formal, define su rol, el formato de salida y restricciones legales.
+No incluyas saludos, despedidas, ni explicaciones adicionales, devuelve únicamente el texto del prompt listo para usarse.`;
+
+  return await askBackend({
+    prompt: metaPrompt,
+    temperature: 0.7, // Un poco mas creativo para armar el prompt
+    maxOutputTokens: 1500
+  });
+};
+
 const GENERIC_PHRASES = [
   /,\s*es importante considerar/gi,
   /\.\s*es importante considerar/gi,

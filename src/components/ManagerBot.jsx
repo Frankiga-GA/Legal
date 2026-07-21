@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { generateMagicPrompt } from '../services/geminiService';
 import { getStoredDriveToken, listDriveFolders, listDriveChildren, downloadDriveFileAsFile, DRIVE_TEXT_MIME_TYPES } from '../services/googleDriveService';
 import { uploadDocumentToBackend } from '../services/documentBackendService';
 import {
@@ -859,6 +860,28 @@ const AssistantForm = ({ initial, editingId, onClose, onSave, prompts }) => {
   });
   const [error, setError] = useState('');
   const [showPromptPicker, setShowPromptPicker] = useState(false);
+  const [showMagicInput, setShowMagicInput] = useState(false);
+  const [magicGoal, setMagicGoal] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateMagic = async () => {
+    if (!magicGoal.trim()) {
+      toast.error('Escribe qué quieres que haga el asistente.');
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const generated = await generateMagicPrompt(magicGoal);
+      update('systemPrompt', generated);
+      setShowMagicInput(false);
+      setMagicGoal('');
+      toast.success('¡Prompt mágico generado!');
+    } catch (err) {
+      toast.error('Error al generar prompt: ' + err.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const update = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
@@ -910,15 +933,46 @@ const AssistantForm = ({ initial, editingId, onClose, onSave, prompts }) => {
               className={textareaClass}
               rows={8}
             />
-            {prompts?.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {prompts?.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowPromptPicker(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-brand-gold/30 bg-brand-gold/10 px-3 py-1.5 text-xs font-semibold text-brand-gold transition-colors hover:bg-brand-gold/20"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Elegir prompt guardado
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => setShowPromptPicker(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-brand-gold/30 bg-brand-gold/10 px-3 py-1.5 text-xs font-semibold text-brand-gold transition-colors hover:bg-brand-gold/20"
+                onClick={() => setShowMagicInput(!showMagicInput)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 text-xs font-semibold text-purple-400 transition-colors hover:bg-purple-500/20"
               >
-                <FileText className="h-3.5 w-3.5" />
-                Elegir prompt guardado
+                <Sparkles className="h-3.5 w-3.5" />
+                {showMagicInput ? 'Cerrar generador' : 'Generar con IA (Mágico)'}
               </button>
+            </div>
+            
+            {showMagicInput && (
+              <div className="mt-3 flex gap-2 rounded-xl border border-purple-500/20 bg-purple-500/5 p-3">
+                <input
+                  type="text"
+                  value={magicGoal}
+                  onChange={(e) => setMagicGoal(e.target.value)}
+                  placeholder="Ej: Quiero que revise contratos civiles..."
+                  className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-sm text-brand-ivory outline-none placeholder:text-brand-accent/30 focus:border-purple-500/40"
+                  disabled={isGenerating}
+                />
+                <button
+                  type="button"
+                  onClick={handleGenerateMagic}
+                  disabled={isGenerating}
+                  className="inline-flex items-center gap-2 rounded-lg bg-purple-500/20 px-4 py-2 text-sm font-semibold text-purple-300 transition-colors hover:bg-purple-500/30 disabled:opacity-50"
+                >
+                  {isGenerating ? 'Generando...' : '¡Crear!'}
+                </button>
+              </div>
             )}
           </div>
         </FormField>
