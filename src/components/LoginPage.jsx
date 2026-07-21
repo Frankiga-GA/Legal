@@ -361,7 +361,7 @@ const LoginPage = ({ onLogin, onBack }) => {
               <p className="text-xs leading-6 text-brand-accent/55">
                 {isRegistering
                   ? 'La cuenta queda lista para conectarse luego a una firma, roles y permisos por organizacion.'
-                  : 'Acceso conectado a Supabase Auth. La sesion abre el panel privado de LUSTI.'}
+                  : 'Acceso seguro cifrado. La sesión abre el panel privado de inteligencia legal.'}
               </p>
             </div>
           </div>
