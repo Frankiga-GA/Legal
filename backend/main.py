@@ -17,7 +17,11 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 import tempfile
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
+
 import httpx
 import pdfplumber
 from docx import Document
@@ -883,6 +887,10 @@ async def process_url(
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, str]:
     check_rate_limit(user.user_id, limit=5, period=60)
+    
+    if genai is None:
+        raise HTTPException(status_code=501, detail="El servicio de Gemini Vision (google-generativeai) no está disponible en este entorno.")
+
     
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
