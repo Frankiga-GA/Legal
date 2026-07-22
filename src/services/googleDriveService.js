@@ -120,13 +120,14 @@ export const onDriveTokenChange = (callback) => {
   return () => window.removeEventListener(DRIVE_TOKEN_CHANGED_EVENT, handler);
 };
 
-const buildDriveListUrl = (query, pageSize = '50') => {
+const buildDriveListUrl = (query, pageSize = '1000', pageToken = null) => {
   const url = new URL('https://www.googleapis.com/drive/v3/files');
   url.searchParams.set('q', query);
   url.searchParams.set('pageSize', pageSize);
-  url.searchParams.set('fields', 'files(id,name,mimeType,modifiedTime,webViewLink,size,parents)');
+  url.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,size,parents)');
   url.searchParams.set('includeItemsFromAllDrives', 'true');
   url.searchParams.set('supportsAllDrives', 'true');
+  if (pageToken) url.searchParams.set('pageToken', pageToken);
   return url;
 };
 
@@ -134,12 +135,21 @@ export const DRIVE_TEXT_MIME_TYPES = new Set([
   'text/plain',
   'text/markdown',
   'application/pdf',
+  'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.google-apps.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.google-apps.spreadsheet',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
 ]);
 
 export const DRIVE_TEMPLATE_MIME_TYPES = new Set([
   'application/pdf',
+  'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.google-apps.document',
   'text/plain',
@@ -150,30 +160,42 @@ export const isSupportedPromptFile = (file) => DRIVE_TEXT_MIME_TYPES.has(file?.m
 
 export const isSupportedTemplateFile = (file) => DRIVE_TEMPLATE_MIME_TYPES.has(file?.mimeType || '');
 
-const fetchDrive = async (token, query, pageSize) => {
-  const response = await fetch(buildDriveListUrl(query, pageSize), {
-    headers: {
-      Authorization: `Bearer ${token.access_token}`,
-    },
-  });
+const fetchDrive = async (token, query, pageSize = '1000', maxPages = 5) => {
+  let allFiles = [];
+  let pageToken = null;
+  let pageCount = 0;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    let friendly = 'No se pudo leer Google Drive.';
+  do {
+    const url = buildDriveListUrl(query, pageSize, pageToken);
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token.access_token}`,
+      },
+    });
 
-    if (errorText.includes('accessNotConfigured')) {
-      friendly = 'La API de Google Drive no esta habilitada en este proyecto de Google Cloud.';
-    } else if (errorText.includes('insufficientPermissions')) {
-      friendly = 'El usuario no concedio permisos suficientes para leer Drive.';
-    } else if (errorText.includes('invalid_grant')) {
-      friendly = 'El token de Google Drive expiro o quedo invalido. Reconecta Drive.';
+    if (!response.ok) {
+      const errorText = await response.text();
+      let friendly = 'No se pudo leer Google Drive.';
+
+      if (errorText.includes('accessNotConfigured')) {
+        friendly = 'La API de Google Drive no esta habilitada en este proyecto de Google Cloud.';
+      } else if (errorText.includes('insufficientPermissions')) {
+        friendly = 'El usuario no concedio permisos suficientes para leer Drive.';
+      } else if (errorText.includes('invalid_grant')) {
+        friendly = 'El token de Google Drive expiro o quedo invalido. Reconecta Drive.';
+      }
+
+      throw new Error(`${friendly} Detalle: ${errorText}`);
     }
 
-    throw new Error(`${friendly} Detalle: ${errorText}`);
-  }
+    const data = await response.json();
+    const files = Array.isArray(data.files) ? data.files : [];
+    allFiles = allFiles.concat(files);
+    pageToken = data.nextPageToken || null;
+    pageCount++;
+  } while (pageToken && pageCount < maxPages);
 
-  const data = await response.json();
-  return Array.isArray(data.files) ? data.files : [];
+  return allFiles;
 };
 
 export const listDriveFolders = async (token = getStoredDriveToken()) => {
