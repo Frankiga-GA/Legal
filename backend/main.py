@@ -235,7 +235,7 @@ def _extract_text_from_image(content_bytes: bytes, mime_type: str) -> str:
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY no esta configurada en el backend.")
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
     base64_image = base64.b64encode(content_bytes).decode("utf-8")
     
     prompt = (
