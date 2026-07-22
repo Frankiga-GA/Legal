@@ -296,19 +296,25 @@ def _read_text_from_upload(upload: UploadFile) -> str:
             raise RuntimeError(f"No se pudo extraer texto de la imagen: {e}")
 
     if filename.endswith(".pdf") or content_type == "application/pdf":
-        # 1. Intentar pdfplumber (limitado a las primeras 25 páginas para evitar OOM/Timeout en Vercel Serverless)
+        # 1. Intentar pdfplumber (limitado a 25 páginas)
+        text = ""
         try:
             with pdfplumber.open(io.BytesIO(content)) as pdf:
                 pages = [page.extract_text() or "" for page in pdf.pages[:25]]
             text = "\n\n".join(part.strip() for part in pages if part.strip()).strip()
-            if text:
-                return text
         except Exception as e:
             print(f"pdfplumber exception: {e}")
 
-
-
-        return ""
+        # Si pdfplumber extrajo suficiente texto nativo, lo usamos
+        if len(text) > 50:
+            return text
+            
+        # 2. Si no hay texto (es un PDF escaneado o puras imágenes), usamos Gemini Vision
+        try:
+            return _extract_text_from_image(content, "application/pdf")
+        except Exception as e:
+            print(f"Gemini PDF Vision exception: {e}")
+            raise RuntimeError(f"El documento parece ser un escaneo, pero falló la lectura: {e}")
 
     if filename.endswith(".docx") or content_type in {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
