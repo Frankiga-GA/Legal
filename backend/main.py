@@ -307,42 +307,26 @@ def _read_text_from_upload(upload: UploadFile) -> str:
             raise RuntimeError(f"No se pudo extraer texto de la imagen: {e}")
 
     if filename.endswith(".pdf") or content_type == "application/pdf":
+        # 1. Intentar pdfplumber (limitado a las primeras 25 páginas para evitar OOM/Timeout en Vercel Serverless)
         try:
             with pdfplumber.open(io.BytesIO(content)) as pdf:
-                pages = [page.extract_text() or "" for page in pdf.pages]
+                pages = [page.extract_text() or "" for page in pdf.pages[:25]]
             text = "\n\n".join(part.strip() for part in pages if part.strip()).strip()
             if text:
                 return text
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"pdfplumber exception: {e}")
 
+        # 2. Fallback a PyMuPDF (fitz) si esta disponible
         if fitz is not None:
             try:
                 document = fitz.open(stream=content, filetype="pdf")
-                pages = [page.get_text("text") or "" for page in document]
+                pages = [page.get_text("text") or "" for page in document[:25]]
                 text = "\n\n".join(part.strip() for part in pages if part.strip()).strip()
                 if text:
                     return text
-
-                # Si el PDF no tiene texto nativo, iteramos sus páginas como imágenes (OCR con Groq Vision)
-                ocr_pages = []
-                for page in document:
-                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
-                    image_bytes = pix.tobytes("png")
-                    try:
-                        # Pasamos la imagen de la página a nuestro OCR impulsado por Llama Vision
-                        ocr_text = _extract_text_from_image(image_bytes, "image/png")
-                        if ocr_text.strip():
-                            ocr_pages.append(ocr_text.strip())
-                    except Exception as e:
-                        print(f"Error extrayendo OCR de pagina PDF: {e}")
-                
-                ocr_text = "\n\n".join(part for part in ocr_pages if part).strip()
-                if ocr_text:
-                    return ocr_text
             except Exception as e:
-                print(f"Error procesando PDF escaneado con fitz: {e}")
-                return ""
+                print(f"Error procesando PDF con fitz: {e}")
 
         return ""
 
@@ -940,12 +924,12 @@ async def upload_file(
     file: UploadFile = File(...),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, str]:
-    _validate_file(file)
     try:
+        _validate_file(file)
         extracted_text = _read_text_from_upload(file)
     except Exception as e:
         print(f"Error processing file in upload_file: {e}")
-        raise HTTPException(status_code=500, detail="Error al procesar el archivo.")
+        extracted_text = ""
 
     return {
         "file_name": file.filename or "",

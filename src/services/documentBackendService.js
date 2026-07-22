@@ -79,7 +79,25 @@ export const uploadDocumentToBackend = async (file) => {
     }
     return await response.json();
   } catch (error) {
-    console.error('Error uploading document:', error);
+    console.warn('Error al conectar con backend para procesar documento. Intentando fallback local...', error);
+    
+    const fileName = (file.name || '').toLowerCase();
+    const isTextFile = fileName.endsWith('.txt') || fileName.endsWith('.md') || fileName.endsWith('.csv') || (file.type || '').startsWith('text/');
+    
+    if (isTextFile) {
+      try {
+        const localText = await file.text();
+        return {
+          file_name: file.name,
+          file_type: file.type || 'text/plain',
+          extracted_text: localText,
+          isLocalFallback: true,
+        };
+      } catch (readError) {
+        console.error('Fallo la lectura local del archivo:', readError);
+      }
+    }
+    
     throw error;
   }
 };
