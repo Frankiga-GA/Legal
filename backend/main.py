@@ -230,11 +230,12 @@ class ProcessUrlRequest(BaseModel):
 
 def _extract_text_from_image(content_bytes: bytes, mime_type: str) -> str:
     import base64
-    api_key = os.getenv("GROQ_API_KEY")
+    import base64
+    api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        raise RuntimeError("GROQ_API_KEY no esta configurada en el backend.")
+        raise RuntimeError("GEMINI_API_KEY no esta configurada en el backend.")
     
-    url = "https://api.groq.com/openai/v1/chat/completions"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     base64_image = base64.b64encode(content_bytes).decode("utf-8")
     
     prompt = (
@@ -244,28 +245,19 @@ def _extract_text_from_image(content_bytes: bytes, mime_type: str) -> str:
     )
     
     payload = {
-        "model": "llama-3.2-11b-vision-preview",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:{mime_type};base64,{base64_image}"
-                        }
-                    }
-                ]
-            }
-        ],
-        "temperature": 0.1,
-        "max_tokens": 4096,
-        "top_p": 1,
+        "contents": [{
+            "parts": [
+                {"text": prompt},
+                {"inline_data": {"mime_type": mime_type, "data": base64_image}}
+            ]
+        }],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 4096,
+        }
     }
     
     headers = {
-        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
     
@@ -273,13 +265,14 @@ def _extract_text_from_image(content_bytes: bytes, mime_type: str) -> str:
         response = client.post(url, json=payload, headers=headers)
         
     if response.status_code >= 400:
-        raise RuntimeError(f"Groq Vision {response.status_code}: {response.text}")
+        raise RuntimeError(f"Gemini Vision {response.status_code}: {response.text}")
         
     data = response.json()
-    choices = data.get("choices") or []
-    if not choices:
-        raise RuntimeError("Groq Vision devolvio respuesta vacia")
-    extracted = (choices[0].get("message") or {}).get("content") or ""
+    candidates = data.get("candidates") or []
+    if not candidates:
+        raise RuntimeError("Gemini Vision devolvio respuesta vacia")
+        
+    extracted = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
     return extracted.strip()
 
 
