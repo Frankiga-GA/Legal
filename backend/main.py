@@ -235,7 +235,7 @@ def _extract_text_from_image(content_bytes: bytes, mime_type: str) -> str:
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY no esta configurada en el backend.")
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
     base64_image = base64.b64encode(content_bytes).decode("utf-8")
     
     prompt = (
@@ -909,8 +909,8 @@ async def process_url(
     try:
         uploaded_file = genai.upload_file(path=tmp_path, display_name=payload.file_name)
         
-        # 3. Extract text
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-3.5-flash')
         prompt = "Transcribe todo el texto visible de este documento de forma precisa. No añadas comentarios ni resúmenes, solo devuelve el texto extraído."
         response = model.generate_content([uploaded_file, prompt])
         
