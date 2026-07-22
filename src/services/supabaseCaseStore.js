@@ -116,8 +116,10 @@ export const insertSupabaseCase = async (caseData) => {
     user_id: userId,
   };
   
-  // Borramos el ID local o temporal para que el trigger SQL de Supabase lo genere
-  delete payload.id;
+  // Borramos el ID solo si está vacío o es un id temporal para que Supabase genere la secuencia
+  if (!payload.id || payload.id.startsWith('temp-') || payload.id.trim() === '') {
+    delete payload.id;
+  }
 
   const { data, error } = await supabase
     .from(TABLE_NAME)
