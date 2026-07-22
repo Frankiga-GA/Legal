@@ -870,7 +870,7 @@ def upload_file(
         extracted_text = _read_text_from_upload(file)
     except Exception as e:
         print(f"Error processing file in upload_file: {e}")
-        extracted_text = ""
+        raise HTTPException(status_code=500, detail=f"Error OCR: {e}")
 
     return {
         "file_name": file.filename or "",
