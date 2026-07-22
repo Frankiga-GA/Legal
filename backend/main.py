@@ -23,15 +23,7 @@ import pdfplumber
 from docx import Document
 from dotenv import load_dotenv
 
-try:
-    import fitz
-except ImportError:
-    fitz = None
 
-try:
-    import pytesseract
-except ImportError:
-    pytesseract = None
 
 from auth import (  # noqa: E402
     CurrentUser,
@@ -317,16 +309,7 @@ def _read_text_from_upload(upload: UploadFile) -> str:
         except Exception as e:
             print(f"pdfplumber exception: {e}")
 
-        # 2. Fallback a PyMuPDF (fitz) si esta disponible
-        if fitz is not None:
-            try:
-                document = fitz.open(stream=content, filetype="pdf")
-                pages = [page.get_text("text") or "" for page in document[:25]]
-                text = "\n\n".join(part.strip() for part in pages if part.strip()).strip()
-                if text:
-                    return text
-            except Exception as e:
-                print(f"Error procesando PDF con fitz: {e}")
+
 
         return ""
 
@@ -635,52 +618,7 @@ def _build_docx_bytes(content: str, title: str) -> bytes:
 
 
 def _build_pdf_bytes(content: str, title: str) -> bytes:
-    if fitz is None:
-        raise RuntimeError("PyMuPDF no esta disponible para generar PDF")
-
-    pdf = fitz.open()
-    page = pdf.new_page(width=595, height=842)
-    margin = 54
-    y = margin
-    line_height = 14
-    max_width = 487
-
-    def write_wrapped(text: str, font_size: int = 10, bold: bool = False) -> None:
-        nonlocal page, y
-        font = "helv"
-        for raw_line in text.splitlines() or [""]:
-            line = raw_line.strip()
-            if not line:
-                y += line_height
-                continue
-            words = line.split()
-            current = ""
-            chunks = []
-            for word in words:
-                candidate = f"{current} {word}".strip()
-                if fitz.get_text_length(candidate, fontname=font, fontsize=font_size) <= max_width:
-                    current = candidate
-                else:
-                    if current:
-                        chunks.append(current)
-                    current = word
-            if current:
-                chunks.append(current)
-
-            for chunk in chunks:
-                if y > 790:
-                    page = pdf.new_page(width=595, height=842)
-                    y = margin
-                page.insert_text((margin, y), chunk, fontsize=font_size, fontname=font)
-                y += line_height + (2 if bold else 0)
-
-    write_wrapped(title, font_size=16, bold=True)
-    y += 10
-    for block in _split_document_blocks(content):
-        write_wrapped(block, font_size=10)
-        y += 8
-
-    return pdf.tobytes()
+    raise NotImplementedError("PDF generation on backend is disabled to save Vercel bundle size. Use frontend export.")
 
 
 def _build_txt_bytes(content: str) -> bytes:
