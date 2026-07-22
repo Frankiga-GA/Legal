@@ -84,7 +84,7 @@ export const fetchSupabaseCases = async () => {
   return { cases: uniqueCases, error: null, skipped: false };
 };
 
-export const upsertSupabaseCase = async (caseData) => {
+export const updateSupabaseCase = async (oldCaseId, caseData) => {
   if (!canUseSupabaseCases()) return { error: null, skipped: true };
 
   const userId = await getCurrentUserId();
@@ -95,11 +95,17 @@ export const upsertSupabaseCase = async (caseData) => {
     user_id: userId,
   };
 
+  // Si el ID cambió, actualizamos la fila específica usando el ID anterior para no duplicar
   const { error } = await supabase
     .from(TABLE_NAME)
-    .upsert(payload);
+    .update(payload)
+    .eq('id', oldCaseId);
 
   return { error, skipped: false };
+};
+
+export const upsertSupabaseCase = async (caseData) => {
+  return updateSupabaseCase(caseData.id, caseData);
 };
 
 export const insertSupabaseCase = async (caseData) => {

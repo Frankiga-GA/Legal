@@ -1,4 +1,4 @@
-import { fetchSupabaseCases, upsertSupabaseCase, insertSupabaseCase, deleteSupabaseCase } from './supabaseCaseStore';
+import { fetchSupabaseCases, updateSupabaseCase, insertSupabaseCase, deleteSupabaseCase } from './supabaseCaseStore';
 import { clearCaseChats } from './chatHistoryStore';
 import { getOrCreateCaseFolder, isGoogleDriveConfigured, getStoredDriveToken } from './googleDriveService';
 
@@ -50,7 +50,9 @@ export const updateCaseAsync = async (cases, caseId, changes) => {
   const newId = changes.id || caseId;
   const updatedCase = nextCases.find((c) => c.id === newId);
   if (!updatedCase) return { cases: nextCases, updatedCase: null, error: null };
-  const { error } = await upsertSupabaseCase(updatedCase);
+  
+  // Actualizamos la fila directamente en Supabase mediante el ID antiguo (caseId)
+  const { error } = await updateSupabaseCase(caseId, updatedCase);
   return { cases: nextCases, updatedCase, error };
 };
 
