@@ -73,10 +73,22 @@ const writeAreaAsync = async (userId, area, value) => {
   if (!userId) return false;
 
   try {
-    // Actualización atómica directa a la base de datos para evitar colisiones
+    // 1. Fetch current data to prevent deleting omitted nested fields
+    const { data: currentData, error: fetchError } = await supabase
+      .from('user_preferences')
+      .select(area)
+      .eq('user_id', userId)
+      .single();
+
+    let finalValue = value;
+    if (!fetchError && currentData && currentData[area]) {
+      finalValue = { ...currentData[area], ...value };
+    }
+
+    // 2. Actualización atómica con merge
     const { error: updateError } = await supabase
       .from('user_preferences')
-      .update({ [area]: value, updated_at: new Date().toISOString() })
+      .update({ [area]: finalValue, updated_at: new Date().toISOString() })
       .eq('user_id', userId);
 
     if (updateError) {

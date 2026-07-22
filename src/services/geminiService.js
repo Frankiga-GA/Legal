@@ -13,11 +13,9 @@ import { isSupabaseConfigured, supabase } from '../utils/supabase';
 // automaticamente. Cada componente llama a abortActiveRequest() al
 // desmontarse para cancelar cualquier fetch en vuelo.
 let activeController = null;
-let isUserAbort = false;
 
 export const abortActiveRequest = () => {
   if (activeController) {
-    isUserAbort = true;
     activeController.abort();
     activeController = null;
   }
@@ -27,15 +25,26 @@ const REQUEST_TIMEOUT = 20000; // 20s max antes de abortar
 
 const fetchWithSignal = (url, options = {}) => {
   abortActiveRequest();
-  isUserAbort = false;
-  activeController = new AbortController();
+  const controller = new AbortController();
+  activeController = controller;
+  
+  let isTimeout = false;
   const timeoutId = setTimeout(() => {
-    if (activeController) activeController.abort();
+    isTimeout = true;
+    controller.abort();
   }, REQUEST_TIMEOUT);
 
-  return fetch(url, { ...options, signal: activeController.signal }).finally(() => {
-    clearTimeout(timeoutId);
-  });
+  return fetch(url, { ...options, signal: controller.signal })
+    .catch(err => {
+      if (err.name === 'AbortError') {
+        if (isTimeout) throw new Error('TIMEOUT');
+        throw new Error('USER_ABORT');
+      }
+      throw err;
+    })
+    .finally(() => {
+      clearTimeout(timeoutId);
+    });
 };
 
 const fetchWithRetry = async (url, options, retries = 1) => {
@@ -46,13 +55,14 @@ const fetchWithRetry = async (url, options, retries = 1) => {
       if (!response.ok) continue;
       return response;
     } catch (err) {
-      if (err.name === 'AbortError') {
-        if (isUserAbort) {
-          throw new Error('USER_ABORT');
-        }
-        throw new Error('La IA no respondió a tiempo. Intentalo de nuevo.');
+      if (err.message === 'USER_ABORT') {
+        throw new Error('USER_ABORT');
       }
-      if (i === retries) throw err;
+      if (err.message === 'TIMEOUT' || err.name === 'AbortError') {
+        if (i === retries) throw new Error('La IA no respondió a tiempo. Intentalo de nuevo.');
+      } else if (i === retries) {
+        throw err;
+      }
       await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)));
     }
   }

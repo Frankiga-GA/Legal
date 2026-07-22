@@ -865,6 +865,7 @@ def upload_file(
     file: UploadFile = File(...),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, str]:
+    check_rate_limit(user.user_id, limit=20, period=60)
     try:
         _validate_file(file)
         extracted_text = _read_text_from_upload(file)

@@ -17,6 +17,8 @@ export const getStoredDriveToken = () => {
     if (!parsed?.access_token) return null;
     if (parsed.expires_at && Date.now() > parsed.expires_at) {
       clearStoredDriveToken();
+      // Notificar al usuario para que vuelva a conectarse en lugar de desconectarlo en silencio
+      window.dispatchEvent(new CustomEvent('lusti-drive-token-expired'));
       return null;
     }
     return parsed;

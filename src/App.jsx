@@ -97,9 +97,12 @@ function App() {
       };
     }
 
+    let initialLoadDone = false;
+
     getCurrentSession()
       .then((currentSession) => {
         if (!isMounted) return;
+        initialLoadDone = true;
         setSession(currentSession);
         if (currentSession) setIsLanding(false);
       })
@@ -112,6 +115,11 @@ function App() {
 
     const subscription = onAuthStateChange((nextSession) => {
       if (!isMounted) return;
+      
+      // Evitar que onAuthStateChange sobrescriba la sesión válida con un null (INITIAL_SESSION)
+      // si getCurrentSession todavía está en vuelo (Race condition de Supabase).
+      if (!initialLoadDone && !nextSession) return;
+
       setSession(nextSession);
       if (!nextSession) return;
 
@@ -164,16 +172,23 @@ function App() {
       }
     });
 
+    const handleDriveExpired = () => {
+      toast.error('Tu sesión de Google Drive expiró por seguridad. Por favor vuelve a conectarlo.', { duration: 6000 });
+      setIsDriveConnected(false);
+    };
+    window.addEventListener('lusti-drive-token-expired', handleDriveExpired);
+
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      window.removeEventListener('lusti-drive-token-expired', handleDriveExpired);
       if (channelRef.current) {
         isChannelOpen.current = false;
         channelRef.current.close();
         channelRef.current = null;
       }
     };
-  }, []);
+  }, [tabId]);
 
   useEffect(() => {
     const syncDriveState = () => {

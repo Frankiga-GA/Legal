@@ -53,7 +53,11 @@ export const updateCaseAsync = async (cases, caseId, changes) => {
   
   // Actualizamos la fila directamente en Supabase mediante el ID antiguo (caseId)
   const { error } = await updateSupabaseCase(caseId, updatedCase);
-  return { cases: nextCases, updatedCase, error };
+  if (error) {
+    // Si falla en la nube, revertimos a la versión original para no engañar al usuario
+    return { cases, updatedCase: null, error };
+  }
+  return { cases: nextCases, updatedCase, error: null };
 };
 
 export const deleteCaseAsync = async (cases, caseId) => {

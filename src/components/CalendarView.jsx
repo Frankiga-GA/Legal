@@ -117,8 +117,8 @@ const CalendarView = ({ onOpenCase }) => {
     
     setLoading(true);
     try {
-      const manualCaseId = 'EXP-MANUAL-001';
-      let manualCase = cases.find(c => c.id === manualCaseId);
+      let manualCase = cases.find(c => c.clientName === 'Agenda Manual' && c.id.startsWith('EXP-MANUAL-'));
+      const manualCaseId = manualCase ? manualCase.id : `EXP-MANUAL-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
       
       const newEvent = {
         id: crypto.randomUUID(),

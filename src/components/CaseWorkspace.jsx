@@ -58,8 +58,12 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
 
   useEffect(() => {
     const fetchProfileAndAssistants = async () => {
-      const prefs = await loadAllPreferencesAsync(session?.user?.id || null);
-      setFirmProfile(prefs.firm);
+      try {
+        const prefs = await loadAllPreferencesAsync(session?.user?.id || null);
+        setFirmProfile(prefs.firm);
+      } catch (err) {
+        console.warn('Error loading preferences:', err);
+      }
       
       try {
         const loadedAssistants = await listAssistants();
@@ -148,7 +152,6 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'cases', filter: `id=eq.${caseId}` },
           (payload) => {
-            console.log('⚡ Sincronización en tiempo real detectada:', payload);
             fetchCase(); // Refrescar los datos para evitar colisiones
           }
         )
@@ -184,10 +187,17 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
     try {
       const { cases: allCases } = await loadCases();
       const result = await updateCaseAsync(allCases, caseData.id, changes);
+      
+      if (result.error) {
+        console.error('Error actualizando Supabase:', result.error);
+        toast.error('Error al guardar en la nube. Los cambios podrían revertirse.');
+      }
+      
       setCaseData(result.updatedCase);
       syncCalendar(allCases).catch(e => console.warn('Error sincronizando calendario en background:', e));
     } catch (err) {
       console.error('Error al actualizar el expediente:', err);
+      toast.error('Error interno al guardar los cambios.');
     }
   };
 
