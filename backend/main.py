@@ -862,7 +862,7 @@ async def health_email() -> dict[str, Any]:
 
 
 @app.post("/upload")
-async def upload_file(
+def upload_file(
     file: UploadFile = File(...),
     user: CurrentUser = Depends(current_user),
 ) -> dict[str, str]:
@@ -1000,7 +1000,7 @@ async def chat(
 
 
 @app.post("/generate-document")
-async def generate_document(
+def generate_document(
     message: str = Form(...),
     prompt: str = Form(""),
     file: UploadFile | None = File(None),
