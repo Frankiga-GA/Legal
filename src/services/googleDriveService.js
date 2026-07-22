@@ -127,6 +127,7 @@ const buildDriveListUrl = (query, pageSize = '1000', pageToken = null) => {
   url.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,size,parents)');
   url.searchParams.set('includeItemsFromAllDrives', 'true');
   url.searchParams.set('supportsAllDrives', 'true');
+  url.searchParams.set('corpora', 'allDrives');
   if (pageToken) url.searchParams.set('pageToken', pageToken);
   return url;
 };
@@ -160,7 +161,7 @@ export const isSupportedPromptFile = (file) => DRIVE_TEXT_MIME_TYPES.has(file?.m
 
 export const isSupportedTemplateFile = (file) => DRIVE_TEMPLATE_MIME_TYPES.has(file?.mimeType || '');
 
-const fetchDrive = async (token, query, pageSize = '1000', maxPages = 5) => {
+const fetchDrive = async (token, query, pageSize = '1000', maxPages = 20) => {
   let allFiles = [];
   let pageToken = null;
   let pageCount = 0;
@@ -200,7 +201,7 @@ const fetchDrive = async (token, query, pageSize = '1000', maxPages = 5) => {
 
 export const listDriveFolders = async (token = getStoredDriveToken()) => {
   if (!token?.access_token) throw new Error('ERROR_AUTH_EXPIRED');
-  return fetchDrive(token, "mimeType = 'application/vnd.google-apps.folder' and trashed = false", '150');
+  return fetchDrive(token, "mimeType = 'application/vnd.google-apps.folder' and trashed = false");
 };
 
 export const listDriveFiles = async (token = getStoredDriveToken()) => {
@@ -211,7 +212,7 @@ export const listDriveFiles = async (token = getStoredDriveToken()) => {
 export const listDriveChildren = async (folderId = 'root', token = getStoredDriveToken()) => {
   if (!token?.access_token) throw new Error('ERROR_AUTH_EXPIRED');
   const safeFolderId = String(folderId || 'root').replace(/'/g, "\\'");
-  return fetchDrive(token, `'${safeFolderId}' in parents and trashed = false`, '100');
+  return fetchDrive(token, `'${safeFolderId}' in parents and trashed = false`);
 };
 
 export const downloadDriveFileAsFile = async (file, token = getStoredDriveToken()) => {
