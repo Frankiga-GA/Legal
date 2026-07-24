@@ -41,7 +41,8 @@ def exchange_cognito_for_supabase(payload: ExchangeRequest):
             cognito_token,
             signing_key.key,
             algorithms=["RS256"],
-            options={"verify_exp": True, "verify_aud": False}
+            options={"verify_exp": True, "verify_aud": False},
+            leeway=300
         )
         
         user_id = claims.get("sub")
@@ -68,6 +69,8 @@ def exchange_cognito_for_supabase(payload: ExchangeRequest):
         return ExchangeResponse(supabase_token=supabase_token, user_id=user_id)
 
     except jwt.ExpiredSignatureError:
+        print("Error in token exchange: Token expirado")
         raise HTTPException(status_code=401, detail="El token de Cognito expiró.")
     except Exception as e:
+        print(f"Error in token exchange: {e}")
         raise HTTPException(status_code=401, detail=f"Token de Cognito inválido: {e}")
