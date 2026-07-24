@@ -144,10 +144,10 @@ const LandingPage = ({ onGetStarted }) => {
               <AnimatedSection delay={200}>
                 <div className="space-y-5">
                   <h1 className="max-w-5xl text-5xl font-serif font-medium leading-[1.05] tracking-tight text-white md:text-7xl">
-                    Lusti: Convierte expedientes dispersos en una operacion legal inteligente.
+                    Convierte expedientes dispersos en una operacion legal inteligente.
                   </h1>
                   <p className="max-w-2xl text-lg font-light leading-8 text-slate-300 md:text-xl">
-                    Lusti es una aplicación B2B para estudios de abogados. El propósito de la app es proporcionar IA para documentos y alertas de plazos procesales. Lusti organiza casos, documentos, vencimientos y asistentes IA para que una firma trabaje con mas control, menos busqueda manual y respuestas mejor sustentadas.
+                    LUSTI organiza casos, documentos, vencimientos y asistentes IA para que una firma trabaje con mas control, menos busqueda manual y respuestas mejor sustentadas.
                   </p>
                 </div>
               </AnimatedSection>
