@@ -91,9 +91,23 @@ export const signUpWithEmail = async ({ email, password, fullName, dni, company 
     });
     // Note: fullName, dni, company are skipped here.
     // LUSTI currently saves them in Supabase after successful login.
-    return { id: userId };
+    return { id: userId, nextStep };
   } catch (err) {
     throw new Error(err.message || 'Error al registrarse');
+  }
+};
+
+import { confirmSignUp } from 'aws-amplify/auth';
+
+export const confirmSignUpEmail = async ({ email, code }) => {
+  try {
+    const { isSignUpComplete } = await confirmSignUp({
+      username: email,
+      confirmationCode: code
+    });
+    return isSignUpComplete;
+  } catch (err) {
+    throw new Error(err.message || 'Código incorrecto o expirado');
   }
 };
 

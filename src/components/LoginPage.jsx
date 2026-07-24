@@ -40,7 +40,8 @@ const REMEMBER_KEY = 'lusti-remember-me';
 const EMAIL_KEY = 'lusti-last-email';
 
 const LoginPage = ({ onLogin, onBack }) => {
-  const [mode, setMode] = useState('login'); // 'login' | 'register'
+  const [mode, setMode] = useState('login'); // 'login' | 'register' | 'confirm'
+  const [code, setCode] = useState('');
   const [email, setEmail] = useState(() => {
     try {
       return window.localStorage.getItem(EMAIL_KEY) || '';
@@ -66,6 +67,7 @@ const LoginPage = ({ onLogin, onBack }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isRegistering = mode === 'register';
+  const isConfirming = mode === 'confirm';
 
   const passwordStrength = useMemo(() => {
     return evaluatePasswordStrength(password);
@@ -105,6 +107,11 @@ const LoginPage = ({ onLogin, onBack }) => {
         }
 
         const result = await signUpWithEmail({ email, password, fullName, dni, company });
+        if (result.nextStep?.signUpStep === 'CONFIRM_SIGN_UP') {
+          setNotice('Te enviamos un código de 6 dígitos al correo. Ingrésalo para verificar tu cuenta.');
+          setMode('confirm');
+          return;
+        }
         if (result.session) {
           persistSessionPrefs();
           onLogin(result.session);
@@ -113,6 +120,19 @@ const LoginPage = ({ onLogin, onBack }) => {
         setNotice('Cuenta creada. Revisa tu correo electrónico para verificar tu cuenta antes de ingresar.');
         setMode('login');
         setConfirmPassword('');
+      } else if (isConfirming) {
+        import('../services/authService').then(async ({ confirmSignUpEmail }) => {
+          try {
+            await confirmSignUpEmail({ email, code });
+            setNotice('¡Cuenta verificada exitosamente! Ahora puedes iniciar sesión.');
+            setMode('login');
+          } catch (err) {
+            setError(err.message);
+          } finally {
+            setIsSubmitting(false);
+          }
+        });
+        return; // handle finality in the promise
       } else {
         const session = await signInWithEmail({ email, password });
         persistSessionPrefs();
@@ -190,12 +210,16 @@ const LoginPage = ({ onLogin, onBack }) => {
               <h2 className="text-4xl font-serif font-medium tracking-tight text-brand-ivory">
                 {isRegistering
                   ? 'Crea tu espacio legal'
-                  : 'Accede a tu estudio'}
+                  : isConfirming
+                    ? 'Verifica tu cuenta'
+                    : 'Accede a tu estudio'}
               </h2>
               <p className="mt-4 text-sm font-light leading-6 text-brand-accent/65">
                 {isRegistering
                   ? 'Activa una cuenta para probar expedientes, documentos e IA contextual.'
-                  : 'Ingresa para continuar con expedientes, documentos, plazos y asistentes IA.'}
+                  : isConfirming
+                    ? 'Ingresa el código que te acabamos de enviar por correo para activar tu cuenta.'
+                    : 'Ingresa para continuar con expedientes, documentos, plazos y asistentes IA.'}
               </p>
             </div>
 
@@ -209,26 +233,42 @@ const LoginPage = ({ onLogin, onBack }) => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              <Field
-                icon={Mail}
-                label="Correo profesional"
-                type="email"
-                value={email}
-                onChange={setEmail}
-                placeholder="usuario@firma.com"
-                autoComplete="email"
-              />
+              {!isConfirming && (
+                <Field
+                  icon={Mail}
+                  label="Correo profesional"
+                  type="email"
+                  value={email}
+                  onChange={setEmail}
+                  placeholder="usuario@firma.com"
+                  autoComplete="email"
+                />
+              )}
 
-              <PasswordField
-                label="Clave de acceso"
-                value={password}
-                onChange={setPassword}
-                placeholder="********"
-                show={showPassword}
-                onToggleShow={() => setShowPassword((v) => !v)}
-                strength={isRegistering ? passwordStrength : null}
-                autoComplete={isRegistering ? 'new-password' : 'current-password'}
-              />
+              {isConfirming && (
+                <Field
+                  icon={Hash}
+                  label="Código de verificación"
+                  type="text"
+                  value={code}
+                  onChange={setCode}
+                  placeholder="123456"
+                  autoComplete="off"
+                />
+              )}
+
+              {!isConfirming && (
+                <PasswordField
+                  label="Clave de acceso"
+                  value={password}
+                  onChange={setPassword}
+                  placeholder="********"
+                  show={showPassword}
+                  onToggleShow={() => setShowPassword((v) => !v)}
+                  strength={isRegistering ? passwordStrength : null}
+                  autoComplete={isRegistering ? 'new-password' : 'current-password'}
+                />
+              )}
 
               {isRegistering && (
                 <>
@@ -271,7 +311,7 @@ const LoginPage = ({ onLogin, onBack }) => {
                 </>
               )}
 
-              {!isRegistering && (
+              {!isRegistering && !isConfirming && (
                 <div className="flex items-center justify-between text-[11px]">
                   <label className="inline-flex cursor-pointer items-center gap-2 text-brand-accent/65">
                     <input
@@ -314,12 +354,23 @@ const LoginPage = ({ onLogin, onBack }) => {
               >
                 {isSubmitting
                   ? 'Enviando...'
-                  : isRegistering
-                    ? 'Crear cuenta'
-                    : 'Entrar al workspace'}
+                  : isConfirming
+                    ? 'Verificar código'
+                    : isRegistering
+                      ? 'Crear cuenta'
+                      : 'Entrar al workspace'}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </button>
 
+              {!isConfirming && isRegistering && (
+                <button
+                  type="button"
+                  onClick={() => switchMode('confirm')}
+                  className="mt-4 flex w-full items-center justify-center text-[12px] text-brand-gold/80 hover:text-brand-gold"
+                >
+                  ¿Ya tienes un código? Verifícalo aquí
+                </button>
+              )}
 
             </form>
 
