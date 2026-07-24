@@ -110,7 +110,7 @@ const LoginPage = ({ onLogin, onBack }) => {
           onLogin(result.session);
           return;
         }
-        setNotice('Cuenta creada. Revisa tu correo si Supabase solicita confirmacion antes de ingresar.');
+        setNotice('Cuenta creada. Revisa tu correo electrónico para verificar tu cuenta antes de ingresar.');
         setMode('login');
         setConfirmPassword('');
       } else {
