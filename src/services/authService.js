@@ -1,6 +1,6 @@
 import { Amplify } from 'aws-amplify';
 import { signIn, signUp, signOut as amplifySignOut, fetchAuthSession, resetPassword } from 'aws-amplify/auth';
-import { supabase } from '../utils/supabase';
+import { supabase, setCustomAccessToken } from '../utils/supabase';
 
 Amplify.configure({
   Auth: {
@@ -29,11 +29,8 @@ async function performTokenExchange(cognitoToken) {
   }
   const data = await res.json();
   
-  // Set the session in Supabase so RLS works!
-  await supabase.auth.setSession({
-    access_token: data.supabase_token,
-    refresh_token: data.supabase_token,
-  });
+  // Guardamos el token para PostgREST bypass GoTrue (Evita el 403 Forbidden)
+  setCustomAccessToken(data.supabase_token);
   
   return { user: { id: data.user_id }, access_token: data.supabase_token };
 }
@@ -114,11 +111,11 @@ export const confirmSignUpEmail = async ({ email, code }) => {
 export const signOut = async () => {
   try {
     await amplifySignOut();
-  } catch (e) {
-    console.warn('Error signing out of Cognito', e);
-  }
-  if (supabase) {
-    await supabase.auth.signOut();
+    setCustomAccessToken(null);
+    if (supabase) await supabase.auth.signOut();
+    window.sessionStorage.removeItem('lusti_self_auth');
+  } catch (err) {
+    console.error('Error al cerrar sesión', err);
   }
 };
 
