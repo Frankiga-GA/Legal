@@ -63,14 +63,22 @@ def exchange_cognito_for_supabase(payload: ExchangeRequest):
         }
         
         supabase_uid = None
-        # Try to find by email
-        res_users = httpx.get(f"{supabase_url}/auth/v1/admin/users", headers=headers)
-        if res_users.status_code == 200:
+        # Try to find by email with pagination
+        page = 1
+        while True:
+            res_users = httpx.get(f"{supabase_url}/auth/v1/admin/users?page={page}&per_page=50", headers=headers)
+            if res_users.status_code != 200:
+                break
             users_list = res_users.json().get("users", [])
+            if not users_list:
+                break
             for u in users_list:
-                if u.get("email") == email:
+                if u.get("email", "").lower() == email.lower():
                     supabase_uid = u.get("id")
                     break
+            if supabase_uid or len(users_list) < 50:
+                break
+            page += 1
         
         # 2. If not found, create a new user in Supabase auth.users
         if not supabase_uid:
