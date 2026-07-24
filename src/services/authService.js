@@ -61,11 +61,12 @@ export const signUpWithEmail = async ({ email, password, fullName, dni, company 
       }
     });
     if (error) throw error;
-    return data.user;
+    return { user: data.user, session: data.session };
   } catch (err) {
     throw new Error(err.message || 'Error al registrarse');
   }
 };
+
 
 export const signOut = async () => {
   try {
@@ -83,12 +84,50 @@ export const signOut = async () => {
 
 export const sendPasswordReset = async ({ email }) => {
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin
-    });
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
     if (error) throw error;
   } catch (err) {
     throw new Error(err.message || 'Error al resetear contraseña');
+  }
+};
+
+export const confirmSignUpEmail = async ({ email, code }) => {
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: 'email'
+    });
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    throw new Error(err.message || 'Código incorrecto o expirado');
+  }
+};
+
+export const verifyRecoveryCode = async ({ email, code }) => {
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: 'recovery'
+    });
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    throw new Error(err.message || 'Código incorrecto o expirado');
+  }
+};
+
+export const updatePassword = async ({ password }) => {
+  try {
+    const { data, error } = await supabase.auth.updateUser({
+      password: password
+    });
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    throw new Error(err.message || 'Error al actualizar contraseña');
   }
 };
 

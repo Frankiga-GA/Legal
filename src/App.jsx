@@ -115,6 +115,9 @@ function App() {
 
     const subscription = onAuthStateChange((nextSession) => {
       if (!isMounted) return;
+
+      // Si estamos a mitad de un cambio de contraseña, ignorar la sesión temporal
+      if (window.sessionStorage.getItem('lusti_reset_pending') === '1') return;
       
       // Evitar que onAuthStateChange sobrescriba la sesión válida con un null (INITIAL_SESSION)
       // si getCurrentSession todavía está en vuelo (Race condition de Supabase).

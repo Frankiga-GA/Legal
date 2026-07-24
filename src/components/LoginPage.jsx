@@ -34,6 +34,10 @@ import {
   signInWithEmail,
   signUpWithEmail,
   sendPasswordReset,
+  confirmSignUpEmail,
+  verifyRecoveryCode,
+  updatePassword,
+  signInWithGoogle
 } from '../services/authService';
 
 const REMEMBER_KEY = 'lusti-remember-me';
@@ -68,6 +72,9 @@ const LoginPage = ({ onLogin, onBack }) => {
 
   const isRegistering = mode === 'register';
   const isConfirming = mode === 'confirm';
+  const isRecoverConfirming = mode === 'recover_confirm';
+  const isResettingPassword = mode === 'reset_password';
+  const isForgotPassword = mode === 'forgot_password';
 
   const passwordStrength = useMemo(() => {
     return evaluatePasswordStrength(password);
@@ -107,32 +114,79 @@ const LoginPage = ({ onLogin, onBack }) => {
         }
 
         const result = await signUpWithEmail({ email, password, fullName, dni, company });
-        if (result.nextStep?.signUpStep === 'CONFIRM_SIGN_UP') {
+        
+        // Si result.session es null, significa que Supabase requiere confirmacion de email
+        if (!result.session) {
           setNotice('Te enviamos un código de 6 dígitos al correo. Ingrésalo para verificar tu cuenta.');
           setMode('confirm');
           return;
         }
-        if (result.session) {
-          persistSessionPrefs();
-          onLogin(result.session);
+        
+        persistSessionPrefs();
+        onLogin(result.session);
+        return;
+      } else if (isConfirming) {
+        try {
+          await confirmSignUpEmail({ email, code });
+          setNotice('¡Cuenta verificada exitosamente! Ahora puedes iniciar sesión.');
+          setMode('login');
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setIsSubmitting(false);
+        }
+        return;
+      } else if (isRecoverConfirming) {
+        try {
+          window.sessionStorage.setItem('lusti_reset_pending', '1');
+          await verifyRecoveryCode({ email, code });
+          setNotice('Código verificado. Ingresa tu nueva contraseña.');
+          setMode('reset_password');
+        } catch (err) {
+          window.sessionStorage.removeItem('lusti_reset_pending');
+          setError(err.message);
+        } finally {
+          setIsSubmitting(false);
+        }
+        return;
+      } else if (isForgotPassword) {
+        if (!email) {
+          setError('Ingresa tu correo para recuperar la clave.');
+          setIsSubmitting(false);
           return;
         }
-        setNotice('Cuenta creada. Revisa tu correo electrónico para verificar tu cuenta antes de ingresar.');
-        setMode('login');
-        setConfirmPassword('');
-      } else if (isConfirming) {
-        import('../services/authService').then(async ({ confirmSignUpEmail }) => {
-          try {
-            await confirmSignUpEmail({ email, code });
-            setNotice('¡Cuenta verificada exitosamente! Ahora puedes iniciar sesión.');
-            setMode('login');
-          } catch (err) {
-            setError(err.message);
-          } finally {
-            setIsSubmitting(false);
-          }
-        });
-        return; // handle finality in the promise
+        try {
+          await sendPasswordReset({ email });
+          setNotice('Te enviamos un código al correo para restablecer tu clave.');
+          setMode('recover_confirm');
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setIsSubmitting(false);
+        }
+        return;
+      } else if (isResettingPassword) {
+        if (password !== confirmPassword) {
+          setError('Las claves no coinciden.');
+          return;
+        }
+        if (password.length < 6) {
+          setError('La clave debe tener al menos 6 caracteres.');
+          return;
+        }
+        try {
+          await updatePassword({ password });
+          window.sessionStorage.removeItem('lusti_reset_pending');
+          const session = await signInWithEmail({ email, password });
+          persistSessionPrefs();
+          onLogin(session);
+        } catch (err) {
+          window.sessionStorage.removeItem('lusti_reset_pending');
+          setError(err.message);
+        } finally {
+          setIsSubmitting(false);
+        }
+        return;
       } else {
         const session = await signInWithEmail({ email, password });
         persistSessionPrefs();
@@ -150,30 +204,23 @@ const LoginPage = ({ onLogin, onBack }) => {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      setIsSubmitting(true);
+      await signInWithGoogle();
+      // Supabase OAuth redirects to Google, so we don't need to do anything else here
+    } catch (err) {
+      setError(err.message);
+      setIsSubmitting(false);
+    }
+  };
+
   const persistSessionPrefs = () => {
     try {
       window.localStorage.setItem(REMEMBER_KEY, rememberMe ? '1' : '0');
       window.localStorage.setItem(EMAIL_KEY, email);
     } catch {
       /* noop */
-    }
-  };
-
-  const handleForgotPassword = async () => {
-    if (!email) {
-      setError('Ingresa tu correo para recuperar la clave.');
-      return;
-    }
-    setError('');
-    setNotice('');
-    setIsSubmitting(true);
-    try {
-      await sendPasswordReset({ email });
-      setNotice('Te enviamos un correo para restablecer tu clave.');
-    } catch (authError) {
-      setError(getFriendlyAuthError(authError.message));
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -210,16 +257,24 @@ const LoginPage = ({ onLogin, onBack }) => {
               <h2 className="text-4xl font-serif font-medium tracking-tight text-brand-ivory">
                 {isRegistering
                   ? 'Crea tu espacio legal'
-                  : isConfirming
-                    ? 'Verifica tu cuenta'
-                    : 'Accede a tu estudio'}
+                  : isForgotPassword
+                    ? 'Recuperar clave'
+                    : isConfirming || isRecoverConfirming
+                      ? 'Verifica tu identidad'
+                      : isResettingPassword
+                        ? 'Nueva contraseña'
+                        : 'Accede a tu estudio'}
               </h2>
               <p className="mt-4 text-sm font-light leading-6 text-brand-accent/65">
                 {isRegistering
                   ? 'Activa una cuenta para probar expedientes, documentos e IA contextual.'
-                  : isConfirming
-                    ? 'Ingresa el código que te acabamos de enviar por correo para activar tu cuenta.'
-                    : 'Ingresa para continuar con expedientes, documentos, plazos y asistentes IA.'}
+                  : isForgotPassword
+                    ? 'Ingresa tu correo profesional y te enviaremos un código para restablecer tu contraseña.'
+                    : isConfirming || isRecoverConfirming
+                      ? 'Ingresa el código de 6 dígitos que te enviamos por correo.'
+                      : isResettingPassword
+                        ? 'Ingresa una nueva contraseña segura para tu cuenta.'
+                        : 'Ingresa para continuar con expedientes, documentos, plazos y asistentes IA.'}
               </p>
             </div>
 
@@ -233,7 +288,7 @@ const LoginPage = ({ onLogin, onBack }) => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {!isConfirming && (
+              {!isConfirming && !isRecoverConfirming && !isResettingPassword && (
                 <Field
                   icon={Mail}
                   label="Correo profesional"
@@ -245,7 +300,7 @@ const LoginPage = ({ onLogin, onBack }) => {
                 />
               )}
 
-              {isConfirming && (
+              {(isConfirming || isRecoverConfirming) && (
                 <Field
                   icon={Hash}
                   label="Código de verificación"
@@ -257,7 +312,7 @@ const LoginPage = ({ onLogin, onBack }) => {
                 />
               )}
 
-              {!isConfirming && (
+              {(!isConfirming && !isRecoverConfirming && !isForgotPassword) && (
                 <PasswordField
                   label="Clave de acceso"
                   value={password}
@@ -265,12 +320,12 @@ const LoginPage = ({ onLogin, onBack }) => {
                   placeholder="********"
                   show={showPassword}
                   onToggleShow={() => setShowPassword((v) => !v)}
-                  strength={isRegistering ? passwordStrength : null}
-                  autoComplete={isRegistering ? 'new-password' : 'current-password'}
+                  strength={(isRegistering || isResettingPassword) ? passwordStrength : null}
+                  autoComplete={isRegistering || isResettingPassword ? 'new-password' : 'current-password'}
                 />
               )}
 
-              {isRegistering && (
+              {(isRegistering || isResettingPassword) && (
                 <>
                   <Field
                     icon={Lock}
@@ -281,8 +336,10 @@ const LoginPage = ({ onLogin, onBack }) => {
                     placeholder="********"
                     autoComplete="new-password"
                   />
-                  <Field
-                    icon={User}
+                  {isRegistering && (
+                    <>
+                      <Field
+                        icon={User}
                     label="Nombre Completo"
                     type="text"
                     value={fullName}
@@ -308,10 +365,12 @@ const LoginPage = ({ onLogin, onBack }) => {
                     placeholder="Ej. Lopez & Asociados"
                     autoComplete="organization"
                   />
+                    </>
+                  )}
                 </>
               )}
 
-              {!isRegistering && !isConfirming && (
+              {!isRegistering && !isConfirming && !isRecoverConfirming && !isResettingPassword && !isForgotPassword && (
                 <div className="flex items-center justify-between text-[11px]">
                   <label className="inline-flex cursor-pointer items-center gap-2 text-brand-accent/65">
                     <input
@@ -324,7 +383,7 @@ const LoginPage = ({ onLogin, onBack }) => {
                   </label>
                   <button
                     type="button"
-                    onClick={handleForgotPassword}
+                    onClick={() => switchMode('forgot_password')}
                     disabled={isSubmitting}
                     className="text-brand-gold/80 transition-colors hover:text-brand-gold disabled:opacity-50"
                   >
@@ -354,15 +413,19 @@ const LoginPage = ({ onLogin, onBack }) => {
               >
                 {isSubmitting
                   ? 'Enviando...'
-                  : isConfirming
-                    ? 'Verificar código'
-                    : isRegistering
-                      ? 'Crear cuenta'
-                      : 'Entrar al workspace'}
+                  : isForgotPassword
+                    ? 'Enviar código'
+                    : isConfirming || isRecoverConfirming
+                      ? 'Verificar código'
+                      : isResettingPassword
+                        ? 'Actualizar clave'
+                        : isRegistering
+                          ? 'Crear cuenta'
+                          : 'Entrar al workspace'}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </button>
 
-              {!isConfirming && isRegistering && (
+              {(!isConfirming && !isRecoverConfirming && !isResettingPassword && isRegistering) && (
                 <button
                   type="button"
                   onClick={() => switchMode('confirm')}
@@ -370,6 +433,46 @@ const LoginPage = ({ onLogin, onBack }) => {
                 >
                   ¿Ya tienes un código? Verifícalo aquí
                 </button>
+              )}
+
+              {(!isConfirming && !isRecoverConfirming && !isResettingPassword && !isForgotPassword) && (
+                <>
+                  <div className="relative mt-6 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-white/[0.06]"></div>
+                    </div>
+                    <div className="relative bg-brand-black px-4 text-[11px] font-medium uppercase tracking-widest text-brand-accent/50">
+                      O continuar con
+                    </div>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={isSubmitting}
+                    className="flex w-full items-center justify-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.02] py-4 text-sm font-medium text-brand-ivory transition-colors hover:bg-white/[0.06] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 24 24">
+                      <path
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        fill="#4285F4"
+                      />
+                      <path
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        fill="#34A853"
+                      />
+                      <path
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                        fill="#FBBC05"
+                      />
+                      <path
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        fill="#EA4335"
+                      />
+                    </svg>
+                    Google
+                  </button>
+                </>
               )}
 
             </form>
