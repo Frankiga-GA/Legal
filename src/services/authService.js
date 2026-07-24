@@ -148,11 +148,9 @@ export const markOnboardingComplete = (userId) => {
 };
 
 export const onAuthStateChange = (callback) => {
-  if (!supabase) return { unsubscribe: () => {} };
-
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-    callback(session);
-  });
-
-  return data.subscription;
+  // Cuando usamos accessToken, el cliente de Supabase desactiva GoTrue y lanza error
+  // si intentamos acceder a supabase.auth.
+  // Como Cognito maneja el auth state y App.jsx lee la sesion en el montaje inicial,
+  // podemos retornar un dummy subscription sin romper la app de React.
+  return { unsubscribe: () => {} };
 };
