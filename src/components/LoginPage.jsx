@@ -33,7 +33,6 @@ import {
 import {
   signInWithEmail,
   signUpWithEmail,
-  signInWithMagicLink,
   sendPasswordReset,
 } from '../services/authService';
 
@@ -41,7 +40,7 @@ const REMEMBER_KEY = 'lusti-remember-me';
 const EMAIL_KEY = 'lusti-last-email';
 
 const LoginPage = ({ onLogin, onBack }) => {
-  const [mode, setMode] = useState('login'); // 'login' | 'register' | 'magic'
+  const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [email, setEmail] = useState(() => {
     try {
       return window.localStorage.getItem(EMAIL_KEY) || '';
@@ -67,7 +66,6 @@ const LoginPage = ({ onLogin, onBack }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isRegistering = mode === 'register';
-  const isMagicLink = mode === 'magic';
 
   const passwordStrength = useMemo(() => {
     return evaluatePasswordStrength(password);
@@ -83,7 +81,7 @@ const LoginPage = ({ onLogin, onBack }) => {
       return;
     }
 
-    if (!isMagicLink && password.length < 6) {
+    if (password.length < 6) {
       setError('La clave debe tener al menos 6 caracteres.');
       return;
     }
@@ -91,12 +89,6 @@ const LoginPage = ({ onLogin, onBack }) => {
     setIsSubmitting(true);
 
     try {
-      if (isMagicLink) {
-        await signInWithMagicLink({ email });
-        setNotice('Te enviamos un link magico a tu correo. Hace click para entrar.');
-        return;
-      }
-
       // Marca que el auth se disparo desde esta pestana para que el
       // handler global de auth no muestre el overlay de "sesion duplicada".
       try {
@@ -198,16 +190,12 @@ const LoginPage = ({ onLogin, onBack }) => {
               <h2 className="text-4xl font-serif font-medium tracking-tight text-brand-ivory">
                 {isRegistering
                   ? 'Crea tu espacio legal'
-                  : isMagicLink
-                    ? 'Entra con un link magico'
-                    : 'Accede a tu estudio'}
+                  : 'Accede a tu estudio'}
               </h2>
               <p className="mt-4 text-sm font-light leading-6 text-brand-accent/65">
                 {isRegistering
                   ? 'Activa una cuenta para probar expedientes, documentos e IA contextual.'
-                  : isMagicLink
-                    ? 'Te enviamos un link al correo. Hace click y entras sin escribir clave.'
-                    : 'Ingresa para continuar con expedientes, documentos, plazos y asistentes IA.'}
+                  : 'Ingresa para continuar con expedientes, documentos, plazos y asistentes IA.'}
               </p>
             </div>
 
@@ -231,18 +219,16 @@ const LoginPage = ({ onLogin, onBack }) => {
                 autoComplete="email"
               />
 
-              {!isMagicLink && (
-                <PasswordField
-                  label="Clave de acceso"
-                  value={password}
-                  onChange={setPassword}
-                  placeholder="********"
-                  show={showPassword}
-                  onToggleShow={() => setShowPassword((v) => !v)}
-                  strength={isRegistering ? passwordStrength : null}
-                  autoComplete={isRegistering ? 'new-password' : 'current-password'}
-                />
-              )}
+              <PasswordField
+                label="Clave de acceso"
+                value={password}
+                onChange={setPassword}
+                placeholder="********"
+                show={showPassword}
+                onToggleShow={() => setShowPassword((v) => !v)}
+                strength={isRegistering ? passwordStrength : null}
+                autoComplete={isRegistering ? 'new-password' : 'current-password'}
+              />
 
               {isRegistering && (
                 <>
@@ -285,7 +271,7 @@ const LoginPage = ({ onLogin, onBack }) => {
                 </>
               )}
 
-              {!isRegistering && !isMagicLink && (
+              {!isRegistering && (
                 <div className="flex items-center justify-between text-[11px]">
                   <label className="inline-flex cursor-pointer items-center gap-2 text-brand-accent/65">
                     <input
@@ -328,33 +314,13 @@ const LoginPage = ({ onLogin, onBack }) => {
               >
                 {isSubmitting
                   ? 'Enviando...'
-                  : isMagicLink
-                    ? 'Enviar link al correo'
-                    : isRegistering
-                      ? 'Crear cuenta'
-                      : 'Entrar al workspace'}
+                  : isRegistering
+                    ? 'Crear cuenta'
+                    : 'Entrar al workspace'}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </button>
 
-              {!isMagicLink && (
-                <div className="relative my-2">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/[0.06]"></div>
-                  </div>
-                  <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
-                    <span className="bg-brand-black px-3 text-brand-accent/45">o</span>
-                  </div>
-                </div>
-              )}
 
-              <button
-                type="button"
-                onClick={() => switchMode(isMagicLink ? 'login' : 'magic')}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] py-3 text-xs font-semibold text-brand-ivory transition-colors hover:border-brand-gold/30 hover:bg-white/[0.04]"
-              >
-                <Sparkles className="h-3.5 w-3.5 text-brand-gold" />
-                {isMagicLink ? 'Volver a clave' : 'Entrar con link magico'}
-              </button>
             </form>
 
             <div className="mt-8 rounded-lg border border-white/[0.06] bg-white/[0.02] p-5">

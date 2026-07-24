@@ -1,98 +1,119 @@
+import { Amplify } from 'aws-amplify';
+import { signIn, signUp, signOut as amplifySignOut, fetchAuthSession, resetPassword } from 'aws-amplify/auth';
 import { supabase } from '../utils/supabase';
 
-export const getCurrentSession = async () => {
-  if (!supabase) return null;
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      userPoolId: 'us-east-2_c9cyZqxAY',
+      userPoolClientId: '36phgsf9kjtlhehqvs339hmu45',
+      identityPoolId: '', 
+      loginWith: {
+        email: true,
+      },
+    }
+  }
+});
 
-  const { data, error } = await supabase.auth.getSession();
-  if (error) throw error;
-  return data.session;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+
+async function performTokenExchange(cognitoToken) {
+  const res = await fetch(`${BACKEND_URL}/auth/exchange`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: cognitoToken })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || 'Error validando sesión');
+  }
+  const data = await res.json();
+  
+  // Set the session in Supabase so RLS works!
+  await supabase.auth.setSession({
+    access_token: data.supabase_token,
+    refresh_token: data.supabase_token,
+  });
+  
+  return { user: { id: data.user_id }, access_token: data.supabase_token };
+}
+
+export const getCurrentSession = async () => {
+  try {
+    const session = await fetchAuthSession();
+    if (!session.tokens) return null;
+    
+    // Exchange Cognito token for Supabase token
+    const cognitoIdToken = session.tokens.idToken.toString();
+    const supabaseSession = await performTokenExchange(cognitoIdToken);
+    return supabaseSession;
+  } catch (error) {
+    // Si falla (ej. expiró en Cognito), deslogueamos de Supabase también
+    if (supabase) await supabase.auth.signOut();
+    return null;
+  }
 };
 
 export const signInWithEmail = async ({ email, password }) => {
-  if (!supabase) {
-    throw new Error('Supabase no esta configurado.');
+  try {
+    const { isSignedIn, nextStep } = await signIn({ username: email, password });
+    if (!isSignedIn) {
+      if (nextStep?.signInStep === 'CONFIRM_SIGN_UP') {
+        throw new Error('Debes confirmar tu correo electrónico antes de iniciar sesión.');
+      }
+      throw new Error('Credenciales inválidas o paso adicional requerido');
+    }
+    
+    return await getCurrentSession();
+  } catch (err) {
+    throw new Error(err.message || 'Error al iniciar sesión');
   }
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) throw error;
-  return data.session;
 };
 
 export const signInWithGoogle = async () => {
-  if (!supabase) {
-    throw new Error('Supabase no esta configurado.');
-  }
+  throw new Error('Inicio de sesión con Google no soportado con Cognito.');
+};
 
-  const redirectTo = `${window.location.origin}${window.location.pathname}`;
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo,
-    },
-  });
-
-  if (error) throw error;
-  return data;
+export const signInWithMagicLink = async () => {
+  throw new Error('Inicio de sesión con Magic Link no soportado con Cognito.');
 };
 
 export const signUpWithEmail = async ({ email, password, fullName, dni, company }) => {
-  if (!supabase) {
-    throw new Error('Supabase no esta configurado.');
-  }
-
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName,
-        dni,
-        company,
+  try {
+    const { isSignUpComplete, userId, nextStep } = await signUp({
+      username: email,
+      password,
+      options: {
+        userAttributes: {
+          email,
+        }
       }
-    }
-  });
-
-  if (error) throw error;
-  return data;
+    });
+    // Note: fullName, dni, company are skipped here.
+    // LUSTI currently saves them in Supabase after successful login.
+    return { id: userId };
+  } catch (err) {
+    throw new Error(err.message || 'Error al registrarse');
+  }
 };
 
 export const signOut = async () => {
-  if (!supabase) return;
-
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
-};
-
-export const signInWithMagicLink = async ({ email }) => {
-  if (!supabase) {
-    throw new Error('Supabase no esta configurado.');
+  try {
+    await amplifySignOut();
+  } catch (e) {
+    console.warn('Error signing out of Cognito', e);
   }
-  const redirectTo = `${window.location.origin}${window.location.pathname}`;
-  const { data, error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: redirectTo,
-    },
-  });
-  if (error) throw error;
-  return data;
+  if (supabase) {
+    await supabase.auth.signOut();
+  }
 };
 
 export const sendPasswordReset = async ({ email }) => {
-  if (!supabase) {
-    throw new Error('Supabase no esta configurado.');
+  try {
+    await resetPassword({ username: email });
+  } catch (err) {
+    throw new Error(err.message || 'Error al resetear contraseña');
   }
-  const redirectTo = `${window.location.origin}${window.location.pathname}`;
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo,
-  });
-  if (error) throw error;
-  return data;
 };
 
 const ONBOARDING_KEY = 'lusti-onboarding-completed';
