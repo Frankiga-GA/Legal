@@ -37,16 +37,12 @@ async function performTokenExchange(cognitoToken) {
 
 export const getCurrentSession = async () => {
   try {
-    const session = await fetchAuthSession();
-    if (!session.tokens) return null;
-    
-    // Exchange Cognito token for Supabase token
-    const cognitoIdToken = session.tokens.idToken.toString();
-    const supabaseSession = await performTokenExchange(cognitoIdToken);
-    return supabaseSession;
+    const { tokens } = await fetchAuthSession({ forceRefresh: true });
+    if (!tokens) return null;
+    return await performTokenExchange(tokens.idToken.toString());
   } catch (error) {
-    // Si falla (ej. expiró en Cognito), deslogueamos de Supabase también
-    if (supabase) await supabase.auth.signOut();
+    // Si falla (ej. expiró en Cognito)
+    setCustomAccessToken(null);
     return null;
   }
 };
@@ -112,7 +108,6 @@ export const signOut = async () => {
   try {
     await amplifySignOut();
     setCustomAccessToken(null);
-    if (supabase) await supabase.auth.signOut();
     window.sessionStorage.removeItem('lusti_self_auth');
   } catch (err) {
     console.error('Error al cerrar sesión', err);
