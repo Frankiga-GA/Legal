@@ -49,15 +49,57 @@ def exchange_cognito_for_supabase(payload: ExchangeRequest):
         if not user_id:
             raise HTTPException(status_code=400, detail="El token de Cognito no contiene 'sub'.")
 
+        email = claims.get("email", "")
+        
+        # 1. Fetch users to see if they exist in Supabase (to preserve old data)
+        supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+        
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "application/json"
+        }
+        
+        supabase_uid = None
+        # Try to find by email
+        res_users = httpx.get(f"{supabase_url}/auth/v1/admin/users", headers=headers)
+        if res_users.status_code == 200:
+            users_list = res_users.json().get("users", [])
+            for u in users_list:
+                if u.get("email") == email:
+                    supabase_uid = u.get("id")
+                    break
+        
+        # 2. If not found, create a new user in Supabase auth.users
+        if not supabase_uid:
+            import secrets
+            import string
+            alphabet = string.ascii_letters + string.digits
+            random_password = ''.join(secrets.choice(alphabet) for i in range(20)) + "A1!"
+            
+            payload = {
+                "email": email,
+                "password": random_password,
+                "email_confirm": True
+            }
+            res_create = httpx.post(f"{supabase_url}/auth/v1/admin/users", json=payload, headers=headers)
+            if res_create.status_code == 200:
+                supabase_uid = res_create.json().get("id")
+            else:
+                # Fallback to cognito user_id if creation fails for some reason
+                print(f"Error creating user in Supabase: {res_create.text}")
+                supabase_uid = user_id
+        
         now = int(time.time())
         supabase_claims = {
             "aud": "authenticated",
             "exp": now + (60 * 60 * 24), # 24 hours
             "iat": now,
             "iss": "supabase",
-            "sub": user_id,
+            "sub": supabase_uid,  # Use Supabase UUID to satisfy Foreign Keys!
             "role": "authenticated",
-            "email": claims.get("email", ""),
+            "email": email,
             "app_metadata": {
                 "provider": "cognito"
             }
@@ -66,7 +108,7 @@ def exchange_cognito_for_supabase(payload: ExchangeRequest):
         supabase_secret = get_jwt_secret()
         supabase_token = jwt.encode(supabase_claims, supabase_secret, algorithm="HS256")
         
-        return ExchangeResponse(supabase_token=supabase_token, user_id=user_id)
+        return ExchangeResponse(supabase_token=supabase_token, user_id=supabase_uid)
 
     except jwt.ExpiredSignatureError:
         print("Error in token exchange: Token expirado")
