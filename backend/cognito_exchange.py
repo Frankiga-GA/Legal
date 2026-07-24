@@ -1,6 +1,7 @@
 import os
 import time
 import jwt
+import httpx
 from jwt import PyJWKClient
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
