@@ -24,11 +24,6 @@ const placeholderDetected = isPlaceholder(supabaseUrl) || isPlaceholder(supabase
 const urlIsValid = isValidHttpUrl(supabaseUrl);
 const keyLooksReal = typeof supabasePublishableKey === 'string' && supabasePublishableKey.length >= 20;
 
-export let customAccessToken = null;
-export const setCustomAccessToken = (token) => {
-  customAccessToken = token;
-};
-
 let supabase = null;
 
 if (placeholderDetected) {
@@ -43,14 +38,7 @@ if (placeholderDetected) {
   );
 } else {
   try {
-    supabase = createClient(supabaseUrl, supabasePublishableKey, {
-      global: {
-        headers: {}
-      },
-      accessToken: async () => {
-        return customAccessToken || null;
-      }
-    });
+    supabase = createClient(supabaseUrl, supabasePublishableKey);
   } catch (error) {
     console.error('[supabase] No se pudo crear el cliente. Modo local activado.', error);
     supabase = null;

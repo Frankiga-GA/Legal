@@ -44,9 +44,6 @@ load_dotenv(BACKEND_DIR / ".env")
 
 
 app = FastAPI(title="LUSTI Document Backend", version="0.2.0")
-
-from cognito_exchange import router as cognito_router
-app.include_router(cognito_router, prefix="/auth")
 # =============================================================================
 # Strip del prefijo `/api`
 # =============================================================================
