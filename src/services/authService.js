@@ -74,6 +74,9 @@ export const signOut = async () => {
     if (error) throw error;
     try {
       window.sessionStorage.removeItem('lusti_self_auth');
+      window.localStorage.removeItem('lusti-google-drive-token');
+      // Despachar el evento para que los componentes (App.jsx, etc) limpien el estado de Drive
+      window.dispatchEvent(new CustomEvent('lusti-drive-token-changed', { detail: { token: null } }));
     } catch {
       // ignore
     }
