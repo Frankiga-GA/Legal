@@ -324,20 +324,117 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
     }
   };
 
-  const handleImportFromDrive = (driveFiles) => {
+  const handleImportFromDrive = async (driveFiles) => {
+    if (!driveFiles || !driveFiles.length) return;
+
+    setIsUploading(true);
+    setDocumentUploadStatus(`Importando ${driveFiles.length} archivo(s) desde Google Drive...`);
+    
+    const showToast = typeof toast !== 'undefined' ? toast : null;
     const today = new Date().toISOString().split('T')[0];
-    const newDocs = driveFiles.map((f) => ({
-      id: `drive-${Date.now()}-${f.id}`,
-      name: f.name,
-      date: today,
-      size: 'Drive',
-      source: 'drive',
-      driveFileId: f.id,
-      mimeType: f.mimeType,
-      webViewLink: f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`,
-    }));
-    handleUpdate({ documents: [...documents, ...newDocs] });
-    toast.success(`${newDocs.length} archivo(s) importado(s) desde Drive`);
+    
+    const newDocs = [];
+    let currentImportantDates = [...importantDates];
+    let latestAiChanges = {};
+    const newAiMessages = [];
+
+    try {
+      const { downloadDriveFileAsFile } = await import('../services/googleDriveService');
+
+      for (let i = 0; i < driveFiles.length; i++) {
+        const f = driveFiles[i];
+        setDocumentUploadStatus(`Procesando "${f.name}" (${i + 1}/${driveFiles.length})...`);
+        
+        let extractedText = '';
+        let excerpt = '';
+
+        try {
+          // 1. Descargar el archivo desde Google Drive
+          const fileObj = await downloadDriveFileAsFile(f);
+          
+          // 2. Extraer texto usando el backend
+          const backendResponse = await uploadDocumentToBackend(fileObj);
+          extractedText = String(backendResponse?.extracted_text || '').trim();
+          excerpt = extractedText ? `Texto extraído (${extractedText.length} caracteres).` : 'Archivo de Drive. No se pudo extraer texto.';
+
+          // 3. Análisis de IA
+          if (extractedText) {
+            setDocumentUploadStatus(`IA analizando "${f.name}"...`);
+            try {
+              const aiDetails = await extractResolutionDetails(extractedText);
+              
+              if (Array.isArray(aiDetails.newDeadlines)) {
+                aiDetails.newDeadlines.forEach((dl, idx) => {
+                  currentImportantDates.unshift({
+                    id: `ai-dl-${Date.now()}-${idx}`,
+                    title: dl.title,
+                    date: dl.date,
+                    priority: dl.priority || 'Alta',
+                    status: 'Pendiente',
+                  });
+                });
+              }
+              
+              latestAiChanges = {
+                latestProgress: aiDetails.latestProgress,
+                hearingLink: aiDetails.hearingLink || latestAiChanges.hearingLink || caseData.hearingLink || '',
+                urgency: aiDetails.urgency || latestAiChanges.urgency || caseData.urgency || 'Alta',
+                isAiUpdated: true,
+              };
+
+              newAiMessages.push({ 
+                role: 'ai', 
+                content: `Acabo de leer el documento de Drive "${f.name}".\n\nResumen: ${aiDetails.latestProgress}\n\n¿Deseas que redacte un escrito o respuesta basada en esto?` 
+              });
+              
+              if (showToast) showToast.success(`"${f.name}" procesado por IA`);
+            } catch (aiError) {
+              console.warn('Error en IA para Drive:', aiError);
+              if (showToast) showToast.error(`Análisis IA falló para "${f.name}"`);
+            }
+          }
+        } catch (downloadError) {
+          console.error('Error procesando archivo de Drive:', downloadError);
+          excerpt = 'Error al descargar o procesar el archivo.';
+          if (showToast) showToast.error(`No se pudo procesar "${f.name}"`);
+        }
+
+        newDocs.push({
+          id: `drive-${Date.now()}-${f.id}`,
+          name: f.name,
+          date: today,
+          size: 'Drive',
+          source: 'drive',
+          driveFileId: f.id,
+          mimeType: f.mimeType,
+          excerpt,
+          content: extractedText,
+          webViewLink: f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`,
+        });
+      }
+
+      // Actualizar el estado con todos los cambios acumulados
+      handleUpdate({
+        documents: [...documents, ...newDocs],
+        importantDates: currentImportantDates,
+        ...latestAiChanges,
+      });
+
+      if (newAiMessages.length > 0) {
+        setAiMessages(prev => [...prev, ...newAiMessages]);
+      }
+
+      if (showToast) showToast.success(`${newDocs.length} archivo(s) importado(s) correctamente`);
+
+    } catch (globalError) {
+      console.error(globalError);
+      setDocumentUploadStatus('Error general al importar de Drive.');
+      if (showToast) showToast.error('Error general al importar desde Drive.');
+    } finally {
+      setIsUploading(false);
+      setDocumentUploadStatus('');
+      setShowDrivePicker(false);
+    }
   };
 
 
