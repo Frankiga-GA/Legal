@@ -52,7 +52,7 @@ function App() {
   const [activeCaseId, setActiveCaseId] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isLanding, setIsLanding] = useState(true);
+  const [isLanding, setIsLanding] = useState(publicPath !== '/login');
   const [session, setSession] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -361,11 +361,11 @@ function App() {
   }
 
   if (isLanding && !session) {
-    return <LandingPage onGetStarted={() => setIsLanding(false)} />;
+    return <LandingPage onGetStarted={() => { window.history.pushState({}, '', '/login'); setIsLanding(false); }} />;
   }
 
   if (!session) {
-    return <LoginPage onLogin={handleLogin} onBack={() => setIsLanding(true)} />;
+    return <LoginPage onLogin={handleLogin} onBack={() => { window.history.pushState({}, '', '/'); setIsLanding(true); }} />;
   }
 
   return (
