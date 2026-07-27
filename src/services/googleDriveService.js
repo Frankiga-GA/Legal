@@ -1,6 +1,7 @@
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
 const GOOGLE_SCOPES = [
-  'https://www.googleapis.com/auth/drive.file', // Allows creating folders and uploading files created by the app
+  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/calendar.events',
 ];
 
