@@ -115,7 +115,7 @@ function App() {
         if (isMounted) setIsAuthLoading(false);
       });
 
-    const subscription = onAuthStateChange((nextSession) => {
+    const subscription = onAuthStateChange((nextSession, event) => {
       if (!isMounted) return;
 
       // Si estamos a mitad de un cambio de contraseña, ignorar la sesión temporal
@@ -156,7 +156,7 @@ function App() {
             /* canal cerrado */
           }
         }
-      } else {
+      } else if (event === 'SIGNED_IN') {
         // Pestana secundaria: detecta si el SIGNED_IN lo disparo esta
         // misma pestana (login con password) o si vino por sync desde
         // otra pestana (magic link abierto en una ventana nueva).
