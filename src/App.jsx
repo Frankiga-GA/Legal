@@ -132,11 +132,20 @@ function App() {
 
       // Detecta si esta pestana es la que abrio el magic link
       // (la URL trae los tokens en el hash o en el query).
-      const hasTokensInUrl =
-        (window.location.hash && window.location.hash.includes('access_token')) ||
-        (window.location.search && window.location.search.includes('access_token'));
+      let hasTokensInUrl = false;
+      try {
+        hasTokensInUrl =
+          (window.location.hash && window.location.hash.includes('access_token')) ||
+          (window.location.search && window.location.search.includes('access_token')) ||
+          (window.sessionStorage.getItem('lusti_magic_link_processed') === '1');
+      } catch {
+        /* noop */
+      }
 
       if (hasTokensInUrl) {
+        try {
+          window.sessionStorage.setItem('lusti_magic_link_processed', '1');
+        } catch { /* noop */ }
         // Pestana principal: limpia los tokens de la URL para que no
         // queden en el historial ni en la barra de direcciones, y avisa
         // a las demas pestanas.
@@ -164,9 +173,8 @@ function App() {
         let dismissed = false;
         try {
           selfTriggered = window.sessionStorage.getItem('lusti_self_auth') === '1';
-          if (selfTriggered) {
-            window.sessionStorage.removeItem('lusti_self_auth');
-          }
+          // NO remover el flag lusti_self_auth inmediatamente para evitar que StrictMode (doble render) 
+          // haga que el segundo render pierda el flag y muestre el overlay incorrectamente.
           dismissed = window.sessionStorage.getItem('lusti_overlay_dismissed') === '1';
         } catch {
           /* noop */
