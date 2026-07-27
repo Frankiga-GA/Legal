@@ -48,7 +48,9 @@ class ErrorBoundary extends React.Component {
 
 function App() {
   const publicPath = window.location.pathname.replace(/\/+$/, '') || '/';
-  const [activeTab, setActiveTab] = useState('library');
+  const validTabs = ['case-workspace', 'library', 'ai-chat', 'global-chat', 'elperuano', 'calendar', 'settings'];
+  const urlTab = publicPath.replace('/', '');
+  const [activeTab, setActiveTab] = useState(validTabs.includes(urlTab) ? urlTab : 'library');
   const [activeCaseId, setActiveCaseId] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -251,7 +253,7 @@ function App() {
 
   const handleLogin = (nextSession) => {
     setSession(nextSession);
-    window.history.pushState({}, '', '/dashboard');
+    window.history.pushState({}, '', `/${activeTab}`);
     setIsLanding(false);
     if (nextSession?.user?.id && !hasCompletedOnboarding(nextSession.user.id)) {
       setShowOnboarding(true);
@@ -267,10 +269,10 @@ function App() {
   };
 
   useEffect(() => {
-    if (!isAuthLoading && session && window.location.pathname === '/') {
-      window.history.replaceState({}, '', '/dashboard');
+    if (!isAuthLoading && session && (window.location.pathname === '/' || window.location.pathname === '/login')) {
+      window.history.replaceState({}, '', `/${activeTab}`);
     }
-  }, [session, isAuthLoading]);
+  }, [session, isAuthLoading, activeTab]);
 
   // Bloquea el boton "Atras" del navegador solo si intenta salir de la app
   // (landing, login, etc.). La navegacion interna la maneja el sidebar.
@@ -290,10 +292,10 @@ function App() {
     pushAppState();
 
     const onPopState = () => {
-      // Si el estado anterior NO es de la app (landing, login, etc.),
-      // empujamos nuestro estado para mantener al usuario en la app.
-      // Si YA es de la app, NO hacemos nada: dejamos que el back navegue
-      // normalmente (cierra modales, vuelve a tabs previos, etc.).
+      const currentUrlTab = window.location.pathname.replace('/', '');
+      if (['case-workspace', 'library', 'ai-chat', 'global-chat', 'elperuano', 'calendar', 'settings'].includes(currentUrlTab)) {
+        setActiveTab(currentUrlTab);
+      }
       if (!window.history.state?.app) {
         pushAppState();
       }
@@ -339,6 +341,7 @@ function App() {
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
+    window.history.pushState({ app: true }, '', `/${tab}`);
     setIsSidebarCollapsed(tab === 'ai-chat' || tab === 'case-workspace' || tab === 'global-chat');
     setIsMobileMenuOpen(false);
   };
