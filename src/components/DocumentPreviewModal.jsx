@@ -18,6 +18,18 @@ const DocumentPreviewModal = ({ doc, onClose }) => {
   const isDrive = doc.source === 'drive' && doc.webViewLink;
   const isImage = doc.fileUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.fileUrl);
   const isPdf = doc.fileUrl && /\.pdf$/i.test(doc.fileUrl);
+  const isGenerated = doc.source === 'generated' && doc.content;
+
+  const handleDownloadText = () => {
+    if (!doc.content) return;
+    const blob = new Blob([doc.content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${doc.name}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   // URL para el iframe
   let iframeUrl = '';
@@ -55,6 +67,14 @@ const DocumentPreviewModal = ({ doc, onClose }) => {
                 <ExternalLink className="h-4 w-4" />
                 <span className="hidden sm:inline">Abrir en Drive</span>
               </a>
+            ) : isGenerated ? (
+              <button
+                onClick={handleDownloadText}
+                className="flex items-center gap-2 rounded-lg bg-white/[0.04] px-4 py-2 text-sm font-medium text-brand-ivory hover:bg-white/[0.08] transition-colors"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Descargar TXT</span>
+              </button>
             ) : doc.fileUrl ? (
               <a
                 href={doc.fileUrl}
@@ -88,7 +108,15 @@ const DocumentPreviewModal = ({ doc, onClose }) => {
             </div>
           )}
 
-          {isImage ? (
+          {isGenerated ? (
+            <div className="h-full w-full max-w-4xl bg-brand-dark/50 p-6 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col shadow-inner">
+              <textarea
+                value={doc.content}
+                readOnly
+                className="flex-1 w-full bg-transparent text-sm text-brand-ivory font-mono leading-relaxed resize-none focus:outline-none custom-scrollbar"
+              />
+            </div>
+          ) : isImage ? (
             <img 
               src={doc.fileUrl} 
               alt={doc.name} 
