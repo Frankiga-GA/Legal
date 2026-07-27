@@ -251,6 +251,7 @@ function App() {
 
   const handleLogin = (nextSession) => {
     setSession(nextSession);
+    window.history.pushState({}, '', '/dashboard');
     setIsLanding(false);
     if (nextSession?.user?.id && !hasCompletedOnboarding(nextSession.user.id)) {
       setShowOnboarding(true);
@@ -260,9 +261,16 @@ function App() {
   const handleLogout = async () => {
     await signOut();
     setSession(null);
+    window.history.pushState({}, '', '/');
     setActiveTab('library');
     setIsLanding(true);
   };
+
+  useEffect(() => {
+    if (!isAuthLoading && session && window.location.pathname === '/') {
+      window.history.replaceState({}, '', '/dashboard');
+    }
+  }, [session, isAuthLoading]);
 
   // Bloquea el boton "Atras" del navegador solo si intenta salir de la app
   // (landing, login, etc.). La navegacion interna la maneja el sidebar.
