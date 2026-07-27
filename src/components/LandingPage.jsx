@@ -147,7 +147,9 @@ const LandingPage = ({ onGetStarted }) => {
                     Convierte expedientes dispersos en una operacion legal inteligente.
                   </h1>
                   <p className="max-w-2xl text-lg font-light leading-8 text-slate-300 md:text-xl">
-                    LUSTI organiza casos, documentos, vencimientos y asistentes IA para que una firma trabaje con mas control, menos busqueda manual y respuestas mejor sustentadas.
+                    LUSTI organiza casos, documentos, vencimientos y asistentes IA para que una firma trabaje con mas control, menos busqueda manual y respuestas mejor sustentadas. 
+                    <br /><br />
+                    <strong>Propósito de la aplicación:</strong> LUSTI es un software B2B de gestión documental. Se integra con Google Drive de manera segura (solo lectura) para que los abogados puedan importar sus documentos legales y analizarlos con Inteligencia Artificial directamente en la plataforma.
                   </p>
                 </div>
               </AnimatedSection>
@@ -316,6 +318,10 @@ const LandingPage = ({ onGetStarted }) => {
       <footer className="relative z-10 border-t border-white/[0.06] px-6 py-10">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 text-center md:flex-row md:items-center md:justify-between md:text-left">
           <p className="font-serif text-xl text-brand-ivory">LUSTI</p>
+          <div className="flex flex-col gap-2 text-sm text-brand-accent/50 md:flex-row md:gap-6">
+            <a href="/privacy" className="transition-colors hover:text-brand-ivory">Política de Privacidad</a>
+            <a href="/terms" className="transition-colors hover:text-brand-ivory">Condiciones del Servicio</a>
+          </div>
           <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-brand-accent/30">
             2026 Legal workspace para estudios juridicos
           </p>
