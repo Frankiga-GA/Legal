@@ -979,7 +979,7 @@ async def ai_raw(
         )
     except Exception as error:
         print(f"Error calling Groq in ai_raw: {error}")
-        raise HTTPException(status_code=502, detail="No se pudo procesar la solicitud con el servicio de IA.")
+        raise HTTPException(status_code=502, detail=f"No se pudo procesar con la IA: {str(error)}")
     return RawAskResponse(text=text)
 
 
