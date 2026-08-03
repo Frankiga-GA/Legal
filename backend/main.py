@@ -409,9 +409,9 @@ async def _ask_gemini(
     url = "https://api.groq.com/openai/v1/chat/completions"
 
     # Si hay archivo adjunto, lo agregamos como contexto antes de la pregunta.
-    # Truncamos para no pasar el limite de tokens del modelo.
+    # Truncamos para no pasar el limite de tokens del modelo en Groq free tier.
     if file_text and file_text.strip():
-        max_file_chars = 18000
+        max_file_chars = 10000
         truncated = file_text.strip()
         if len(truncated) > max_file_chars:
             truncated = truncated[:max_file_chars] + "\n\n[...texto truncado por limite de contexto...]"
@@ -422,6 +422,10 @@ async def _ask_gemini(
             f"--- FIN DEL ARCHIVO ---\n\n"
         )
         prompt_text = file_block + prompt_text
+
+    # Truncar prompt_text si es excesivamente largo para no desbordar el TPM de Groq
+    if len(prompt_text) > 12000:
+        prompt_text = prompt_text[:12000] + "\n\n[...texto truncado para procesar respuesta...]"
 
     messages: list[dict[str, str]] = []
     if system_prompt and system_prompt.strip():
@@ -439,36 +443,49 @@ async def _ask_gemini(
 
     messages.append({"role": "user", "content": prompt_text})
 
-    payload: dict[str, Any] = {
-        "model": model,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_output_tokens,
-        "top_p": 0.9,
-    }
-    if response_json:
-        payload["response_format"] = {"type": "json_object"}
-
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
-    async with httpx.AsyncClient(timeout=90) as client:
-        response = await client.post(url, json=payload, headers=headers)
+    # Modelos a intentar: primero el configurado, luego fallback a 8b si hay rate limit
+    models_to_try = [model]
+    if model != "llama-3.1-8b-instant":
+        models_to_try.append("llama-3.1-8b-instant")
 
-    if response.status_code >= 400:
-        raise RuntimeError(f"Groq {response.status_code}: {response.text}")
+    last_error_text = ""
+    for current_model in models_to_try:
+        payload: dict[str, Any] = {
+            "model": current_model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": min(max_output_tokens, 2048),
+            "top_p": 0.9,
+        }
+        if response_json:
+            payload["response_format"] = {"type": "json_object"}
 
-    data = response.json()
-    choices = data.get("choices") or []
-    if not choices:
-        raise RuntimeError(f"Groq devolvio respuesta vacia: {data}")
-    extracted = (choices[0].get("message") or {}).get("content") or ""
-    extracted = extracted.strip()
-    if not extracted:
-        raise RuntimeError("Groq devolvio contenido vacio")
-    return extracted
+        async with httpx.AsyncClient(timeout=90) as client:
+            response = await client.post(url, json=payload, headers=headers)
+
+        if response.status_code == 200:
+            data = response.json()
+            choices = data.get("choices") or []
+            if not choices:
+                raise RuntimeError(f"Groq devolvio respuesta vacia: {data}")
+            extracted = (choices[0].get("message") or {}).get("content") or ""
+            extracted = extracted.strip()
+            if not extracted:
+                raise RuntimeError("Groq devolvio contenido vacio")
+            return extracted
+        elif response.status_code in (413, 429):
+            last_error_text = response.text
+            print(f"Groq {response.status_code} con {current_model}. Intentando fallback...")
+            continue
+        else:
+            raise RuntimeError(f"Groq {response.status_code}: {response.text}")
+
+    raise RuntimeError(f"Groq fallo en todos los modelos disponibles: {last_error_text}")
 
 
 def _build_file_generation_prompt(payload: GenerateFileRequest) -> str:
