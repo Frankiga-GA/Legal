@@ -228,16 +228,14 @@ class ProcessUrlRequest(BaseModel):
 
 def _extract_text_from_image(content_bytes: bytes, mime_type: str) -> str:
     import base64
-    import base64
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY no esta configurada en el backend.")
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
     base64_image = base64.b64encode(content_bytes).decode("utf-8")
     
     prompt = (
-        "Por favor, transcribe de forma precisa todo el texto visible en esta imagen. "
+        "Por favor, transcribe de forma precisa todo el texto visible en este documento o imagen. "
         "Si es una conversación, mantén el formato de diálogo. Si es un documento formal, "
         "mantén la estructura de párrafos. Responde SOLAMENTE con el texto extraído, sin comentarios adicionales."
     )
@@ -259,19 +257,31 @@ def _extract_text_from_image(content_bytes: bytes, mime_type: str) -> str:
         "Content-Type": "application/json",
     }
     
-    with httpx.Client(timeout=90) as client:
-        response = client.post(url, json=payload, headers=headers)
-        
-    if response.status_code >= 400:
-        raise RuntimeError(f"Gemini Vision {response.status_code}: {response.text}")
-        
-    data = response.json()
-    candidates = data.get("candidates") or []
-    if not candidates:
-        raise RuntimeError("Gemini Vision devolvio respuesta vacia")
-        
-    extracted = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-    return extracted.strip()
+    vision_models = ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"]
+    last_err = ""
+
+    for model_name in vision_models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        try:
+            with httpx.Client(timeout=90) as client:
+                response = client.post(url, json=payload, headers=headers)
+                
+            if response.status_code == 200:
+                data = response.json()
+                candidates = data.get("candidates") or []
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [{}])
+                    if parts and "text" in parts[0]:
+                        extracted = parts[0]["text"].strip()
+                        if extracted:
+                            return extracted
+            else:
+                last_err = f"Gemini Vision {response.status_code}: {response.text}"
+        except Exception as e:
+            last_err = str(e)
+            continue
+
+    raise RuntimeError(f"No se pudo extraer texto por OCR. Ultimo error: {last_err}")
 
 
 def _read_text_from_upload(upload: UploadFile) -> str:
@@ -294,7 +304,6 @@ def _read_text_from_upload(upload: UploadFile) -> str:
             raise RuntimeError(f"No se pudo extraer texto de la imagen: {e}")
 
     if filename.endswith(".pdf") or content_type == "application/pdf":
-        # 1. Intentar pdfplumber (limitado a 25 páginas)
         text = ""
         try:
             with pdfplumber.open(io.BytesIO(content)) as pdf:
@@ -307,12 +316,19 @@ def _read_text_from_upload(upload: UploadFile) -> str:
         if len(text) > 50:
             return text
             
-        # 2. Si no hay texto (es un PDF escaneado o puras imágenes), usamos Gemini Vision
+        # 2. Si no hay suficiente texto nativo, intentamos Gemini Vision OCR
         try:
-            return _extract_text_from_image(content, "application/pdf")
+            ocr_text = _extract_text_from_image(content, "application/pdf")
+            if ocr_text:
+                return ocr_text
         except Exception as e:
             print(f"Gemini PDF Vision exception: {e}")
-            raise RuntimeError(f"El documento parece ser un escaneo, pero falló la lectura: {e}")
+
+        # Si el OCR falló pero pdfplumber obtuvo ALGO de texto, devolvemos lo que obtuvo
+        if text:
+            return text
+
+        raise RuntimeError("No se pudo extraer texto del PDF (ni por texto directo ni por OCR).")
 
     if filename.endswith(".docx") or content_type in {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -392,24 +408,17 @@ async def _ask_gemini(
     file_name: str | None = None,
     file_text: str | None = None,
 ) -> str:
-    """Llama a Groq (OpenAI-compatible) usando GROQ_API_KEY.
+    """Llama a Groq (OpenAI-compatible) usando GROQ_API_KEY."""
+    import httpx
+    from typing import Any
 
-    Si se pasa `history`, se construye la conversacion como
-    [system, ...history..., user(prompt_text)]. Esto le da a la IA
-    memoria de los mensajes previos del chat.
-
-    Si se pasa `file_name` y `file_text`, el contenido del archivo se
-    adjunta al prompt del usuario como contexto de solo lectura.
-    """
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError("GROQ_API_KEY no esta configurada en el backend.")
 
-    model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
     url = "https://api.groq.com/openai/v1/chat/completions"
 
-    # Si hay archivo adjunto, lo agregamos como contexto antes de la pregunta.
-    # Truncamos para no pasar el limite de tokens del modelo en Groq free tier.
     if file_text and file_text.strip():
         max_file_chars = 10000
         truncated = file_text.strip()
@@ -423,7 +432,6 @@ async def _ask_gemini(
         )
         prompt_text = file_block + prompt_text
 
-    # Truncar prompt_text si es excesivamente largo para no desbordar el TPM de Groq
     if len(prompt_text) > 12000:
         prompt_text = prompt_text[:12000] + "\n\n[...texto truncado para procesar respuesta...]"
 
@@ -432,13 +440,11 @@ async def _ask_gemini(
         messages.append({"role": "system", "content": system_prompt.strip()})
 
     if history:
-        # Solo aceptamos roles validos; descartamos entradas mal formadas
         for entry in history:
             role = entry.get("role") if isinstance(entry, dict) else None
             content = entry.get("content") if isinstance(entry, dict) else None
-            if role in ("user", "ai", "assistant", "system") and content:
-                # Groq espera "assistant", no "ai"
-                normalized = "assistant" if role == "ai" else role
+            if role in ("user", "ai", "assistant", "system", "model") and content:
+                normalized = "assistant" if role in ("ai", "model") else role
                 messages.append({"role": normalized, "content": str(content)})
 
     messages.append({"role": "user", "content": prompt_text})
@@ -448,12 +454,9 @@ async def _ask_gemini(
         "Content-Type": "application/json",
     }
 
-    # Modelos a intentar: primero el configurado, luego fallback a 8b si hay rate limit
-    models_to_try = [model]
-    if model != "llama-3.1-8b-instant":
-        models_to_try.append("llama-3.1-8b-instant")
-
+    models_to_try = [model, "qwen/qwen3.8-27b", "allam-2-7b"]
     last_error_text = ""
+    
     for current_model in models_to_try:
         payload: dict[str, Any] = {
             "model": current_model,
@@ -465,27 +468,32 @@ async def _ask_gemini(
         if response_json:
             payload["response_format"] = {"type": "json_object"}
 
-        async with httpx.AsyncClient(timeout=90) as client:
-            response = await client.post(url, json=payload, headers=headers)
+        try:
+            async with httpx.AsyncClient(timeout=90) as client:
+                response = await client.post(url, json=payload, headers=headers)
 
-        if response.status_code == 200:
-            data = response.json()
-            choices = data.get("choices") or []
-            if not choices:
-                raise RuntimeError(f"Groq devolvio respuesta vacia: {data}")
-            extracted = (choices[0].get("message") or {}).get("content") or ""
-            extracted = extracted.strip()
-            if not extracted:
-                raise RuntimeError("Groq devolvio contenido vacio")
-            return extracted
-        elif response.status_code in (413, 429):
-            last_error_text = response.text
-            print(f"Groq {response.status_code} con {current_model}. Intentando fallback...")
+            if response.status_code == 200:
+                data = response.json()
+                choices = data.get("choices") or []
+                if not choices:
+                    raise RuntimeError(f"Groq devolvio respuesta vacia: {data}")
+                extracted = (choices[0].get("message") or {}).get("content") or ""
+                extracted = extracted.strip()
+                if not extracted:
+                    raise RuntimeError("Groq devolvio contenido vacio")
+                return extracted
+            elif response.status_code in (413, 429, 404, 503):
+                last_error_text = response.text
+                print(f"Groq {response.status_code} con {current_model}. Intentando fallback...")
+                continue
+            else:
+                raise RuntimeError(f"Error {response.status_code} de Groq: {response.text}")
+        except httpx.RequestError as e:
+            last_error_text = str(e)
+            print(f"Error de conexion con {current_model}: {e}")
             continue
-        else:
-            raise RuntimeError(f"Groq {response.status_code}: {response.text}")
 
-    raise RuntimeError(f"Groq fallo en todos los modelos disponibles: {last_error_text}")
+    raise RuntimeError(f"Todos los modelos fallaron. Ultimo error: {last_error_text}")
 
 
 def _build_file_generation_prompt(payload: GenerateFileRequest) -> str:
