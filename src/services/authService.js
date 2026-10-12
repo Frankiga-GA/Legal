@@ -1,12 +1,20 @@
 import { supabase } from '../utils/supabase';
 
 export const getCurrentSession = async () => {
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session) return null;
-  return data.session;
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data?.session) return null;
+    return data.session;
+  } catch {
+    return null;
+  }
 };
 
 export const signInWithEmail = async ({ email, password }) => {
+  if (!supabase) {
+    throw new Error('Supabase no está configurado. Revisa tus variables de entorno.');
+  }
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -20,6 +28,9 @@ export const signInWithEmail = async ({ email, password }) => {
 };
 
 export const signInWithGoogle = async () => {
+  if (!supabase) {
+    throw new Error('Supabase no está configurado o no está disponible en este entorno.');
+  }
   try {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',

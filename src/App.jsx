@@ -128,6 +128,21 @@ function App() {
       setSession(nextSession);
       if (!nextSession) return;
 
+      // Detecta errores de OAuth en la URL (ej: redirect_uri_mismatch o unauthorized_client)
+      try {
+        const rawHash = (window.location.hash || '').replace(/^#/, '');
+        const hashParams = new URLSearchParams(rawHash);
+        const searchParams = new URLSearchParams(window.location.search);
+        const oauthError = hashParams.get('error_description') || searchParams.get('error_description') || hashParams.get('error') || searchParams.get('error');
+        if (oauthError) {
+          console.error('[Supabase OAuth Error]:', oauthError);
+          toast.error(`Error en autenticación Google: ${decodeURIComponent(oauthError.replace(/\+/g, ' '))}`);
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      } catch {
+        /* noop */
+      }
+
       setIsLanding(false);
 
       // Detecta si esta pestana es la que abrio el magic link
