@@ -4,6 +4,7 @@ import { getOrCreateCaseFolder, isGoogleDriveConfigured, getStoredDriveToken } f
 
 const normalizeCase = (caseData) => ({
   ...caseData,
+  clientEmail: caseData.clientEmail || caseData.metadata?.client_email || '',
   latestProgress: caseData.latestProgress || 'Sin avance registrado.',
   hearingLink: caseData.hearingLink || '',
   counterparty: caseData.counterparty || '',

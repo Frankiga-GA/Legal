@@ -1,6 +1,6 @@
 // src/components/CreateCaseModal.jsx
 import { useState } from 'react';
-import { X, User, Hash, Briefcase, FileText, Users, ChevronDown } from 'lucide-react';
+import { X, User, Hash, Briefcase, FileText, Users, ChevronDown, Mail } from 'lucide-react';
 
 const CASE_TYPES = [
   { value: 'Laboral',        label: 'Laboral' },
@@ -16,6 +16,7 @@ const CASE_TYPES = [
 const CreateCaseModal = ({ onClose, onSave, initialData = null }) => {
   const [caseId, setCaseId] = useState(initialData?.id || '');
   const [clientName, setClientName] = useState(initialData?.clientName || '');
+  const [clientEmail, setClientEmail] = useState(initialData?.clientEmail || initialData?.metadata?.client_email || '');
   const [dni, setDni] = useState(initialData?.dni || '');
   const [type, setType] = useState(initialData?.type || 'Laboral');
   const [counterparty, setCounterparty] = useState(initialData?.counterparty || '');
@@ -33,6 +34,7 @@ const CreateCaseModal = ({ onClose, onSave, initialData = null }) => {
       ...(initialData || {}),
       id: caseId.trim() || undefined,
       clientName: clientName.trim(),
+      clientEmail: clientEmail.trim(),
       dni: dni.trim(),
       type,
       counterparty: counterparty.trim(),
@@ -107,6 +109,22 @@ const CreateCaseModal = ({ onClose, onSave, initialData = null }) => {
                 placeholder="Nombre y apellido o razon social"
                 className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3.5 pl-12 pr-5 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/30 focus:border-brand-gold/40"
                 required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-brand-accent/70">
+              Correo del Cliente (Gmail para Alertas) <span className="text-brand-accent/40">(opcional)</span>
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-accent/30" />
+              <input
+                type="email"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+                placeholder="cliente@gmail.com"
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] py-3.5 pl-12 pr-5 text-brand-ivory outline-none transition-all placeholder:text-brand-accent/30 focus:border-brand-gold/40"
               />
             </div>
           </div>

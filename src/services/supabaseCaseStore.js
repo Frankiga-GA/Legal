@@ -13,6 +13,7 @@ const getCurrentUserId = async () => {
 const toAppCase = (row) => ({
   id: row.id,
   clientName: row.client_name,
+  clientEmail: row.client_email || row.metadata?.client_email || row.metadata?.clientEmail || '',
   dni: row.dni,
   type: row.type,
   status: row.status,
@@ -30,6 +31,7 @@ const toAppCase = (row) => ({
   specialist: row.specialist || '',
   cuaderno: row.cuaderno || '',
   escritoNro: row.escrito_nro || '',
+  metadata: row.metadata || {},
 });
 
 const toDbCase = (caseData) => ({
@@ -52,6 +54,10 @@ const toDbCase = (caseData) => ({
   specialist: caseData.specialist || '',
   cuaderno: caseData.cuaderno || '',
   escrito_nro: caseData.escritoNro || '',
+  metadata: {
+    ...(caseData.metadata || {}),
+    client_email: caseData.clientEmail || caseData.metadata?.client_email || '',
+  },
   updated_at: new Date().toISOString(),
 });
 

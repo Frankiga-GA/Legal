@@ -757,6 +757,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
               <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <InfoCard icon={User} label="Titular / cliente" value={caseData.clientName} />
                 <InfoCard icon={Calendar} label="Última actualización" value={caseData.lastUpdate} />
+                {caseData.clientEmail && <InfoCard icon={Mail} label="Correo (Alertas Gmail)" value={caseData.clientEmail} />}
                 {caseData.judge && <InfoCard icon={Gavel} label="Juez" value={caseData.judge} />}
                 {caseData.specialist && <InfoCard icon={User} label="Especialista" value={caseData.specialist} />}
                 {caseData.cuaderno && <InfoCard icon={FileText} label="Cuaderno" value={caseData.cuaderno} />}
