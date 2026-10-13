@@ -48,9 +48,9 @@ class ErrorBoundary extends React.Component {
 
 function App() {
   const publicPath = window.location.pathname.replace(/\/+$/, '') || '/';
-  const validTabs = ['case-workspace', 'library', 'ai-chat', 'global-chat', 'elperuano', 'calendar', 'settings'];
+  const validTabs = ['dashboard', 'case-workspace', 'library', 'ai-chat', 'global-chat', 'elperuano', 'calendar', 'settings'];
   const urlTab = publicPath.replace('/', '');
-  const [activeTab, setActiveTab] = useState(validTabs.includes(urlTab) ? urlTab : 'library');
+  const [activeTab, setActiveTab] = useState(validTabs.includes(urlTab) ? urlTab : 'dashboard');
   const [activeCaseId, setActiveCaseId] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -338,6 +338,13 @@ function App() {
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'dashboard': return (
+        <Dashboard
+          setActiveTab={setActiveTab}
+          onOpenCase={(id) => { setActiveCaseId(id); setActiveTab('case-workspace'); }}
+          isDriveConnected={isDriveConnected}
+        />
+      );
       case 'case-workspace': return <CaseWorkspace caseId={activeCaseId} onClose={() => setActiveTab('library')} />;
       case 'library': return <CaseLibrary setActiveTab={setActiveTab} onOpenCase={(id) => { setActiveCaseId(id); setActiveTab('case-workspace'); }} userId={session?.user?.id} focusTab={libraryFocusTab} onFocusTabChange={setLibraryFocusTab} />;
       case 'ai-chat': return <ManagerBot onUseInChat={openGlobalChat} />;

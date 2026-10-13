@@ -4,6 +4,8 @@ import io
 import os
 import re
 import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import unicodedata
 from datetime import datetime
 from pathlib import Path
@@ -224,6 +226,17 @@ class ProcessUrlRequest(BaseModel):
     url: str
     file_name: str
     file_type: str | None = None
+
+
+class EmailAlertRequest(BaseModel):
+    to_email: str
+    client_name: str | None = "Cliente"
+    case_id: str
+    case_title: str | None = ""
+    deadline_title: str
+    deadline_date: str
+    priority: str | None = "Alta"
+    custom_message: str | None = None
 
 
 def _extract_text_from_image(content_bytes: bytes, mime_type: str) -> str:
@@ -881,6 +894,152 @@ async def health_email() -> dict[str, Any]:
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+def _send_gmail_alert(
+    to_email: str,
+    client_name: str,
+    case_id: str,
+    case_title: str,
+    deadline_title: str,
+    deadline_date: str,
+    priority: str = "Alta",
+    custom_message: str | None = None,
+) -> bool:
+    gmail_user = os.getenv("GMAIL_USER")
+    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
+    if not gmail_user or not gmail_pass:
+        raise RuntimeError("Credenciales SMTP de Gmail no configuradas en el backend.")
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"Alerta Procesal: {deadline_title} - Exp. {case_id}"
+    msg["From"] = f"LUSTI Legal <{gmail_user}>"
+    msg["To"] = to_email
+
+    priority_color = "#dc2626" if priority == "Alta" else ("#d97706" if priority == "Media" else "#16a34a")
+
+    safe_title = f"- {case_title}" if case_title else ""
+    custom_block = f"""
+    <div style="background-color: #14171d; border: 1px dashed #374151; border-radius: 8px; padding: 14px; font-size: 13px; color: #d1d5db; margin-top: 18px; line-height: 1.5;">
+      <strong style="color: #c5a059;">Indicaciones del Estudio Jurídico:</strong><br>{custom_message}
+    </div>
+    """ if custom_message else ""
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0c10; color: #f3f4f6; margin: 0; padding: 24px; }}
+        .card {{ background-color: #16181d; border: 1px solid #2d3139; border-radius: 12px; max-width: 600px; margin: 0 auto; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }}
+        .header {{ background: linear-gradient(135deg, #1f242d 0%, #111317 100%); border-bottom: 2px solid #c5a059; padding: 28px; text-align: center; }}
+        .header h1 {{ margin: 0; font-size: 24px; color: #c5a059; letter-spacing: 2px; font-family: Georgia, serif; }}
+        .header p {{ margin: 6px 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #9ca3af; }}
+        .content {{ padding: 28px; }}
+        .greeting {{ font-size: 16px; color: #ffffff; margin-bottom: 16px; }}
+        .alert-box {{ background-color: #1f2229; border-left: 4px solid {priority_color}; border-radius: 8px; padding: 18px; margin: 20px 0; }}
+        .field {{ margin-bottom: 12px; font-size: 14px; }}
+        .field:last-child {{ margin-bottom: 0; }}
+        .label {{ color: #9ca3af; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }}
+        .value {{ color: #ffffff; font-weight: 600; font-size: 15px; margin-top: 2px; }}
+        .badge {{ display: inline-block; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: bold; background-color: {priority_color}22; color: {priority_color}; border: 1px solid {priority_color}55; }}
+        .footer {{ border-top: 1px solid #262930; padding: 20px 28px; text-align: center; font-size: 12px; color: #6b7280; line-height: 1.6; background-color: #0f1115; }}
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="header">
+          <h1>LUSTI</h1>
+          <p>Plataforma de Inteligencia Legal | J&N Asesoría Legal</p>
+        </div>
+        <div class="content">
+          <p class="greeting">Estimado(a) <strong>{client_name}</strong>,</p>
+          <p style="font-size: 14px; color: #d1d5db; line-height: 1.6; margin-bottom: 18px;">
+            Le enviamos este aviso oficial para recordarle la proximidad de un término procesal de su expediente judicial monitoreado en nuestra plataforma:
+          </p>
+          
+          <div class="alert-box">
+            <div class="field">
+              <div class="label">Expediente / Caso</div>
+              <div class="value">{case_id} {safe_title}</div>
+            </div>
+            <div class="field">
+              <div class="label">Acto Procesal / Vencimiento</div>
+              <div class="value">{deadline_title}</div>
+            </div>
+            <div class="field">
+              <div class="label">Fecha Límite</div>
+              <div class="value" style="color: #fbbf24;">📅 {deadline_date}</div>
+            </div>
+            <div class="field">
+              <div class="label">Prioridad Procesal</div>
+              <div style="margin-top: 4px;"><span class="badge">{priority}</span></div>
+            </div>
+          </div>
+
+          {custom_block}
+
+          <p style="font-size: 13px; color: #9ca3af; margin-top: 24px; line-height: 1.5;">
+            Nuestro equipo legal se encuentra realizando las actuaciones correspondientes. Si cuenta con documentación adicional que aportar o requiere una reunión de coordinación, responda a este correo o comuníquese con su abogado asignado.
+          </p>
+        </div>
+        <div class="footer">
+          Mensaje emitido automáticamente por <strong>LUSTI Legal</strong> en nombre de su estudio jurídico.<br>
+          Este correo contiene información confidencial sujeta al secreto profesional abogado-cliente.
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+
+    plain_content = (
+        f"Alerta Procesal: {deadline_title}\n"
+        f"Expediente: {case_id} {safe_title}\n"
+        f"Fecha límite: {deadline_date}\n"
+        f"Prioridad: {priority}\n\n"
+        f"{custom_message or ''}\n\n"
+        f"LUSTI Legal | J&N Asesoría Legal"
+    )
+
+    part_text = MIMEText(plain_content, "plain", "utf-8")
+    part_html = MIMEText(html_content, "html", "utf-8")
+
+    msg.attach(part_text)
+    msg.attach(part_html)
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as server:
+        server.login(gmail_user, gmail_pass)
+        server.sendmail(gmail_user, [to_email], msg.as_string())
+
+    return True
+
+
+@app.post("/notifications/send-email")
+def send_email_alert(
+    payload: EmailAlertRequest,
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    check_rate_limit(user.user_id, limit=30, period=60)
+    try:
+        _send_gmail_alert(
+            to_email=payload.to_email,
+            client_name=payload.client_name or "Cliente",
+            case_id=payload.case_id,
+            case_title=payload.case_title or "",
+            deadline_title=payload.deadline_title,
+            deadline_date=payload.deadline_date,
+            priority=payload.priority or "Alta",
+            custom_message=payload.custom_message,
+        )
+        return {
+            "success": True,
+            "message": f"Alerta enviada exitosamente a {payload.to_email}",
+            "recipient": payload.to_email,
+        }
+    except Exception as e:
+        print(f"Error enviando correo de alerta: {e}")
+        raise HTTPException(status_code=500, detail=f"No se pudo enviar el correo de alerta: {str(e)}")
 
 
 @app.post("/upload")

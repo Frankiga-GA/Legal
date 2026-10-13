@@ -200,3 +200,32 @@ export const generateDocumentFile = async ({
     fileName: headerName || match?.[1] || `documento-lusti.${outputFormat}`,
   };
 };
+
+export const sendDeadlineEmailAlert = async ({
+  toEmail,
+  clientName = 'Cliente',
+  caseId,
+  caseTitle = '',
+  deadlineTitle,
+  deadlineDate,
+  priority = 'Alta',
+  customMessage = '',
+}) => {
+  const headers = await authHeaders({ 'Content-Type': 'application/json' });
+  const response = await fetchWithTimeout(`${backendUrl}/notifications/send-email`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      to_email: toEmail,
+      client_name: clientName,
+      case_id: caseId,
+      case_title: caseTitle,
+      deadline_title: deadlineTitle,
+      deadline_date: deadlineDate,
+      priority,
+      custom_message: customMessage,
+    }),
+  }, 20000);
+
+  return handleJsonResponse(response, '/notifications/send-email');
+};

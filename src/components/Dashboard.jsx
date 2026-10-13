@@ -17,11 +17,14 @@ import {
   Scale,
   SearchCheck,
   UploadCloud,
+  Mail,
 } from 'lucide-react';
 import { getCases, loadCases } from '../services/caseStore';
+import EmailAlertModal from './EmailAlertModal';
 
-const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
+const Dashboard = ({ setActiveTab, onOpenCase, isDriveConnected = false }) => {
   const [cases, setCases] = useState(() => getCases());
+  const [selectedDeadlineToNotify, setSelectedDeadlineToNotify] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -207,7 +210,7 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
               {priorityCases.length ? priorityCases.map((caseItem) => (
                 <button
                   key={caseItem.id}
-                  onClick={() => setActiveTab('library')}
+                  onClick={() => onOpenCase ? onOpenCase(caseItem.id) : setActiveTab('library')}
                   className="grid gap-4 rounded-lg border border-white/[0.05] bg-white/[0.018] p-4 text-left transition-all hover:border-brand-gold/30 hover:bg-white/[0.035] lg:grid-cols-[1fr_160px_150px]"
                 >
                   <div className="min-w-0">
@@ -258,7 +261,12 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
               </div>
               <div className="space-y-3">
                 {upcomingDeadlines.length > 0 ? upcomingDeadlines.slice(0, 4).map((item) => (
-                  <DeadlineItem key={item.id} item={item} />
+                  <DeadlineItem
+                    key={item.id}
+                    item={item}
+                    onNotify={(deadItem) => setSelectedDeadlineToNotify(deadItem)}
+                    onOpenCase={onOpenCase}
+                  />
                 )) : (
                   <EmptyState
                     icon={CalendarClock}
@@ -351,6 +359,13 @@ const Dashboard = ({ setActiveTab, isDriveConnected = false }) => {
           </div>
         </section>
       </div>
+
+      {/* Modal para enviar alerta oficial por Gmail */}
+      <EmailAlertModal
+        isOpen={Boolean(selectedDeadlineToNotify)}
+        onClose={() => setSelectedDeadlineToNotify(null)}
+        initialData={selectedDeadlineToNotify || {}}
+      />
     </div>
   );
 };
@@ -378,20 +393,37 @@ const MetricCard = ({ title, value, detail, icon: Icon, tone }) => {
   );
 };
 
-const DeadlineItem = ({ item }) => (
-  <div className="rounded-lg border border-white/[0.05] bg-brand-black/30 p-4">
+const DeadlineItem = ({ item, onNotify, onOpenCase }) => (
+  <div className="rounded-lg border border-white/[0.05] bg-brand-black/30 p-4 transition-all hover:border-white/[0.1]">
     <div className="flex items-start justify-between gap-3">
-      <div>
-        <p className="text-sm font-semibold text-brand-ivory">{item.title}</p>
-        <p className="mt-1 text-xs text-brand-accent">{item.caseId} - {item.clientName}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-brand-ivory truncate">{item.title}</p>
+        <button
+          onClick={() => onOpenCase && onOpenCase(item.caseId)}
+          className="mt-1 text-xs text-brand-accent hover:text-brand-gold transition-colors text-left truncate block"
+          title="Abrir expediente"
+        >
+          {item.caseId} • {item.clientName}
+        </button>
       </div>
-      <span className={`text-xs font-bold ${getPriorityTextClass(item.priority)}`}>
+      <span className={`text-xs font-bold shrink-0 ${getPriorityTextClass(item.priority)}`}>
         {item.priority || 'Media'}
       </span>
     </div>
-    <div className="mt-3 flex items-center gap-2 text-xs text-brand-gold">
-      <CalendarClock className="h-3.5 w-3.5" />
-      {item.due}
+    <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-white/[0.04]">
+      <div className="flex items-center gap-1.5 text-xs text-brand-gold font-medium">
+        <CalendarClock className="h-3.5 w-3.5" />
+        {item.due}
+      </div>
+      <button
+        type="button"
+        onClick={() => onNotify && onNotify(item)}
+        className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-300 hover:bg-amber-500/20 transition-all shadow-sm"
+        title="Enviar alerta por Gmail al cliente"
+      >
+        <Mail className="h-3 w-3" />
+        <span>Notificar Gmail</span>
+      </button>
     </div>
   </div>
 );

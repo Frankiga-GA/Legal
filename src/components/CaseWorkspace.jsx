@@ -15,6 +15,7 @@ import {
   Hash,
   Library,
   Loader2,
+  Mail,
   MessageSquare,
   PenLine,
   Pencil,
@@ -42,6 +43,7 @@ import CitationPanel from './CitationPanel';
 import DocumentWriter from './DocumentWriter';
 import DocumentPreviewModal from './DocumentPreviewModal';
 import DriveFilePicker from './DriveFilePicker';
+import EmailAlertModal from './EmailAlertModal';
 import { collectCitations } from '../utils/citationParser';
 import { syncDeadlinesToCalendar } from '../services/googleCalendarService';
 import { getStoredDriveToken, isGoogleDriveConfigured, getOrCreateCaseFolder, uploadFileToDrive } from '../services/googleDriveService';
@@ -81,6 +83,7 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
   const [documentUploadStatus, setDocumentUploadStatus] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [deadlineForm, setDeadlineForm] = useState({ title: '', date: '', priority: 'Media' });
+  const [selectedDeadlineToNotify, setSelectedDeadlineToNotify] = useState(null);
 
   // Right panel AI State
   const [aiInput, setAiInput] = useState('');
@@ -966,6 +969,18 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
                               {isDone ? 'Hecho' : item.priority}
                             </span>
                             <button
+                              onClick={() => setSelectedDeadlineToNotify({
+                                ...item,
+                                caseId: caseData.id,
+                                clientName: caseData.clientName,
+                                clientEmail: caseData.clientEmail,
+                              })}
+                              className="rounded p-2 text-brand-accent transition-colors hover:bg-amber-500/10 hover:text-amber-300"
+                              title="Enviar notificación oficial por Gmail al cliente"
+                            >
+                              <Mail className="h-4 w-4" />
+                            </button>
+                            <button
                               onClick={() => handleDeleteDate(item.id)}
                               className="rounded p-2 text-brand-accent opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
                               title="Eliminar plazo"
@@ -1272,6 +1287,13 @@ const CaseWorkspace = ({ caseId, onClose, session }) => {
           onClose={() => setShowDrivePicker(false)}
         />
       )}
+
+      {/* Modal para enviar alerta oficial por Gmail */}
+      <EmailAlertModal
+        isOpen={Boolean(selectedDeadlineToNotify)}
+        onClose={() => setSelectedDeadlineToNotify(null)}
+        initialData={selectedDeadlineToNotify || {}}
+      />
 
       {/* Confirmacion de eliminacion */}
       {deleteConfirm && (

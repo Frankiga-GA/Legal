@@ -13,6 +13,7 @@ import ThemeToggle from './ThemeToggle';
 
 const Sidebar = ({ activeTab, setActiveTab, onHome, onLogout, userEmail, collapsed = false, onToggleCollapse, showDrive = false }) => {
   const primaryItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'library', label: 'Mis Expedientes', icon: FileText },
     { id: 'ai-chat', label: 'Consultar', icon: MessageSquare },
     { id: 'calendar', label: 'Agenda', icon: CalendarDays },
