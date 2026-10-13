@@ -474,6 +474,7 @@ const getUpcomingDeadlines = (cases) => {
         id: `${caseItem.id}-${dateItem.id || dateItem.title}`,
         caseId: caseItem.id,
         clientName: caseItem.clientName,
+        clientEmail: caseItem.clientEmail || caseItem.metadata?.client_email || '',
         parsedDate,
         daysUntil,
         due: formatDueDate(daysUntil, dateItem.date),
