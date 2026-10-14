@@ -480,8 +480,13 @@ const getUpcomingDeadlines = (cases) => {
         due: formatDueDate(daysUntil, dateItem.date),
       };
     }))
-    .filter((item) => item.date && !Number.isNaN(item.parsedDate.getTime()) && item.daysUntil >= 0)
-    .sort((a, b) => a.parsedDate - b.parsedDate);
+    .filter((item) => item.date && !Number.isNaN(item.parsedDate.getTime()) && item.daysUntil >= 0 && item.status !== 'Completado')
+    .sort((a, b) => {
+      const dateDiff = a.parsedDate - b.parsedDate;
+      if (dateDiff !== 0) return dateDiff;
+      const weight = { Alta: 3, Media: 2, Normal: 1, Baja: 1 };
+      return (weight[b.priority] || 0) - (weight[a.priority] || 0);
+    });
   };
 
 const buildPriorityCases = (cases, deadlines) => {
