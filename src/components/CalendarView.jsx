@@ -85,9 +85,10 @@ const collectDeadlines = (cases) => {
   const events = [];
   cases.forEach((caso) => {
     if (!Array.isArray(caso.importantDates)) return;
-    caso.importantDates.forEach((d) => {
+    caso.importantDates.forEach((d, idx) => {
       events.push({
         ...d,
+        id: d.id || `${caso.id}-${d.title || 'deadline'}-${d.date}-${idx}`,
         caseId: caso.id,
         caseName: caso.clientName,
         caseType: caso.type,
