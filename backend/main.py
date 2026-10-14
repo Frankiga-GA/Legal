@@ -6,6 +6,7 @@ import re
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 import unicodedata
 from datetime import datetime
 from pathlib import Path
@@ -913,7 +914,8 @@ def _send_gmail_alert(
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"Alerta Procesal: {deadline_title} - Exp. {case_id}"
-    msg["From"] = f"LUSTI Legal <{gmail_user}>"
+    msg["From"] = formataddr(("LUSTI Legal", gmail_user))
+    msg["Reply-To"] = gmail_user
     msg["To"] = to_email
 
     priority_color = "#dc2626" if priority == "Alta" else ("#d97706" if priority == "Media" else "#16a34a")
